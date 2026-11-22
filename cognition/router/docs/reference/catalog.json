@@ -4317,6 +4317,103 @@
         "columns": [
           {
             "default": null,
+            "description": "Canonical model id (models.canonical).",
+            "name": "model_id",
+            "nullable": false,
+            "type": "text"
+          },
+          {
+            "default": null,
+            "description": "Largest input window any source announces (tokens).",
+            "name": "context_length",
+            "nullable": true,
+            "type": "integer"
+          },
+          {
+            "default": null,
+            "description": "Largest answer any source allows (tokens); null = not published.",
+            "name": "max_output_tokens",
+            "nullable": true,
+            "type": "integer"
+          },
+          {
+            "default": null,
+            "description": "What it reads: text, image, audio, video, file.",
+            "name": "input_modalities",
+            "nullable": true,
+            "type": "text[]"
+          },
+          {
+            "default": null,
+            "description": "What it writes: text, image, audio…",
+            "name": "output_modalities",
+            "nullable": true,
+            "type": "text[]"
+          },
+          {
+            "default": null,
+            "description": "Request parameters supported (tools, response_format, structured_outputs, reasoning, n, logprobs…), union of its routes.",
+            "name": "parameters",
+            "nullable": true,
+            "type": "text[]"
+          },
+          {
+            "default": null,
+            "description": "Reasoning efforts it accepts (none, low, medium, high, xhigh, max…).",
+            "name": "reasoning_efforts",
+            "nullable": true,
+            "type": "text[]"
+          },
+          {
+            "default": null,
+            "description": "Effort used when none is asked.",
+            "name": "reasoning_default",
+            "nullable": true,
+            "type": "text"
+          },
+          {
+            "default": null,
+            "description": "Training data cutoff as published by a source.",
+            "name": "knowledge_cutoff",
+            "nullable": true,
+            "type": "text"
+          },
+          {
+            "default": null,
+            "description": "Date its provider will retire it, when announced.",
+            "name": "expires",
+            "nullable": true,
+            "type": "text"
+          },
+          {
+            "default": "'{}'::jsonb",
+            "description": "{field: [source…]}: which catalogue said each value.",
+            "name": "sources",
+            "nullable": false,
+            "type": "jsonb"
+          },
+          {
+            "default": "now()",
+            "description": "When the cycle last rebuilt this row.",
+            "name": "updated_at",
+            "nullable": false,
+            "type": "timestamp with time zone"
+          }
+        ],
+        "constraints": [
+          "PRIMARY KEY (model_id)"
+        ],
+        "description": "What each model can do, from its providers' free catalogues (OpenRouter models list, Codex account catalogue), rebuilt each cycle by analysis/details.py; the widest value of its sources wins.",
+        "indexes": [
+          "CREATE UNIQUE INDEX model_details_pkey ON models.model_details USING btree (model_id)"
+        ],
+        "kind": "r",
+        "name": "model_details"
+      },
+      {
+        "columns": [
+          {
+            "default": null,
             "description": "Identifiant canonique du modèle dans le catalogue du routeur.",
             "name": "model_id",
             "nullable": true,
@@ -4738,6 +4835,110 @@
         ],
         "kind": "r",
         "name": "plan_evidence"
+      },
+      {
+        "columns": [
+          {
+            "default": null,
+            "description": "Router task (poste), as the gateway journal names it before its /level.",
+            "name": "task",
+            "nullable": false,
+            "type": "text"
+          },
+          {
+            "default": "''::text",
+            "description": "L1/L2/L3 for a text tier, empty for a poste without levels.",
+            "name": "level",
+            "nullable": false,
+            "type": "text"
+          },
+          {
+            "default": "0",
+            "description": "Successful real calls seen in the window.",
+            "name": "calls",
+            "nullable": false,
+            "type": "integer"
+          },
+          {
+            "default": null,
+            "description": "Days of journal read.",
+            "name": "window_days",
+            "nullable": false,
+            "type": "integer"
+          },
+          {
+            "default": "'{}'::jsonb",
+            "description": "{part type: share of calls} beyond text (image_url, input_audio, file…).",
+            "name": "inputs",
+            "nullable": false,
+            "type": "jsonb"
+          },
+          {
+            "default": null,
+            "description": "Share of calls that give the model tools.",
+            "name": "tools_share",
+            "nullable": true,
+            "type": "double precision"
+          },
+          {
+            "default": null,
+            "description": "Share of calls that ask for a JSON answer (response_format).",
+            "name": "json_share",
+            "nullable": true,
+            "type": "double precision"
+          },
+          {
+            "default": null,
+            "description": "Most answers asked in one call (n).",
+            "name": "max_n",
+            "nullable": true,
+            "type": "integer"
+          },
+          {
+            "default": null,
+            "description": "95th percentile of the input size (tokens).",
+            "name": "input_tokens_p95",
+            "nullable": true,
+            "type": "integer"
+          },
+          {
+            "default": null,
+            "description": "Largest input seen (tokens): a challenger's context must hold it.",
+            "name": "input_tokens_max",
+            "nullable": true,
+            "type": "integer"
+          },
+          {
+            "default": null,
+            "description": "Longest answer seen (tokens).",
+            "name": "output_tokens_max",
+            "nullable": true,
+            "type": "integer"
+          },
+          {
+            "default": null,
+            "description": "Question kinds the decision modules ask (choice, noul, multiple, spans…).",
+            "name": "decision_kinds",
+            "nullable": true,
+            "type": "text[]"
+          },
+          {
+            "default": "now()",
+            "description": "When the cycle last rebuilt this row.",
+            "name": "updated_at",
+            "nullable": false,
+            "type": "timestamp with time zone"
+          }
+        ],
+        "constraints": [
+          "PRIMARY KEY (task, level)"
+        ],
+        "description": "What each poste really uses, rebuilt each cycle by analysis/needs.py from the walter-llm journal (counts only) and the declared Walter Decision needs; models.model_details says whether a challenger can do it.",
+        "indexes": [
+          "CREATE UNIQUE INDEX poste_needs_pkey ON models.poste_needs USING btree (task, level)"
+        ],
+        "kind": "r",
+        "name": "poste_needs"
       },
       {
         "columns": [
@@ -6035,6 +6236,32 @@
         ]
       },
       {
+        "description": "What each model can do (models.model_details), from catalogues the cycle already reads — no extra call, nothing",
+        "file": "analysis/details.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "_openrouter",
+            "signature": "m: dict"
+          },
+          {
+            "description": "",
+            "name": "_ids",
+            "signature": "conn, sid: int, provider: str"
+          },
+          {
+            "description": "",
+            "name": "collect",
+            "signature": "conn"
+          },
+          {
+            "description": "",
+            "name": "refresh",
+            "signature": "conn"
+          }
+        ]
+      },
+      {
         "description": "One JSON dossier per task, rebuilt at every refresh (models.dossiers): everything the router / orchestrator",
         "file": "analysis/dossier.py",
         "functions": [
@@ -6271,6 +6498,52 @@
             "description": "",
             "name": "short_modes",
             "signature": "modes: list[str]"
+          }
+        ]
+      },
+      {
+        "description": "What each poste really uses (models.poste_needs) and whether a challenger can do it (owner 2026-11-22: D1.2 Ultra",
+        "file": "analysis/needs.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "_journal_lines",
+            "signature": "tail_bytes: int=TAIL_BYTES"
+          },
+          {
+            "description": "",
+            "name": "_split",
+            "signature": "task: str"
+          },
+          {
+            "description": "",
+            "name": "observed",
+            "signature": "window_days: int=WINDOW_DAYS, lines: list[bytes] | None=None"
+          },
+          {
+            "description": "",
+            "name": "declared_decision_kinds",
+            "signature": ""
+          },
+          {
+            "description": "",
+            "name": "refresh",
+            "signature": "conn, window_days: int=WINDOW_DAYS"
+          },
+          {
+            "description": "What the poste uses that `model_id` keeps, loses, or no free catalogue says. -> {\"kept\", \"lost\", \"unknown\"},",
+            "name": "fit",
+            "signature": "conn, task: str, model_id: str, level: str | None=None"
+          },
+          {
+            "description": "",
+            "name": "_features",
+            "signature": "d: dict | None"
+          },
+          {
+            "description": "The poste's real use checked on the challenger (`fit`), plus what the current model can do that the challenger",
+            "name": "compare",
+            "signature": "conn, task: str, challenger: str, current: str | None, level: str | None=None"
           }
         ]
       },
@@ -7297,6 +7570,11 @@
             "signature": ""
           },
           {
+            "description": "The walter-llm journal, resolved as the gateway does: the instance's config/llm/gateway.json first, the shipped",
+            "name": "gateway_journal",
+            "signature": ""
+          },
+          {
             "description": "",
             "name": "_expand",
             "signature": "value: str"
@@ -7999,6 +8277,16 @@
             "signature": ""
           },
           {
+            "description": "What a call asks of its model, without its content (owner 2026-11-22: a challenger is judged against what each",
+            "name": "request_needs",
+            "signature": "body: dict"
+          },
+          {
+            "description": "The same counts for a typed decision: media beside the state, samples, question kinds (never the state).",
+            "name": "decision_needs",
+            "signature": "body: dict"
+          },
+          {
             "description": "",
             "name": "json_instruction",
             "signature": "fmt: dict"
@@ -8398,9 +8686,19 @@
             "signature": "entries: list"
           },
           {
-            "description": "Model slugs the account may run (first client version that answers a non-empty list).",
+            "description": "The account's catalogue entries (first client version that answers a non-empty list): slugs and what each",
+            "name": "catalog_entries",
+            "signature": ""
+          },
+          {
+            "description": "Model slugs the account may run.",
             "name": "catalog",
             "signature": ""
+          },
+          {
+            "description": "{slug: what it accepts}, kept with the catalogue snapshot (models.model_details).",
+            "name": "details",
+            "signature": "entries: list"
           },
           {
             "description": "Quota windows of a /wham/usage answer, named by their published duration (position only as fallback).",
@@ -8805,6 +9103,11 @@
             "description": "",
             "name": "_family",
             "signature": "model_id: str"
+          },
+          {
+            "description": "« Le haut du panier » (owner 2026-11-21: « que la partie agentique ne s'éparpille pas sur des modèles inutiles,",
+            "name": "basket",
+            "signature": "conn, board_top: int=BOARD_TOP, aa_top: int=AA_TOP"
           },
           {
             "description": "A model that beats one of the owner's choices on a board but has no offer: often the same model sold under",
@@ -9692,6 +9995,11 @@
         "file": "serve/execution.py",
         "functions": [
           {
+            "description": "GPT models Kie's Codex API serves, as its free model list last said (2026-11-22: the list written by hand on",
+            "name": "kie_codex_models",
+            "signature": ""
+          },
+          {
             "description": "(Hermes provider, model id at that provider, status key) or None when Hermes cannot run this offer.",
             "name": "_runnable",
             "signature": "offer: dict"
@@ -9742,22 +10050,32 @@
             "signature": "conn, entry: dict"
           },
           {
-            "description": "The provider's own reason when an HTTP 200 stream ends on an error event (Kie: « no_available_account »).",
-            "name": "_stream_error",
-            "signature": "data: bytes"
-          },
-          {
             "description": "Kie's media API (video, image, music tasks) is another service than its Claude chat API: usable when the",
             "name": "_kie_media",
             "signature": "kie: str"
           },
           {
-            "description": "POST and read the whole answer (SSE included); ok = HTTP 200, non-empty, containing `must` when given",
-            "name": "_post",
-            "signature": "url: str, body: dict, headers: dict, timeout: int | None=None, must: str | None=None"
+            "description": "Free liveness check of a paid chat endpoint (owner 2026-11-21: « la vérification du modèle et du provider doit",
+            "name": "_refused",
+            "signature": "url: str, body: dict, headers: dict"
           },
           {
-            "description": "Tiny live call per API provider (max 5 output tokens, streamed when the provider streams for Hermes).",
+            "description": "",
+            "name": "_get_json",
+            "signature": "url: str, headers: dict"
+          },
+          {
+            "description": "",
+            "name": "_journal_provider",
+            "signature": "entry: dict"
+          },
+          {
+            "description": "Providers whose `last` most recent REAL calls (the gateway journal, within window_h) all failed: the free check",
+            "name": "recent_failures",
+            "signature": "window_h: float=24, last: int=3, tail_bytes: int=4000000"
+          },
+          {
+            "description": "Free check per API provider: never a generation, never a billed token (owner 2026-11-21). Account and credit",
             "name": "probe",
             "signature": "conn, only: str | None=None, timeout: int=90"
           }
@@ -15480,6 +15798,36 @@
       },
       {
         "comment": "",
+        "file": "analysis/details.py",
+        "name": "LISTS",
+        "value": [
+          "input_modalities",
+          "output_modalities",
+          "parameters",
+          "reasoning_efforts"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "analysis/details.py",
+        "name": "NUMBERS",
+        "value": [
+          "context_length",
+          "max_output_tokens"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "analysis/details.py",
+        "name": "TEXTS",
+        "value": [
+          "reasoning_default",
+          "knowledge_cutoff",
+          "expires"
+        ]
+      },
+      {
+        "comment": "",
         "file": "analysis/dossier.py",
         "name": "RULES",
         "value": [
@@ -15606,6 +15954,63 @@
           "t2i": "texte→image",
           "t2v": "texte→vidéo",
           "v2v": "vidéo→vidéo"
+        }
+      },
+      {
+        "comment": "",
+        "file": "analysis/needs.py",
+        "name": "WINDOW_DAYS",
+        "value": 14
+      },
+      {
+        "comment": "",
+        "file": "analysis/needs.py",
+        "name": "TAIL_BYTES",
+        "value": 40000000
+      },
+      {
+        "comment": "",
+        "file": "analysis/needs.py",
+        "name": "SCALARS",
+        "value": [
+          "format",
+          "kinds",
+          "logprobs",
+          "max_completion_tokens",
+          "max_tokens",
+          "n",
+          "tools"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "analysis/needs.py",
+        "name": "PART_TO_MODALITY",
+        "value": {
+          "audio": "audio",
+          "file": "file",
+          "image": "image",
+          "image_url": "image",
+          "input_audio": "audio",
+          "input_file": "file",
+          "input_image": "image",
+          "video": "video",
+          "video_url": "video"
+        }
+      },
+      {
+        "comment": "",
+        "file": "analysis/needs.py",
+        "name": "FEATURES",
+        "value": {
+          "audio": "entend l'audio",
+          "file": "lit les fichiers",
+          "image": "lit les images",
+          "n": "plusieurs réponses par appel",
+          "reasoning": "raisonnement réglable",
+          "structured_outputs": "JSON strict",
+          "tools": "outils",
+          "video": "lit la vidéo"
         }
       },
       {
@@ -17774,6 +18179,18 @@
         ]
       },
       {
+        "comment": "the leaders of each poste's reference board",
+        "file": "research/agent/review.py",
+        "name": "BOARD_TOP",
+        "value": 5
+      },
+      {
+        "comment": "the leaders of AA Intelligence (the general text index)",
+        "file": "research/agent/review.py",
+        "name": "AA_TOP",
+        "value": 15
+      },
+      {
         "comment": "",
         "file": "research/benchmarks/aa.py",
         "name": "AA_MODEL_URL",
@@ -18552,15 +18969,24 @@
         "file": "serve/execution.py",
         "name": "KIE_CODEX_MODELS",
         "value": [
+          "gpt-5-4",
           "gpt-5-5",
           "gpt-5-6-luna",
           "gpt-5-6-sol",
           "gpt-5-6-terra",
           "gpt-6-1-sol",
+          "gpt-6-1-terra",
+          "gpt-6-2-astra",
+          "gpt-6-2-sol",
           "gpt-6-astra",
-          "gpt-6-luna",
           "gpt-6-sol"
         ]
+      },
+      {
+        "comment": "",
+        "file": "serve/execution.py",
+        "name": "KIE_CODEX_STATE",
+        "value": "kie-codex-models.json"
       },
       {
         "comment": "owner, 2026-11-21: OpenRouter is used to its last cent; the guardian warns at CREDIT_STEPS_USD",
@@ -18569,7 +18995,7 @@
         "value": 0.0
       },
       {
-        "comment": "a 5-token probe slower than this = degraded (Kie Claude took 64 s on 2026-10-02)",
+        "comment": "a free check slower than this = degraded (Kie Claude took 64 s for 5 tokens on 2026-10-02)",
         "file": "serve/execution.py",
         "name": "SLOW_MS",
         "value": 30000
@@ -19050,13 +19476,6 @@
       },
       {
         "default_expression": "aucun",
-        "description": "Nom d'accès fournisseur (autorisation venice, lecteurs llm et router) ; jamais affiché.",
-        "file": "serve/execution.py",
-        "name": "VENICE_API_KEY",
-        "operation": "secret_value"
-      },
-      {
-        "default_expression": "aucun",
         "description": "Identifiant du compte pour la voie de décision configurée ; valeur privée hors documentation.",
         "file": "serve/intent.py",
         "name": "CLOUDFLARE_ACCOUNT_ID",
@@ -19173,7 +19592,6 @@
       "KIE_API_KEY",
       "OPENROUTER_API_KEY",
       "PYTEST_CURRENT_TEST",
-      "VENICE_API_KEY",
       "WALTER_DATABASE_URL_FILE",
       "WALTER_DELEGATION_DEPTH",
       "WALTER_ENGINE_API_URL",
@@ -19240,16 +19658,18 @@
     "analysis/catalog.py": "cb98f053933981ee20acea0410a31484acf988a8144fd34a680b6e61a8b4828f",
     "analysis/changes.py": "c6b4f850da513c8e1cab96a351670b0e41292ffee0079b716c905da587d90358",
     "analysis/decision_pareto.py": "7b6baccc8f2b924fef703c7f49ab97f81620f3de58f84a58d7048f4721fa5e9d",
+    "analysis/details.py": "83aedb38a5b8907394580744c5dd41c8287576184fc6fd00ad689fa10fdc9016",
     "analysis/dossier.py": "31cb4cdb76c9ada3510f040f9dd8fc30861d25b44a97db3add8a563cae4e2872",
     "analysis/identity.py": "06626cefaeea94adda2153e9b7400ab948b5bece0a821b36211546f00e8aca9f",
     "analysis/ingest.py": "d952e8f16448734710ec8d64667ce2124b422f0de0309065a64881074afa18af",
     "analysis/knowledge.py": "3a8059a56f954abfa97b46a4d965cf11a6723d4d8e8bd424028f4dd0dfd75891",
     "analysis/media.py": "c61030754e36087f9b9b4caf86641ec786e97eccf3b33345d04b5f2d7eb1b267",
+    "analysis/needs.py": "41cd451ef459fd5d79e3b989a863b910fb73137c742459ed937528a30f35b639",
     "analysis/pareto.py": "00621f7e0584567022991ee1bd154dfe15b64b9443dd0c89a6faf26f11d23f0f",
     "analysis/parse.py": "6d1401b7a53c05e26f58e17084a5738e175c20c28a90f0d9ba223d7f1797349b",
     "analysis/postes.py": "8871b0214df0a72334179b1fc575af74452a4608c786200ca5170a2bce996fd1",
     "analysis/recommend.py": "5ebce883dd37252539473671120c439012e46cd6a2497954c0e08fbb62e64ece",
-    "analysis/refresh.py": "047e8a1cd50ea4c52ce3947ea9f702f00c18d3288a7c87ff3234d6eaed5b9906",
+    "analysis/refresh.py": "afdff1865c74139851fb1daf4b0cfeed84e1fe3dae776f880d77dbcfcb869435",
     "analysis/scoring.py": "f7abdc1a829b85eee3dff891f081fac36bbdde710fdbc614e10bf271e4e9b557",
     "analysis/select.py": "39ad5f96af616cd95209b22ee6f4f77c62be760cf7efa614e775bf6065390624",
     "analysis/telegram.py": "5e444d17241f9a3d7446dda2c30da6ddd65cd7f0f8cbac8aac13a7e1e537a10f",
@@ -19274,14 +19694,14 @@
     "documentation.py": "2c37ce0d6189e2551eb7b85ed70060fdd196ed6ef36f420bcb6b1e8e1e9e448c",
     "guardian/__init__.py": "a28ff92bf9c1254bad5416a6139b10f03a3cfedd0955894a65d042960b4ee587",
     "guardian/__main__.py": "507846e4c26dd1f427861a627daa6a4aea91e91710ed1640405f1e074d11b064",
-    "guardian/advice.py": "1d64179e24257d9a431f15e957d5981881598b04d60be58c3f57a28bdd556c49",
+    "guardian/advice.py": "cdbfe137ef4011547e044e6fd8ea3c6035f1102a01fb85a681447ffd43736297",
     "guardian/agent.py": "45b543d716f8f97eb5584e0f90fda2b3da8175cbfbb189fbeba8505def0b438d",
     "guardian/checks.py": "510e008432bbcf0c31287163bed9afdf42242380486fc6039b86dd7eba51f341",
     "guardian/playbook.json": "dd413285fa40d68b4539bd2469a74d825dd576cf03910add0a47ff5cb5fda5e6",
     "guardian/repair.py": "50604a48872e4684ba7a8cbe031eafde5ec7cbfe1c04697927dd9447d3dd29cd",
     "guardian/run.py": "58e51e4199d184c4213eae760cd9407c4b7cf081f86d1fa04c55127a05064fc3",
     "health.py": "aeb89568df1f3c699a749117efac4c6d7074edc441b57de32672f50dbf38eac8",
-    "instance.py": "81fc40b3bf9914f5246d0bb16f0a750141432127b6e03716546aebfc6f991724",
+    "instance.py": "244c85216abba400abdfbfa396139c66e68c8fbdf0991562e053cca7406947f7",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
     "interface/library.py": "813c6a027d1cd98e071dedc1f9f3200c779d1dbf90b82e8078f514b51f1971e0",
     "interface/page.py": "87621c2bb25bd00dee5a9e2c90a8ec40b97fdaa7505d8746072d9f63dc44b320",
@@ -19297,13 +19717,13 @@
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
     "llm/decision.py": "999ffcf20c7a4598878369e9ad5439b0113b6a0d1b77bf7b0124c44557aba305",
-    "llm/gateway.py": "79c803972062badb5d04b371f24966f702b721e7f5e9397dc7ae8100990eccda",
+    "llm/gateway.py": "343f4f60a24e6d9e5d6c7e2233e0c802f6d46264ecfd452d61cc0eebc32f1f68",
     "llm/resolver.py": "cd04d0c818891381f988d044cc910902ec3fc11e1d1401ad16190e601935d188",
     "llm/structured.py": "4a8e241f6033f6e61753d6090dbc920d28a4fdcf45150140d70fdf169ff742da",
     "llm/transcription.py": "6ab3be5f2b81801248665469f8451ea630a07e53397c44e3f0357448b627b8dc",
     "paths.py": "2feb1f504430171cc532b1bd7ce3a16a00f489eb286f820b48dc9aa4b6fcdab5",
     "plan/__init__.py": "5ba5fab620c9715c48f475098814d11ff6f272469a2adc08d5f01c7b3bd69e79",
-    "plan/codex_account.py": "c6304ef26216528a6c2b5da12e5a410bef6a59bc44d2d0ea440de12b043815a7",
+    "plan/codex_account.py": "240d8875b0eb5bdd4fc5008cee4d8841e71641762d2ebd2df72780d8a66d4786",
     "plan/consumption.py": "6ff376bf70ecd34d5d16ef9315fc20c1993aec3f178a20ead43f7f61be9d59fe",
     "plan/declared.py": "1961f1f790b1c8b0502d3c68d451da67e5a71e5d9d68acc644fbbaf866f67bf0",
     "plan/mail.py": "541e27d036223253091b2349aa5ca4844fd72f478582b465d83abb22cc1da534",
@@ -19314,7 +19734,7 @@
     "plan/watch.py": "e470e06d4c9b0fe3b77f6f1f62919893ef19e81b88b4a22c2e42710e011f6fb5",
     "research/__init__.py": "3772fd8c8f851cfce7d8f5f164a91d57de0e63d8ec6a7f58a03e4400a8d8423e",
     "research/agent/__init__.py": "812029e1b1fc9526a1f1cf35bed63023b47d1f23d3aa3b0a9c8886d98c5615a1",
-    "research/agent/review.py": "a8dc825e4237c5e810ab8d9ca352212511a7bae0694b0becee377cb356655236",
+    "research/agent/review.py": "5d8fb456f8341d57114f187fdb65bb859124551c48b3a24f8f20e34dcc18a263",
     "research/agent/run.py": "8c44e8466f7cb87421085de7d0cc3ee81aef47018f6f5b2205cc82f6b7bd634e",
     "research/benchmarks/__init__.py": "5066d339167d8898f0cda8d667da3b6e935a3edda56c178ce3f4e350b58e3679",
     "research/benchmarks/aa.py": "04c8aa990ad9d31c0aba588b0cd186a8863b15864923525285616fec9df61207",
@@ -19341,7 +19761,7 @@
     "research/prices/__init__.py": "1198eb22372b5ec637affeb36abf7bb4f262f4a44452910ee4ace979bbfe2eda",
     "research/prices/antigravity.py": "b2b484892d4758791d3cda87f5137ecbfca892952f0f3dfd863d671a8ef13bfb",
     "research/prices/claude_pro.py": "4bb165ba806f3ef3219c584c5343f45f397ed3cfb220a3b3f211ed4361ec9463",
-    "research/prices/codex.py": "8c36d600f8b2c06244ac14937e73f0396f5e3edfcaab1c1f3f5baaa527defbd5",
+    "research/prices/codex.py": "4a1c38e9821c76920a455f0bdfdaddcc2882f4506c46c59c7a118bcbdf0f2652",
     "research/prices/declared.py": "37756c77c42d4740aaf33f20532eba9676babb4d263b0f07e52f48070408a0b7",
     "research/prices/kie.py": "c5f72a270421f475faba4a15b1c70e63f07fddc6ccb41ef9210f1ebfb0dba018",
     "research/prices/openrouter.py": "1301d99d11624c50a619146c67ef4a0af7c6a4f0b983f178966b3a4389df3f0b",
@@ -19356,7 +19776,7 @@
     "serve/brief.py": "db7bf5b366f73e12fa9f45698a3877c9a62a4939a8d1ad971f586cb421f45f7b",
     "serve/choose.py": "b1c260b7e8536a68e2b323b4dbe4e4039995eed702b1f5eebe9c50fe05d665f2",
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
-    "serve/execution.py": "78863d1337508d0123a9d288904c8284758dbc1a44f5160d1ec8104eb2df8c23",
+    "serve/execution.py": "f73cda9d793dc7f659fc503af591eaa359d737bef15311c436179cbe43d22c8e",
     "serve/intent.py": "b5cc05dfe5a571e4f74e3a2dd379e041f961e49d8e9b2d15181c647c7b98c9ab",
     "serve/media_exec.py": "11d4b2ffa3912518e40b348429af9a0976b6b94e4f39c0ff46e52ae87909ef2f",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
@@ -19411,7 +19831,9 @@
     "store/migrations/043_alerts_advice.sql": "fa667b9ed075e8c3bb75fd0ef5bc7de5ee04c27300a2a8a4ec6c1c41ea415bb5",
     "store/migrations/044_specialists_one_reference.sql": "6ebefea3889e466d16ef369e5b8a06231329ed2377cd37f0efaebe4850c76dae",
     "store/migrations/045_design_tasks_on_design_arena.sql": "bcddd3848035ac35e76f154aa09a19869c96f4bbdee25a58d1179e3a7aeec448",
-    "store/migrations/046_3d_on_aa_3d.sql": "8f81da49203457af598005b428b5df0df5fc6b80519106497e73ca342d9bf74f"
+    "store/migrations/046_3d_on_aa_3d.sql": "8f81da49203457af598005b428b5df0df5fc6b80519106497e73ca342d9bf74f",
+    "store/migrations/047_model_details.sql": "265d7f2b6adff0ae8aa17e849ba6c3115240ebc84a7b3a3b137a6b58b3af1a79",
+    "store/migrations/048_poste_needs.sql": "e874777714ff94a7f549f895aa1a29dd40cbd7c761cba86ce3f3be95ac4f3c24"
   },
   "tasks": [
     {

@@ -105,7 +105,11 @@ def state(conn, trigger: str = "manual", extra: dict | None = None) -> dict:
               "provider": r["pinned_provider"], "locked": r["locked"]}
              for r in conn.execute("""select task, role, pinned_model_id, pinned_variant, pinned_provider, locked
                                       from models.preferences where pinned_model_id is not null order by task, role""")]
-    chg = changes.events(conn)
+    from walter_router.research.agent import review
+    top = review.basket(conn)
+    # owner 2026-11-21: only the top of the basket is worth the agent's look; a new or moved model elsewhere is noise
+    chg = {k: ({m: v for m, v in d.items() if m in top} if k != "rebased" else d)
+           for k, d in changes.events(conn).items()}
     # 2026-11-21: 24k characters of 60 rows with their `why` were a third of the state; the advisor needs what
     # the owner answered (not to repropose) and what still waits. Status words say who decided: adopted = in use,
     # dismissed = refused or replaced since (verdict_note says which).
@@ -136,7 +140,7 @@ def challengers_to_send(conn) -> list[dict]:
     """The proposals step 3 of the cycle is about to send (status open): each with the current choice, the scores and
     both prices, so the agent writes the one-line comparison the owner reads in the message (2026-11-21, owner: « 1
     point de mieux mais quasiment 3 fois plus cher que d1.2 Ultra : ça aurait été intéressant de le donner »)."""
-    from walter_router.analysis import catalog, telegram
+    from walter_router.analysis import catalog, needs, telegram
     out = []
     for a in conn.execute("""select a.alert_id, a.task, a.role, a.subject, a.evidence, t.interface, t.modes
                              from models.alerts a join models.tasks t using (task)
@@ -147,6 +151,8 @@ def challengers_to_send(conn) -> list[dict]:
                     "current": e.get("pinned"), "composite": e.get("composite"),
                     "boards": {k: [v.get("challenger"), v.get("pinned")] for k, v in (e.get("all_boards") or {}).items()},
                     "callable_via": e.get("callable_via"),
+                    "needs": needs.compare(conn, a["task"], a["subject"], e.get("pinned"),
+                                           a["role"] if a["role"] in LEVELS else None),
                     "price": catalog.price_text(c), "current_price": catalog.price_text(cur),
                     "price_ratio": (round(telegram._per_m(c) / telegram._per_m(cur), 2)
                                     if telegram._per_m(c) and telegram._per_m(cur) else None)})

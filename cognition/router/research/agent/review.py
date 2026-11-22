@@ -26,6 +26,44 @@ def _family(model_id: str) -> str:
     return model_id.split("-", 1)[0]
 
 
+BOARD_TOP = 5     # the leaders of each poste's reference board
+AA_TOP = 15       # the leaders of AA Intelligence (the general text index)
+
+
+def basket(conn, board_top: int = BOARD_TOP, aa_top: int = AA_TOP) -> dict[str, list[str]]:
+    """« Le haut du panier » (owner 2026-11-21: « que la partie agentique ne s'éparpille pas sur des modèles inutiles,
+    y a des milliers de modèles obsolètes »): the only models the analysis looks at — the short list (tiers, best of
+    each poste, the owner's pins, unrestricted models), the general frontier, AA Intelligence top `aa_top` and the
+    top `board_top` of every poste's reference board. -> {model_id: [why]}."""
+    out: dict[str, list[str]] = {}
+
+    def add(mid, why):
+        if mid:
+            out.setdefault(mid, []).append(why)
+    for r in conn.execute("select model_id, why from models.shortlist"):
+        for w in r["why"] or ["liste courte"]:
+            add(r["model_id"], w)
+    for r in conn.execute("""select model_id, rank from models.selection where run_id = (select run_id from models.latest_run)
+                             and task = 'general' and level = 'frontier'"""):
+        add(r["model_id"], f'frontière #{r["rank"]}')
+    snaps = sel.latest_snapshots(conn)
+    if snaps.get("aa"):
+        for i, r in enumerate(conn.execute("""select model_id, max(score) as s from models.benchmarks
+                                              where snapshot_id = %s and benchmark = 'aa' group by model_id
+                                              order by s desc limit %s""", (snaps["aa"], aa_top)), 1):
+            add(r["model_id"], f"AA Intelligence #{i}")
+    for b in conn.execute("select task, benchmark, bench_task from models.task_benchmarks where is_primary"):
+        sid = sel.board_snapshot(conn, snaps, b["benchmark"], b["bench_task"])
+        if sid is None:
+            continue
+        for i, r in enumerate(conn.execute("""select model_id, max(score) as s from models.benchmarks
+                                              where snapshot_id = %s and benchmark = %s and task = %s and model_id is not null
+                                              group by model_id order by s desc limit %s""",
+                                           (sid, b["benchmark"], b["bench_task"], board_top)), 1):
+            add(r["model_id"], f'{b["task"]} #{i}')
+    return out
+
+
 def blocked_challengers(conn) -> list[dict]:
     """A model that beats one of the owner's choices on a board but has no offer: often the same model sold under
     another name (2026-11-21: AA « Bison 31B » = OpenRouter « Bison 1 », a 31B model). Its unscored offers of the
@@ -53,8 +91,10 @@ def blocked_challengers(conn) -> list[dict]:
 
 def unmatched(conn, limit: int = 25) -> list[dict]:
     """Callable models without any score, next to a scored model with a very similar id: probable naming gaps
-    between sources (candidate aliases for aliases.json). The challengers blocked for want of an offer come first."""
-    scored = [r["model_id"] for r in conn.execute("select model_id from models.model_scores")]
+    between sources (candidate aliases for aliases.json). The challengers blocked for want of an offer come first.
+    Only links to a model of the basket are worth a look: naming an obsolete model gains nothing."""
+    top = basket(conn)
+    scored = [r["model_id"] for r in conn.execute("select model_id from models.model_scores") if r["model_id"] in top]
     first = blocked_challengers(conn)
     out = []
     for r in conn.execute("""select distinct model_id, interface from models.catalog
@@ -119,6 +159,7 @@ def price_changes(conn) -> list[dict]:
 
 
 def digest(conn) -> dict:
+    top = basket(conn)
     run = conn.execute("""select run_id, status, started_at, finished_at, summary from models.runs
                           order by run_id desc limit 1""").fetchone()
     summary = (run or {}).get("summary") or {}
@@ -140,6 +181,8 @@ def digest(conn) -> dict:
                                       r["subscription"] or r["provider"]}
                           for r in conn.execute("""select * from models.selection where run_id = %s and level = 'best'
                                                    and rank = 1""", (run["run_id"],))} if run else {},
+        "basket": {"rule": basket.__doc__.split("(owner")[0].strip(), "size": len(top),
+                   "models": {m: w[:3] for m, w in top.items()}},
         "unmatched_candidates": unmatched(conn),
         "design_arena_not_measured": board_gaps(conn),
         "price_changes_shortlist": price_changes(conn),

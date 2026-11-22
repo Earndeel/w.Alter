@@ -58,11 +58,3 @@ def test_fallback_and_kie_health():
         conn.execute("update models.provider_status set ok = false where provider = 'kie-media'")
         assert media_exec.choose_provider(conn, "minimax-h3", "video", None, True, or_id)[0] == "openrouter"
         conn.rollback()
-
-
-def test_stream_error_reason_is_kept_in_the_probe_detail():
-    from walter_router.serve import execution
-    data = (b'event: message_start\ndata: {"type": "message_start"}\n\nevent: error\n'
-            b'data: {"type": "error", "error": {"type": "api_error", "message": "no_available_account"}}\n')
-    assert execution._stream_error(data) == " : no_available_account"
-    assert execution._stream_error(b"data: {}") == ""

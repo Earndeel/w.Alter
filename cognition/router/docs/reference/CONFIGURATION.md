@@ -27,6 +27,9 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | analysis/changes.py | `OFFER_KINDS` | ["openrouter", "kie", "hermes_providers"] |  |
 | analysis/changes.py | `INTELLIGENCE` | aa_intelligence:intelligence |  |
 | analysis/decision_pareto.py | `FREE` | {"clef": "Workers AI (allocation gratuite)", "clef-flash": "Workers AI (allocation gratuite)", "mercury-decide": "OpenRouter :free"} |  |
+| analysis/details.py | `LISTS` | ["input_modalities", "output_modalities", "parameters", "reasoning_efforts"] |  |
+| analysis/details.py | `NUMBERS` | ["context_length", "max_output_tokens"] |  |
+| analysis/details.py | `TEXTS` | ["reasoning_default", "knowledge_cutoff", "expires"] |  |
 | analysis/dossier.py | `RULES` | ["1. Les favoris de {owner} priment : choisir le rôle qui correspond à l'objectif de la demande (signaux), sinon le rôle « default ».", "2. Sans favori : prendre le premier candidat (score composite pondéré multi-benchmarks).", "3. Égalité (écart dans la marge) : préférence de {owner}, puis accès par abonnement (Codex, crédits Flow).", "4. Workflow d'un modèle (références, prompt adapté…) : le planifier avant de générer.", "5. Demande sans restriction : uniquement un modèle 'unrestricted' (ou 'permissive' avec avertissement).", "6. Ne jamais changer un favori sans l'accord de {owner}."] |  |
 | analysis/identity.py | `TIERS` | ["non-reasoning", "minimal", "low", "medium", "high", "xhigh", "max"] |  |
 | analysis/identity.py | `VENDOR_PREFIXES` | ["google-", "openai-", "anthropic-", "meta-", "microsoft-", "alibaba-", "bytedance-", "black-forest-labs-"] |  |
@@ -37,6 +40,11 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | analysis/knowledge.py | `ELO_TIE` | 10.0 | Elo boards (Arena, AA arenas, Design Arena) |
 | analysis/media.py | `NORM_UNITS` | {"audio": "per 1000 characters", "embedding": "per 1m tokens", "image": "per image", "music": null, "rerank": "per search", "transcription": "per minute", "video": "per second"} |  |
 | analysis/media.py | `MODE_LABELS` | {"i2i": "image→image", "i2v": "image→vidéo", "r2v": "référence→vidéo", "t2i": "texte→image", "t2v": "texte→vidéo", "v2v": "vidéo→vidéo"} |  |
+| analysis/needs.py | `WINDOW_DAYS` | 14 |  |
+| analysis/needs.py | `TAIL_BYTES` | 40000000 |  |
+| analysis/needs.py | `SCALARS` | ["format", "kinds", "logprobs", "max_completion_tokens", "max_tokens", "n", "tools"] |  |
+| analysis/needs.py | `PART_TO_MODALITY` | {"audio": "audio", "file": "file", "image": "image", "image_url": "image", "input_audio": "audio", "input_file": "file", "input_image": "image", "video": "video", "video_url": "video"} |  |
+| analysis/needs.py | `FEATURES` | {"audio": "entend l'audio", "file": "lit les fichiers", "image": "lit les images", "n": "plusieurs réponses par appel", "reasoning": "raisonnement réglable", "structured_outputs": "JSON strict", "tools": "outils", "video": "lit la vidéo"} |  |
 | analysis/parse.py | `MM_TASKS` | {"index": "speech_to_speech", "provider_voice": "tts"} |  |
 | analysis/parse.py | `KIE_DIMENSION_FIXES` | {"('claude-opus-5-5', 'claude-opus-5')": "output"} |  |
 | analysis/parse.py | `OR_BASE_UNITS` | {"/1K calls": "per call", "/M UTF-8 bytes": "per utf-8 byte", "/M characters": "per character", "/M tokens": "per token", "/minute": "per second"} |  |
@@ -201,6 +209,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | plan/watch.py | `PROMPT` | ## Mission : veille des abonnements<br><br>Ici, tu fais la veille des abonnements IA de {owner}. Ses plans actuels (JSON) :<br>{plans}<br><br>Faits déjà connus (ne les redonne pas sauf s'ils ont changé) :<br>{known}<br><br>Sources que {owner} a écartées (ne les cite jamais, ne t'en sers pas) : {excluded}<br><br>Cherche sur le web (au plus 10 recherches, pages officielles d'abord : aide, tarifs, notes de version de l'éditeur ;<br>puis analyses sérieuses et datées : SemiAnalysis / Tokenomics, autres mesures publiées de la valeur d'un plan au prix<br>de l'API ou du nombre de tokens / messages par fenêtre). Pour CHAQUE plan : prix actuel, limites publiées (fenêtre de<br>5 h, hebdomadaire, modèles inclus), valeur mensuelle au prix API par modèle si quelqu'un l'a mesurée.<br><br>Réponds UNIQUEMENT par un tableau JSON, sans texte autour. Chaque élément :<br>{{"sub_id": "<id du plan ou null>", "vendor": "...", "plan": "...", "model_id": "<id router du modèle ou null>",<br>  "metric": "usd_value_month \| tokens_month \| messages_5h \| messages_week \| price_usd_month \| limit_note",<br>  "value": <nombre ou null>, "unit": "...", "source_name": "...", "source_url": "https://...",<br>  "published": "AAAA-MM-JJ ou null", "quote": "<phrase exacte de la source, 300 caractères max>"}}<br>N'invente rien : un fait sans URL vérifiée n'est pas rendu. Tableau vide si rien de nouveau. | # Mission : veille des abonnements |
 | research/agent/review.py | `MY_PROVIDERS` | ["openrouter", "kie", "codex", "arnict", "google-flow"] |  |
 | research/agent/review.py | `INTERFACES` | ["chat", "image", "video", "audio", "music", "decisions", "rerank", "transcription", "embedding"] |  |
+| research/agent/review.py | `BOARD_TOP` | 5 | the leaders of each poste's reference board |
+| research/agent/review.py | `AA_TOP` | 15 | the leaders of AA Intelligence (the general text index) |
 | research/benchmarks/aa.py | `AA_MODEL_URL` | https://artificialanalysis.ai/models/{} |  |
 | research/benchmarks/aa.py | `ANCHORS` | ["gpt-6-luna", "gpt-5-6-luna", "claude-opus-5-5", "deepseek-v4-pro"] |  |
 | research/benchmarks/aa.py | `AA_LEADERBOARD_URL` | https://artificialanalysis.ai/leaderboards/models |  |
@@ -284,9 +294,10 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/engine.py | `TASK_OF` | {"code": "coding", "front": "coding"} | router task → engine poste when names differ |
 | serve/execution.py | `HERMES_PROVIDERS` | {"arnict": "arnict", "codex": "openai-codex", "kie": "kie", "openrouter": "openrouter"} |  |
 | serve/execution.py | `NATIVE_ONLY` | ["antigravity", "venice"] | providers walter-llm runs itself (2026-10-30), with no Hermes provider |
-| serve/execution.py | `KIE_CODEX_MODELS` | ["gpt-5-5", "gpt-5-6-luna", "gpt-5-6-sol", "gpt-5-6-terra", "gpt-6-1-sol", "gpt-6-astra", "gpt-6-luna", "gpt-6-sol"] |  |
+| serve/execution.py | `KIE_CODEX_MODELS` | ["gpt-5-4", "gpt-5-5", "gpt-5-6-luna", "gpt-5-6-sol", "gpt-5-6-terra", "gpt-6-1-sol", "gpt-6-1-terra", "gpt-6-2-astra", "gpt-6-2-sol", "gpt-6-astra", "gpt-6-sol"] |  |
+| serve/execution.py | `KIE_CODEX_STATE` | kie-codex-models.json |  |
 | serve/execution.py | `MIN_CREDIT_USD` | 0.0 | owner, 2026-11-21: OpenRouter is used to its last cent; the guardian warns at CREDIT_STEPS_USD |
-| serve/execution.py | `SLOW_MS` | 30000 | a 5-token probe slower than this = degraded (Kie Claude took 64 s on 2026-10-02) |
+| serve/execution.py | `SLOW_MS` | 30000 | a free check slower than this = degraded (Kie Claude took 64 s for 5 tokens on 2026-10-02) |
 | serve/execution.py | `REASONING` | {"high": "high", "low": "low", "max": "max", "medium": "medium", "minimal": "minimal", "non-reasoning": "none", "xhigh": "xhigh"} |  |
 | serve/execution.py | `UA` | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36 |  |
 | serve/execution.py | `PROVIDER_RANK` | {"arnict": 1, "kie": 1, "kie-codex": 1, "openrouter": 3} |  |
@@ -349,7 +360,6 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `WALTER_DELEGATION_DEPTH` | serve/engine.py | get | aucun | Profondeur de délégation de l'appelant (0 = le propriétaire) transmise au moteur par une délégation Engine API ; posée par le moteur pour ses sous-tâches. |
 | `WALTER_RUN_ID` | serve/execution.py | get | aucun | Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log. |
 | `WALTER_TASK_ID` | serve/execution.py | get | aucun | Tâche de sous-agent (runs.tasks) servie par l'exécution walter_run ; inscrite dans models.exec_log. |
-| `VENICE_API_KEY` | serve/execution.py | secret_value | aucun | Nom d'accès fournisseur (autorisation venice, lecteurs llm et router) ; jamais affiché. |
 | `CLOUDFLARE_ACCOUNT_ID` | serve/intent.py | secret_value | aucun | Identifiant du compte pour la voie de décision configurée ; valeur privée hors documentation. |
 | `CLOUDFLARE_AI_TOKEN` | serve/intent.py | secret_value | aucun | Nom d'un accès secret pour la voie de décision ; ne pas afficher sa valeur. |
 | `OPENROUTER_API_KEY` | serve/intent.py | secret_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |

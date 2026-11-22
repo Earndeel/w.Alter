@@ -51,6 +51,15 @@ def host() -> dict:
     return json.loads(config_path("host.json").read_text())
 
 
+@functools.lru_cache(maxsize=1)
+def gateway_journal() -> Path:
+    """The walter-llm journal, resolved as the gateway does: the instance's config/llm/gateway.json first, the shipped
+    default after (2026-11-22: reading the shipped default pointed at a file that does not exist)."""
+    conf = _walter("config", "llm", "gateway.json")
+    path = Path(conf) if conf else Path(__file__).resolve().parent / "llm" / "config" / "gateway.json"
+    return _expand(json.loads(path.read_text())["log"])
+
+
 def _expand(value: str) -> Path:
     if value == "@instance" or value.startswith("@instance/"):
         root = _walter("path")

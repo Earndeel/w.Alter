@@ -2,6 +2,7 @@
 import ast
 import asyncio
 import hashlib
+from collections import Counter
 import json
 import re
 import sys
@@ -316,12 +317,12 @@ def test_rerank_failure_is_explicit_and_a_model_off_the_poste_is_refused():
 def app_ns(tmp_path, monkeypatch, chain=("inception/mercury-decide:free",)):
     source = LLM / "gateway.py"
     tree = ast.parse(source.read_text())
-    names = {"build_app", "_correlation", "_channel", "_uuid", "_dsh_session", "log"}
+    names = {"build_app", "_correlation", "_channel", "_uuid", "_dsh_session", "log", "request_needs", "decision_needs"}
     nodes = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in names]
     agents = tmp_path / "agents.json"
     agents.write_text(json.dumps({hashlib.sha256(b"fixture-token").hexdigest(): {"agent": "walter-memory"}}))
     logs = []
-    ns = {"json": json, "hashlib": hashlib, "uuid": uuid, "time": time, "re": re, "Request": Request,
+    ns = {"Counter": Counter, "json": json, "hashlib": hashlib, "uuid": uuid, "time": time, "re": re, "Request": Request,
           "threading": SimpleNamespace(Thread=lambda **k: SimpleNamespace(start=lambda: None)),
           "AGENTS": agents, "TEST_BUDGET": {"accounts": ["e2e"]}, "warm": lambda: None, "_install_codex_auth": lambda: None,
           "decision_chain": lambda: list(chain),

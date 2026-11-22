@@ -10,4 +10,6 @@ from walter_router.research.web import now
 
 def source_codex() -> tuple[dict, datetime, str]:
     """Live Codex catalogue of the owner's ChatGPT account (read-only; token never printed)."""
-    return {"models": codex_account.catalog()}, now(), "chatgpt.com/backend-api/codex (account catalogue)"
+    entries = codex_account.catalog_entries()
+    return ({"models": codex_account.ranked(entries), "details": codex_account.details(entries)}, now(),
+            "chatgpt.com/backend-api/codex (account catalogue)")

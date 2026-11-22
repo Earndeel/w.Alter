@@ -77,17 +77,36 @@ def ranked(entries: list) -> list[str]:
     return list(dict.fromkeys(slug for _, slug in sorted(out)))
 
 
-def catalog() -> list[str]:
-    """Model slugs the account may run (first client version that answers a non-empty list)."""
+def catalog_entries() -> list[dict]:
+    """The account's catalogue entries (first client version that answers a non-empty list): slugs and what each
+    model accepts (context window, input modalities, reasoning levels)."""
     for v in CLIENT_VERSIONS:
         try:
             entries = _get(f"/codex/models?client_version={v}").get("models")
         except (OSError, ValueError):
             continue
-        slugs = ranked(entries or [])
-        if slugs:
-            return slugs
+        if ranked(entries or []):
+            return entries
     raise ValueError("codex: catalogue unavailable")
+
+
+def catalog() -> list[str]:
+    """Model slugs the account may run."""
+    return ranked(catalog_entries())
+
+
+def details(entries: list) -> dict[str, dict]:
+    """{slug: what it accepts}, kept with the catalogue snapshot (models.model_details)."""
+    out = {}
+    for e in entries:
+        if not isinstance(e, dict) or not isinstance(e.get("slug"), str):
+            continue
+        out[e["slug"]] = {"context_length": e.get("max_context_window") or e.get("context_window"),
+                          "input_modalities": e.get("input_modalities"),
+                          "reasoning_efforts": [r.get("effort") for r in e.get("supported_reasoning_levels") or []
+                                                if isinstance(r, dict) and r.get("effort")],
+                          "reasoning_default": e.get("default_reasoning_level")}
+    return out
 
 
 def windows(payload: dict) -> list[dict]:

@@ -26,6 +26,15 @@ Ce que tu cherches (exemples, pas une liste fermée) :
   faut pas reproposer (regarde `recent_alerts_and_owner_answers`) ;
 - les conséquences du choix que {{owner}} vient de faire (détail du déclencheur).
 
+Périmètre : **le haut du panier seulement** (`cycle.review.basket` au cycle ; sinon les niveaux, la frontière et les
+favoris de l'état). Il y a des milliers de modèles obsolètes : un modèle hors du panier ne mérite ni recherche, ni
+comparaison, ni proposition. Les nouveautés et les variations de l'état sont déjà filtrées sur ce panier.
+
+Vérifier un modèle ou un fournisseur ne coûte **jamais** rien : pas de génération (texte, image, vidéo, musique, voix)
+pour « voir s'il marche ». Les preuves gratuites suffisent : `providers` (le Router vérifie comptes, crédits et listes
+de modèles sans rien facturer), les vrais appels récents (un fournisseur qui échoue y est marqué « dégradé »), les
+pages publiques des fournisseurs et des benchmarks.
+
 Temps : {{minutes}} minutes en tout, puis ta réponse est perdue — conclus avant {{deadline}} UTC. L'état ci-dessous
 contient déjà les faits utiles : ne lis PAS le code du Router ni ses fichiers, ne refais pas ses calculs. Au plus
 {{checks}} vérifications ciblées, chacune pour confirmer UN fait précis avant de le proposer (une route, un prix, un
@@ -67,8 +76,11 @@ C'est le cycle de 48 h : tu fais aussi l'analyse du cycle (les faits sont dans `
 - Prix (`price_changes_shortlist`) : seulement ceux qui changent un choix ou un coût de plus de 20 %.
 - Propositions qui vont partir (`cycle.challengers_to_send`) : pour chacune, une phrase pour {{owner}} qui compare au
   choix actuel, chiffres à l'appui — ce qu'on gagne (points, classements), ce que ça coûte (`price_ratio` = combien de
-  fois le prix actuel), et ton avis (vaut le coup / pas à ce prix / à tester). Un modèle sans offre
-  (`callable_via` vide) : cherche s'il est vendu sous un autre nom (lien de nom ci-dessus).
+  fois le prix actuel), ce qu'on garde ou perd de ce que le poste utilise vraiment (`needs` : `kept` / `lost` d'après
+  les vrais appels du poste, `only_current` = ce que le modèle actuel sait faire et pas lui, `unknown` = aucun
+  catalogue ne le dit), et ton avis (vaut le coup / pas à ce prix / à tester / non : il perd X). Une perte dans
+  `lost` l'emporte sur un gain de points. Un modèle sans offre (`callable_via` vide) : cherche s'il est vendu sous un
+  autre nom (lien de nom ci-dessus).
 Ajoute à ton JSON final : "aliases": [{"key": "<id sans score>", "model_id": "<id classé>", "reason": "<preuve>"}],
 "challenger_notes": [{"alert_id": <n>, "note_fr": "<une ou deux phrases, ≤ 300 caractères>"}]
 et "report_fr": "<rapport Markdown court (≤ 40 lignes) : sources et fournisseurs, noms décidés / rejetés / incertains,

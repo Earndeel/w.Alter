@@ -21,6 +21,7 @@ Run:   gateway.py serve                 (127.0.0.1:8894)
 from __future__ import annotations
 
 import functools
+from collections import Counter
 import hashlib
 import json
 import re
@@ -652,6 +653,43 @@ def chatgpt_ready() -> bool:
         return False
 
 
+def request_needs(body: dict) -> dict:
+    """What a call asks of its model, without its content (owner 2026-11-22: a challenger is judged against what each
+    poste really uses — images, tools, JSON, several answers…). Counted, never copied: no text enters the journal."""
+    parts = Counter()
+    for m in body.get("messages") or []:
+        content = m.get("content") if isinstance(m, dict) else None
+        for c in content if isinstance(content, list) else []:
+            if isinstance(c, dict) and c.get("type") not in (None, "text"):
+                parts[str(c["type"])] += 1
+    out = {k: v for k, v in parts.items()}
+    if body.get("tools"):
+        out["tools"] = len(body["tools"])
+    fmt = (body.get("response_format") or {}).get("type") if isinstance(body.get("response_format"), dict) else None
+    if fmt and fmt != "text":
+        out["format"] = fmt
+    if isinstance(body.get("n"), int) and body["n"] > 1:
+        out["n"] = body["n"]
+    for k in ("max_tokens", "max_completion_tokens", "logprobs"):
+        if body.get(k):
+            out[k] = body[k]
+    return out
+
+
+def decision_needs(body: dict) -> dict:
+    """The same counts for a typed decision: media beside the state, samples, question kinds (never the state)."""
+    out = dict(Counter(str(m.get("type")) for m in body.get("media") or [] if isinstance(m, dict)))
+    qs = body.get("questions")
+    qs = list(qs.values()) if isinstance(qs, dict) else qs if isinstance(qs, list) else []
+    kinds = Counter(("multiple" if q.get("multiple") else str(q.get("type"))) for q in qs
+                    if isinstance(q, dict) and q.get("type"))
+    if kinds:
+        out["kinds"] = dict(kinds)
+    if isinstance(body.get("samples"), int) and body["samples"] > 1:
+        out["n"] = body["samples"]
+    return out
+
+
 def json_instruction(fmt: dict) -> str:
     schema = (fmt.get("json_schema") or {}).get("schema")
     return ("Réponds uniquement par un objet JSON valide, sans texte autour ni bloc de code."
@@ -1199,7 +1237,8 @@ def build_app():
             raise HTTPException(400, "request must be a JSON object")
         correlation = await _correlation(request, body, agent)
         correlation.pop("requested", None)
-        base = {"agent": agent, "task": task, "kind": task, **correlation}
+        needs = decision_needs(body)
+        base = {"agent": agent, "task": task, "kind": task, **({"needs": needs} if needs else {}), **correlation}
 
         def attempt(entry: dict) -> None:
             log({**base, "model_id": entry.get("model"), **entry})
@@ -1284,6 +1323,7 @@ def build_app():
             floor = float(request.headers["X-Walter-Paid-Floor-USD"]) if request.headers.get("X-Walter-Paid-Floor-USD") else None
         except ValueError:
             raise HTTPException(400, "invalid X-Walter-Paid-Floor-USD") from None
+        needs = request_needs(body)
         for index, route in enumerate(plan):
             t0 = time.perf_counter()
             following = plan[index + 1] if index + 1 < len(plan) else {}
@@ -1291,7 +1331,7 @@ def build_app():
                                  and following.get("account") not in (None, route["account"]))
             base = {"agent": agent, "task": task, "model_id": d.get("model_id"), "provider": route["provider"],
                     "model": route["model"], **({"account": route["account"]} if route.get("account") else {}),
-                    **correlation}
+                    **({"needs": needs} if needs else {}), **correlation}
             if (floor is not None and route["provider"] == "openrouter" and not str(route["model"]).endswith(":free")):
                 remaining = await balance()
                 if remaining is not None and remaining < floor:

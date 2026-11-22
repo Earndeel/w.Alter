@@ -32,6 +32,15 @@ def refresh(notify: bool = True, dry_run: bool = False, skip_collect: bool = Fal
             report = {"sources": rederive(conn) if skip_collect else sources.collect_all(conn, ingest.store)}
             with conn.transaction():
                 report["knowledge"] = knowledge.declare(conn)  # config/knowledge.json is the source of truth
+            try:   # what each model can do, from catalogues already read (no call)
+                from walter_router.analysis import details
+                with conn.transaction():
+                    report["model_details"] = details.refresh(conn)
+                from walter_router.analysis import needs
+                with conn.transaction():
+                    report["poste_needs"] = needs.refresh(conn)
+            except Exception as exc:  # noqa: BLE001 — never blocks the cycle
+                report["model_details"] = {"error": f"{type(exc).__name__}: {exc}"[:200]}
             if not skip_collect:
                 with conn.transaction():
                     report["providers"] = execution.probe(conn)

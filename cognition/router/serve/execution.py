@@ -10,6 +10,8 @@ import os
 import re
 import time
 import uuid
+from datetime import datetime
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -20,10 +22,23 @@ from walter_router.analysis import select as sel
 # `kie` = Anthropic endpoint (/claude, Claude models), `kie-codex` = Responses endpoint (/codex/v1, GPT models).
 HERMES_PROVIDERS = {"codex": "openai-codex", "openrouter": "openrouter", "kie": "kie", "arnict": "arnict"}
 NATIVE_ONLY = {"venice", "antigravity"}   # providers walter-llm runs itself (2026-10-30), with no Hermes provider
-KIE_CODEX_MODELS = {"gpt-6-1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5-6-sol", "gpt-5-6-terra",
-                    "gpt-5-6-luna", "gpt-5-5"}  # GET https://api.kie.ai/codex/v1/models, 2026-10-02
+# Fallback when the probe has not yet listed them (GET https://api.kie.ai/codex/v1/models, free, 2026-11-22); the live
+# list is the one the kie-codex probe last saved (`kie_codex_models`).
+KIE_CODEX_MODELS = {"gpt-6-2-sol", "gpt-6-2-astra", "gpt-6-1-sol", "gpt-6-1-terra", "gpt-6-astra", "gpt-6-sol",
+                    "gpt-5-6-sol", "gpt-5-6-terra", "gpt-5-6-luna", "gpt-5-5", "gpt-5-4"}
+KIE_CODEX_STATE = "kie-codex-models.json"
+
+
+def kie_codex_models() -> set[str]:
+    """GPT models Kie's Codex API serves, as its free model list last said (2026-11-22: the list written by hand on
+    2026-10-02 still named gpt-6-luna, gone, and missed GPT-6.2 Sol and Astra)."""
+    try:
+        ids = set(json.loads(instance.state_file(KIE_CODEX_STATE).read_text())["models"])
+        return ids or KIE_CODEX_MODELS
+    except (OSError, ValueError, KeyError, TypeError):
+        return KIE_CODEX_MODELS
 MIN_CREDIT_USD = 0.0  # owner, 2026-11-21: OpenRouter is used to its last cent; the guardian warns at CREDIT_STEPS_USD
-SLOW_MS = 30000  # a 5-token probe slower than this = degraded (Kie Claude took 64 s on 2026-10-02)
+SLOW_MS = 30000  # a free check slower than this = degraded (Kie Claude took 64 s for 5 tokens on 2026-10-02)
 REASONING = {"non-reasoning": "none", "minimal": "minimal", "low": "low", "medium": "medium", "high": "high",
              "xhigh": "xhigh", "max": "max"}
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36"
@@ -41,7 +56,7 @@ def _runnable(offer: dict) -> tuple[str, str, str] | None:
     if offer["provider"] == "kie":  # Kie ids are the canonical ids (claude-opus-5-5, gpt-6-1-sol)
         if offer["model_id"].startswith("claude-"):
             return "kie", offer["model_id"], "kie"
-        if offer["model_id"] in KIE_CODEX_MODELS:
+        if offer["model_id"] in kie_codex_models():
             return "kie-codex", offer["model_id"], "kie-codex"
         return None
     hp = (offer.get("pricing") or {}).get("hermes_provider") or HERMES_PROVIDERS.get(offer["provider"])
@@ -236,12 +251,6 @@ def log(conn, entry: dict) -> int:
 _TIMEOUT = 90
 
 
-def _stream_error(data: bytes) -> str:
-    """The provider's own reason when an HTTP 200 stream ends on an error event (Kie: « no_available_account »)."""
-    m = re.search(rb'"error"\s*:\s*\{[^{}]*?"message"\s*:\s*"([^"]{1,160})"', data)
-    return f" : {m.group(1).decode('utf-8', 'replace')}" if m else ""
-
-
 def _kie_media(kie: str) -> tuple[bool, str]:
     """Kie's media API (video, image, music tasks) is another service than its Claude chat API: usable when the
     account answers and has credit. No generation is started (2026-10-26: a Claude-only outage at Kie had sent
@@ -262,71 +271,157 @@ def _kie_media(kie: str) -> tuple[bool, str]:
     return True, f"HTTP 200, crédit {credit} crédits"
 
 
-def _post(url: str, body: dict, headers: dict, timeout: int | None = None, must: str | None = None) -> tuple[bool, str]:
-    """POST and read the whole answer (SSE included); ok = HTTP 200, non-empty, containing `must` when given
-    (a Kie stream can be HTTP 200 and still end without a message)."""
-    req = Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json",
-                                                                 "User-Agent": UA, **headers})
+def _refused(url: str, body: dict, headers: dict) -> tuple[bool, str]:
+    """Free liveness check of a paid chat endpoint (owner 2026-11-21: « la vérification du modèle et du provider doit
+    être sans dépense »): a request the provider refuses before any model runs — no message, no input — proves the
+    endpoint is up and the key accepted, and is never billed. ok = HTTP 400 (validation refusal); 401/403 = key;
+    5xx = provider down. Kie answers HTTP 200 with its own JSON code (401 bad key, 404/500 unknown path)."""
+    req = Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json", "User-Agent": UA,
+                                                                 **headers})
     try:
-        with urlopen(req, timeout=timeout or _TIMEOUT) as resp:  # noqa: S310 (fixed provider endpoints)
-            data = resp.read(200000)
-            ok = resp.status == 200 and bool(data.strip()) and (must is None or must.encode() in data)
-            return ok, f"HTTP {resp.status}" + ("" if ok else f" (réponse incomplète{_stream_error(data)})")
+        with urlopen(req, timeout=_TIMEOUT) as resp:  # noqa: S310 (fixed provider endpoints)
+            data = resp.read(4000)
+        try:
+            code = json.loads(data).get("code")
+        except ValueError:
+            code = None
+        if code in (401, 403):
+            return False, f"clé refusée (code {code})"
+        return False, f"HTTP 200 inattendu (code {code}) : la requête vide aurait dû être refusée"
     except HTTPError as exc:
+        if exc.code == 400:
+            return True, "HTTP 400 attendu (point d'accès et clé valides, rien facturé)"
         return False, f"HTTP {exc.code}: {exc.read(200).decode('utf-8', 'replace')}"
     except Exception as exc:  # noqa: BLE001
         return False, f"{type(exc).__name__}: {exc}"[:200]
 
 
+def _get_json(url: str, headers: dict) -> dict:
+    with urlopen(Request(url, headers={"User-Agent": UA, **headers}), timeout=_TIMEOUT) as resp:  # noqa: S310
+        return json.loads(resp.read())
+
+
+def _journal_provider(entry: dict) -> str | None:
+    p, m = entry.get("provider"), str(entry.get("model") or "")
+    if p == "kie":
+        return "kie-codex" if m.startswith("gpt-") else "kie"
+    return p
+
+
+def recent_failures(window_h: float = 24, last: int = 3, tail_bytes: int = 4_000_000) -> dict[str, int]:
+    """Providers whose `last` most recent REAL calls (the gateway journal, within window_h) all failed: the free check
+    cannot see a model the provider keeps refusing (2026-11-22: Kie Codex « temporarily unavailable »), real traffic
+    can — at no cost. -> {provider key: failed calls in a row}."""
+    try:
+        path = instance.gateway_journal()
+        with open(path, "rb") as fh:
+            fh.seek(max(0, path.stat().st_size - tail_bytes))
+            lines = fh.read().splitlines()[1:]
+    except (OSError, ValueError, KeyError):
+        return {}
+    horizon = time.time() - window_h * 3600
+    runs: dict[str, list[bool]] = {}
+    for raw in lines:
+        try:
+            e = json.loads(raw)
+        except ValueError:
+            continue
+        if "ok" not in e or e.get("skipped") or not e.get("provider") or e.get("event"):
+            continue
+        ts = e.get("ts") or e.get("time") or e.get("at")
+        try:
+            t = float(ts) if isinstance(ts, (int, float)) else datetime.fromisoformat(str(ts).replace("Z", "+00:00")).timestamp()
+        except (TypeError, ValueError):
+            continue
+        if t >= horizon:
+            runs.setdefault(_journal_provider(e), []).append(bool(e["ok"]))
+    return {p: len(v[-last:]) for p, v in runs.items() if len(v) >= last and not any(v[-last:])}
+
+
 def probe(conn, only: str | None = None, timeout: int = 90) -> dict:
-    """Tiny live call per API provider (max 5 output tokens, streamed when the provider streams for Hermes).
-    A provider that answers but slower than SLOW_MS is recorded not ok ('dégradé'). Codex is the subscription
-    Hermes itself uses all day: not probed here (the Hermes run falls back if it fails). Kie has three services
-    probed apart: `kie` = its Claude chat API, `kie-codex` = its Codex responses API, `kie-media` = its media
-    tasks (account and credit, no generation)."""
+    """Free check per API provider: never a generation, never a billed token (owner 2026-11-21). Account and credit
+    endpoints, model lists, or a request refused before any model runs (`_refused`). What it cannot see — one model
+    temporarily unavailable at a provider — the gateway sees on the real calls and fails over. Codex and Claude Pro
+    (subscriptions) are not probed. Kie has three services checked apart: `kie` = its Claude chat API, `kie-codex` =
+    its Codex responses API, `kie-media` = its media tasks (account and credit)."""
     key = instance.secret_value
     kie = key("KIE_API_KEY") or ""
-    checks = {
-        "kie": lambda: _post("https://api.kie.ai/claude/v1/messages",
-                             {"model": "claude-sonnet-5", "max_tokens": 5, "stream": True,
-                              "messages": [{"role": "user", "content": "OK"}]},
-                             {"x-api-key": kie, "Authorization": f"Bearer {kie}", "anthropic-version": "2023-06-01"},
-                             must="message_stop"),
-        "kie-media": lambda: _kie_media(kie),
-        "kie-codex": lambda: _post("https://api.kie.ai/codex/v1/responses",
-                                   {"model": "gpt-6-luna", "input": "OK", "stream": False, "max_output_tokens": 16},
-                                   {"Authorization": f"Bearer {kie}"}),
-        "openrouter": lambda: _post("https://openrouter.ai/api/v1/chat/completions",
-                                    {"model": "openai/gpt-6-luna", "max_tokens": 5,
-                                     "messages": [{"role": "user", "content": "OK"}]},
-                                    {"Authorization": f'Bearer {key("OPENROUTER_API_KEY")}'}),
-        "venice": lambda: _post("https://api.venice.ai/api/v1/chat/completions",
-                                {"model": "deepseek-v4-1-flash-1017-uncensored", "max_tokens": 5,
-                                 "messages": [{"role": "user", "content": "OK"}]},
-                                {"Authorization": f'Bearer {instance.secret_value("VENICE_API_KEY")}'}),
-        "arnict": lambda: _post("https://api.arnict.com/v1/chat/completions",
-                                {"model": "zai/glm-5.3-flash-uncensored", "max_tokens": 5,
-                                 "messages": [{"role": "user", "content": "OK"}]},
-                                {"Authorization": f'Bearer {key("ARNICT_API_KEY")}'}),
-    }
-    def openrouter() -> tuple[bool, str]:
-        """A paid route is only usable with credit left: the 5-token call can pass on a tiny negative balance."""
-        ok, detail = _post("https://openrouter.ai/api/v1/chat/completions",
-                           {"model": "openai/gpt-6-luna", "max_tokens": 5, "messages": [{"role": "user", "content": "OK"}]},
-                           {"Authorization": f'Bearer {key("OPENROUTER_API_KEY")}'})
-        try:
-            req = Request("https://openrouter.ai/api/v1/credits", headers={"Authorization": f'Bearer {key("OPENROUTER_API_KEY")}'})
-            with urlopen(req, timeout=20) as resp:  # noqa: S310
-                c = json.loads(resp.read())["data"]
-            left = c["total_credits"] - c["total_usage"]
-            if left <= MIN_CREDIT_USD:
-                return False, f"crédit épuisé : {left:.2f} $ restant"
-            return ok, f"{detail}, crédit {left:.2f} $"
-        except Exception:  # noqa: BLE001 — balance unknown: keep the call verdict
-            return ok, detail
+    kie_h = {"x-api-key": kie, "Authorization": f"Bearer {kie}", "anthropic-version": "2023-06-01"}
 
-    checks["openrouter"] = openrouter
+    def kie_chat() -> tuple[bool, str]:
+        ok, detail = _refused("https://api.kie.ai/claude/v1/messages", {"model": "claude-sonnet-5", "max_tokens": 1,
+                                                                         "messages": []}, kie_h)
+        if not ok:
+            return ok, detail
+        media_ok, credit = _kie_media(kie)
+        return media_ok, f"{detail} ; {credit}"
+
+    def openrouter() -> tuple[bool, str]:
+        """A paid route is only usable with credit left."""
+        h = {"Authorization": f'Bearer {key("OPENROUTER_API_KEY")}'}
+        try:
+            c = _get_json("https://openrouter.ai/api/v1/credits", h)["data"]
+        except HTTPError as exc:
+            return False, f"HTTP {exc.code}: {exc.read(200).decode('utf-8', 'replace')}"
+        except Exception as exc:  # noqa: BLE001
+            return False, f"{type(exc).__name__}: {exc}"[:200]
+        left = c["total_credits"] - c["total_usage"]
+        if left <= MIN_CREDIT_USD:
+            return False, f"crédit épuisé : {left:.2f} $ restant"
+        return True, f"HTTP 200, crédit {left:.2f} $"
+
+    def venice() -> tuple[bool, str]:
+        try:
+            d = _get_json("https://api.venice.ai/api/v1/api_keys/rate_limits",
+                          {"Authorization": f'Bearer {key("VENICE_API_KEY")}'})["data"]
+        except HTTPError as exc:
+            return False, f"HTTP {exc.code}: {exc.read(200).decode('utf-8', 'replace')}"
+        except Exception as exc:  # noqa: BLE001
+            return False, f"{type(exc).__name__}: {exc}"[:200]
+        usd = (d.get("balances") or {}).get("USD")
+        if not d.get("accessPermitted") or (usd is not None and usd <= 0):
+            return False, f"crédit épuisé : {usd} $ (accès {'ouvert' if d.get('accessPermitted') else 'fermé'})"
+        return True, f"HTTP 200, crédit {usd} $"
+
+    def arnict() -> tuple[bool, str]:
+        try:
+            n = len(_get_json("https://api.arnict.com/v1/models", {"Authorization": f'Bearer {key("ARNICT_API_KEY")}'})
+                    .get("data") or [])
+        except HTTPError as exc:
+            return False, f"HTTP {exc.code}: {exc.read(200).decode('utf-8', 'replace')}"
+        except Exception as exc:  # noqa: BLE001
+            return False, f"{type(exc).__name__}: {exc}"[:200]
+        return (n > 0), f"HTTP 200, {n} modèles listés"
+
+    def kie_codex() -> tuple[bool, str]:
+        """Its model list (free) proves endpoint and key, and keeps the routable GPT models current."""
+        try:
+            ids = sorted({m.get("id") for m in _get_json("https://api.kie.ai/codex/v1/models",
+                                                         {"Authorization": f"Bearer {kie}"}).get("data") or []} - {None})
+        except HTTPError as exc:
+            return False, f"HTTP {exc.code}: {exc.read(200).decode('utf-8', 'replace')}"
+        except Exception as exc:  # noqa: BLE001
+            return False, f"{type(exc).__name__}: {exc}"[:200]
+        if not ids:
+            return False, "HTTP 200, aucun modèle listé"
+        try:
+            path = instance.state_file(KIE_CODEX_STATE)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"checked_at": datetime.now().isoformat(timespec="seconds"), "models": ids}))
+        except OSError:
+            pass
+        return True, f"HTTP 200, {len(ids)} modèles GPT listés"
+
+    checks = {
+        "kie": kie_chat,
+        "kie-media": lambda: _kie_media(kie),
+        "kie-codex": kie_codex,
+        "openrouter": openrouter,
+        "venice": venice,
+        "arnict": arnict,
+    }
     out = {}
+    failing = recent_failures()
     global _TIMEOUT
     _TIMEOUT = timeout
     for provider, fn in checks.items():
@@ -336,7 +431,9 @@ def probe(conn, only: str | None = None, timeout: int = 90) -> dict:
         ok, detail = fn()
         ms = int((time.monotonic() - t0) * 1000)
         if ok and ms > SLOW_MS:
-            ok, detail = False, f"dégradé : {ms / 1000:.0f} s pour 5 tokens"
+            ok, detail = False, f"dégradé : {ms / 1000:.0f} s pour une vérification"
+        if ok and provider in failing:
+            ok, detail = False, f"dégradé : ses {failing[provider]} derniers vrais appels ont échoué ({detail})"
         conn.execute("""insert into models.provider_status (provider, ok, checked_at, latency_ms, detail)
                         values (%s, %s, now(), %s, %s) on conflict (provider) do update set ok = excluded.ok,
                         checked_at = excluded.checked_at, latency_ms = excluded.latency_ms, detail = excluded.detail""",

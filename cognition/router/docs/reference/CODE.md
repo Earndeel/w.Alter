@@ -80,6 +80,15 @@ Decision models on three axes (2026-10-16): intelligence (AA Decision Index, hig
 - `frontier(pts: list[dict])` — 
 - `verdict(new: dict, current: dict | None, pts: list[dict])` — Where a newcomer stands: on the frontier?, models it dominates, models dominating it, the frontier itself.
 
+## analysis/details.py
+
+What each model can do (models.model_details), from catalogues the cycle already reads — no extra call, nothing
+
+- `_openrouter(m: dict)` — 
+- `_ids(conn, sid: int, provider: str)` — 
+- `collect(conn)` — 
+- `refresh(conn)` — 
+
 ## analysis/dossier.py
 
 One JSON dossier per task, rebuilt at every refresh (models.dossiers): everything the router / orchestrator
@@ -146,6 +155,19 @@ What a media offer actually sells: generation mode(s), output resolution, audio,
 - `norm_price(interface: str, unit_price: float | None, unit: str | None, label: str)` — Price in the interface's comparable unit; 'per video' with an explicit duration ('10s', '6.0s') -> per second.
 - `compatible(offer_modes: list[str] | None, wanted: list[str] | None)` — A generation offer fits a task when it declares one of the task's modes; a generic SKU (no declared mode)
 - `short_modes(modes: list[str])` — 
+
+## analysis/needs.py
+
+What each poste really uses (models.poste_needs) and whether a challenger can do it (owner 2026-11-22: D1.2 Ultra
+
+- `_journal_lines(tail_bytes: int=TAIL_BYTES)` — 
+- `_split(task: str)` — 
+- `observed(window_days: int=WINDOW_DAYS, lines: list[bytes] | None=None)` — 
+- `declared_decision_kinds()` — 
+- `refresh(conn, window_days: int=WINDOW_DAYS)` — 
+- `fit(conn, task: str, model_id: str, level: str | None=None)` — What the poste uses that `model_id` keeps, loses, or no free catalogue says. -> {"kept", "lost", "unknown"},
+- `_features(d: dict | None)` — 
+- `compare(conn, task: str, challenger: str, current: str | None, level: str | None=None)` — The poste's real use checked on the challenger (`fit`), plus what the current model can do that the challenger
 
 ## analysis/pareto.py
 
@@ -427,6 +449,7 @@ What the Router needs from the active Walter instance, asked through its public 
 - `owner()` — How messages, notes and prompts name the person this instance serves (its declared address form).
 - `config_path(name: str)` — An instance's own Router file (config/router/<name>) when it has one, else the shipped default.
 - `host()` — Host bindings of the instance (config host.json): runtime profiles, cron jobs, publishing helpers.
+- `gateway_journal()` — The walter-llm journal, resolved as the gateway does: the instance's config/llm/gateway.json first, the shipped
 - `_expand(value: str)` — 
 - `host_path(key: str)` — A path binding of host.json (absolute, ~/ or @instance/); None when the instance has none.
 - `own_file(name: str)` — Where the instance keeps its own copy of a Router file it writes (config/router/<name>).
@@ -598,6 +621,8 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `_install_codex_stream_arguments()` — Parallel tool calls on the ChatGPT backend stream no argument deltas: the arguments come only in each call's
 - `codex_cache_session(agent: str, task: str, body: dict, correlation: dict)` — The ChatGPT backend keeps a prompt prefix warm on the server a session id is routed to; LiteLLM draws a new id
 - `chatgpt_ready()` — 
+- `request_needs(body: dict)` — What a call asks of its model, without its content (owner 2026-11-22: a challenger is judged against what each
+- `decision_needs(body: dict)` — The same counts for a typed decision: media beside the state, samples, question kinds (never the state).
 - `json_instruction(fmt: dict)` — 
 - `as_json(text: str | None)` — The JSON object of a Codex answer; ValueError (= next route, which honours response_format) when there is none.
 - `exact_call(spec: dict)` — Local router transport: one provider, one model, no retries or model fallbacks.
@@ -701,7 +726,9 @@ The owner's ChatGPT/Codex account read with W.Alter's OWN Codex session (2026-11
 - `headers(token: str)` — Bearer + the workspace headers the backend derives from the OAuth JWT (account id, data residency).
 - `_get(path: str, timeout: int=30)` — A 401 drops the token kept by this process and reads the grant again, once: the session's token is refreshed
 - `ranked(entries: list)` — Visible slugs by (priority, slug): `visibility: hide` entries are not offered to the account.
-- `catalog()` — Model slugs the account may run (first client version that answers a non-empty list).
+- `catalog_entries()` — The account's catalogue entries (first client version that answers a non-empty list): slugs and what each
+- `catalog()` — Model slugs the account may run.
+- `details(entries: list)` — {slug: what it accepts}, kept with the catalogue snapshot (models.model_details).
 - `windows(payload: dict)` — Quota windows of a /wham/usage answer, named by their published duration (position only as fallback).
 - `usage()` — 
 
@@ -825,6 +852,7 @@ Deterministic digest of a refresh cycle, the input of the 48 h analysis agent (e
 
 - `_previous_snapshot(conn, kind: str, latest: int)` — 
 - `_family(model_id: str)` — 
+- `basket(conn, board_top: int=BOARD_TOP, aa_top: int=AA_TOP)` — « Le haut du panier » (owner 2026-11-21: « que la partie agentique ne s'éparpille pas sur des modèles inutiles,
 - `blocked_challengers(conn)` — A model that beats one of the owner's choices on a board but has no offer: often the same model sold under
 - `unmatched(conn, limit: int=25)` — Callable models without any score, next to a scored model with a very similar id: probable naming gaps
 - `board_gaps(conn, top: int=12)` — Leading models (AA Intelligence top, and the text tiers in use) a Design Arena reference has not measured yet:
@@ -1164,6 +1192,7 @@ walter_run text jobs executed by Walter Engine (lot E5, 2026-11-10) — no secon
 
 Ordered provider routes and execution metadata for Walter consumers.
 
+- `kie_codex_models()` — GPT models Kie's Codex API serves, as its free model list last said (2026-11-22: the list written by hand on
 - `_runnable(offer: dict)` — (Hermes provider, model id at that provider, status key) or None when Hermes cannot run this offer.
 - `reliability(conn, provider: str, model: str)` — Recent real executions of this provider x model (models.exec_log, skipped attempts excluded: walter-llm logs a
 - `quota_spent(r: dict)` — A subscription route whose weekly quota is spent (provider meter at 100 %), or whose session window is full.
@@ -1174,10 +1203,12 @@ Ordered provider routes and execution metadata for Walter consumers.
 - `routes(conn, model_id: str, variant: str='', preferred: str | None=None, usage: str='interactive', modes: list[str] | None=None)` — Every way Hermes can run this chat model, in the owner's order: subscription (while its weekly quota is not
 - `_uuid(value)` — 
 - `log(conn, entry: dict)` — One routed execution attempt (from the Hermes plugin or the media executor).
-- `_stream_error(data: bytes)` — The provider's own reason when an HTTP 200 stream ends on an error event (Kie: « no_available_account »).
 - `_kie_media(kie: str)` — Kie's media API (video, image, music tasks) is another service than its Claude chat API: usable when the
-- `_post(url: str, body: dict, headers: dict, timeout: int | None=None, must: str | None=None)` — POST and read the whole answer (SSE included); ok = HTTP 200, non-empty, containing `must` when given
-- `probe(conn, only: str | None=None, timeout: int=90)` — Tiny live call per API provider (max 5 output tokens, streamed when the provider streams for Hermes).
+- `_refused(url: str, body: dict, headers: dict)` — Free liveness check of a paid chat endpoint (owner 2026-11-21: « la vérification du modèle et du provider doit
+- `_get_json(url: str, headers: dict)` — 
+- `_journal_provider(entry: dict)` — 
+- `recent_failures(window_h: float=24, last: int=3, tail_bytes: int=4000000)` — Providers whose `last` most recent REAL calls (the gateway journal, within window_h) all failed: the free check
+- `probe(conn, only: str | None=None, timeout: int=90)` — Free check per API provider: never a generation, never a billed token (owner 2026-11-21). Account and credit
 
 ## serve/intent.py
 

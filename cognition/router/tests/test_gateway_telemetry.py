@@ -1,5 +1,6 @@
 """HTTP gateway request-local correlation and real usage, entirely offline."""
 import ast
+from collections import Counter
 import asyncio
 import hashlib
 import json
@@ -27,7 +28,7 @@ def gateway(tmp_path, monkeypatch):
     names={'_usage','_number','_telemetry','_uuid','_dsh_session','_correlation','_channel','_session_run','_run_metadata','_record_attempt','exact_call','log','build_app',
            'start_completion','_rate_limited','_charge','_price_usd','_priced','test_budget','test_gate','_ledger','_ledger_add','approve_tests',
            'planned_task','exact_task','owner_tasks','rule_answer','_text_parts','_rule_completion','_rule_stream','_rule_routing',
-           'route_state','selection_plan','selection_check','log_selection','cost_headers'}
+           'route_state','selection_plan','selection_check','log_selection','cost_headers','request_needs','decision_needs'}
     nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name in names]
     agents=tmp_path/'agents.json'
     agents.write_text(json.dumps({hashlib.sha256(b'fixture-token').hexdigest():{'agent':'dsh'}}))
@@ -35,7 +36,7 @@ def gateway(tmp_path, monkeypatch):
         def __init__(self,target,**kw):self.target,self.kw=target,kw
         def start(self):
             if self.target.__name__=='<lambda>':self.target()
-    ns={'re':re,'EXACT':'exact:','_MODEL_ID':re.compile(r'^[A-Za-z0-9._:/-]{1,120}$'),'json':json,'hashlib':hashlib,'uuid':uuid,'math':math,'datetime':datetime,'timezone':timezone,
+    ns={'Counter':Counter,'re':re,'EXACT':'exact:','_MODEL_ID':re.compile(r'^[A-Za-z0-9._:/-]{1,120}$'),'json':json,'hashlib':hashlib,'uuid':uuid,'math':math,'datetime':datetime,'timezone':timezone,
         'time':time,'Request':Request,'subprocess':subprocess,'AGENTS':agents,'LOG':tmp_path/'log.jsonl',
         'ROUTER':'walter-router','DEFAULT_TASK':'coding','threading':SimpleNamespace(Thread=Thread),
         'warm':lambda:None,'_install_codex_auth':lambda:None,'chat_tasks':lambda:['coding'],

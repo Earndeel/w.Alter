@@ -681,6 +681,37 @@ SELECT DISTINCT ON (sub_id, window_name) reading_id,
   ORDER BY sub_id, window_name, read_at DESC;
 ```
 
+## models.model_details (table)
+
+What each model can do, from its providers' free catalogues (OpenRouter models list, Codex account catalogue), rebuilt each cycle by analysis/details.py; the widest value of its sources wins.
+
+| Colonne | Type SQL | Nullable | Défaut SQL | Signification |
+|---|---|---|---|---|
+| `model_id` | text | False | — | Canonical model id (models.canonical). |
+| `context_length` | integer | True | — | Largest input window any source announces (tokens). |
+| `max_output_tokens` | integer | True | — | Largest answer any source allows (tokens); null = not published. |
+| `input_modalities` | text[] | True | — | What it reads: text, image, audio, video, file. |
+| `output_modalities` | text[] | True | — | What it writes: text, image, audio… |
+| `parameters` | text[] | True | — | Request parameters supported (tools, response_format, structured_outputs, reasoning, n, logprobs…), union of its routes. |
+| `reasoning_efforts` | text[] | True | — | Reasoning efforts it accepts (none, low, medium, high, xhigh, max…). |
+| `reasoning_default` | text | True | — | Effort used when none is asked. |
+| `knowledge_cutoff` | text | True | — | Training data cutoff as published by a source. |
+| `expires` | text | True | — | Date its provider will retire it, when announced. |
+| `sources` | jsonb | False | '{}'::jsonb | {field: [source…]}: which catalogue said each value. |
+| `updated_at` | timestamp with time zone | False | now() | When the cycle last rebuilt this row. |
+
+constraints :
+
+```sql
+PRIMARY KEY (model_id)
+```
+
+indexes :
+
+```sql
+CREATE UNIQUE INDEX model_details_pkey ON models.model_details USING btree (model_id)
+```
+
 ## models.model_scores (vue)
 
 All latest scores of a model as one JSON (benchmark:task -> score)
@@ -835,6 +866,38 @@ indexes :
 ```sql
 CREATE UNIQUE INDEX plan_evidence_pkey ON models.plan_evidence USING btree (evidence_id)
 CREATE UNIQUE INDEX plan_evidence_sub_id_model_id_metric_source_url_value_key ON models.plan_evidence USING btree (sub_id, model_id, metric, source_url, value)
+```
+
+## models.poste_needs (table)
+
+What each poste really uses, rebuilt each cycle by analysis/needs.py from the walter-llm journal (counts only) and the declared Walter Decision needs; models.model_details says whether a challenger can do it.
+
+| Colonne | Type SQL | Nullable | Défaut SQL | Signification |
+|---|---|---|---|---|
+| `task` | text | False | — | Router task (poste), as the gateway journal names it before its /level. |
+| `level` | text | False | ''::text | L1/L2/L3 for a text tier, empty for a poste without levels. |
+| `calls` | integer | False | 0 | Successful real calls seen in the window. |
+| `window_days` | integer | False | — | Days of journal read. |
+| `inputs` | jsonb | False | '{}'::jsonb | {part type: share of calls} beyond text (image_url, input_audio, file…). |
+| `tools_share` | double precision | True | — | Share of calls that give the model tools. |
+| `json_share` | double precision | True | — | Share of calls that ask for a JSON answer (response_format). |
+| `max_n` | integer | True | — | Most answers asked in one call (n). |
+| `input_tokens_p95` | integer | True | — | 95th percentile of the input size (tokens). |
+| `input_tokens_max` | integer | True | — | Largest input seen (tokens): a challenger's context must hold it. |
+| `output_tokens_max` | integer | True | — | Longest answer seen (tokens). |
+| `decision_kinds` | text[] | True | — | Question kinds the decision modules ask (choice, noul, multiple, spans…). |
+| `updated_at` | timestamp with time zone | False | now() | When the cycle last rebuilt this row. |
+
+constraints :
+
+```sql
+PRIMARY KEY (task, level)
+```
+
+indexes :
+
+```sql
+CREATE UNIQUE INDEX poste_needs_pkey ON models.poste_needs USING btree (task, level)
 ```
 
 ## models.preferences (table)
