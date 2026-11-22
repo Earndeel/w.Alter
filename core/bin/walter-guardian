@@ -192,7 +192,9 @@ For each incident decide one outcome:
 - "act": a listed action can plausibly fix it -> give the actions (id + params from the allowed values).
 - "expected": a normal, known situation per the notes; nothing to do and nobody to tell.
 - "external": the cause is outside W.Alter (provider outage, network, the owner's machine asleep) and should
-  recover by itself; nothing to tell yet.
+  recover by itself; nothing to tell yet. Not when only OUR route to it is closed (an exit or browser engine
+  closed, the owner's machine asleep or on its VPN, one address blocked) while another route W.Alter controls
+  works: then "act" with a listed action, else "needs_owner" (the repair agent then makes the module take it).
 - "needs_owner": only Monsieur can resolve it, or the actions already tried did not work.
 Never repeat an action that already failed for this incident unless the evidence shows a different cause.
 
@@ -412,8 +414,14 @@ Déjà tenté :
 5. Jamais : afficher ou lire un secret (passer par `walter-secret exec`), envoyer un message, changer un choix de
    Monsieur (favoris, préférences, abonnements, configuration de l'instance), supprimer des données, purger, toucher à
    l'historique mémoire, réécrire git. Dépense : rien de payant au-delà de quelques centimes de test.
-6. Panne chez un fournisseur ou un site (5xx, 429, indisponible) : `external`. Crédit épuisé, clé refusée, paiement,
-   mot de passe, geste physique, décision de Monsieur : `needs_owner` avec la question précise.
+6. Une cause extérieure ne dispense pas de réparer. Distingue « la chose est en panne » de « notre chemin vers elle
+   est fermé » (sortie réseau ou navigateur fermée, Mac en veille ou sur VPN, une adresse bloquée, un fournisseur
+   parmi d'autres) : s'il existe un autre chemin que Walter contrôle (autre moteur ou sortie de Browse, autre
+   fournisseur, autre source de la même donnée) et qui marche, fais en sorte que le module le prenne tout seul la
+   prochaine fois (repli dans le code, avec son test), prouve-le en relisant pour de bon, et c'est `fixed`.
+   `external` seulement quand la chose elle-même est en panne (5xx, 429, site indisponible par tous nos chemins) et
+   que le module continue déjà sans elle ; dis alors dans `evidence` quels chemins tu as essayés. Crédit épuisé, clé
+   refusée, paiement, mot de passe, geste physique, décision de Monsieur : `needs_owner` avec la question précise.
 
 ## Verdict (fin de ta réponse, un seul objet JSON)
 {{"outcome": "fixed | external | needs_owner | failed",

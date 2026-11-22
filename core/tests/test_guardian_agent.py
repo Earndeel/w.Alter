@@ -214,3 +214,11 @@ def test_the_engine_is_restarted_after_the_agent_never_by_it(monkeypatch):
     monkeypatch.setattr(A, "sh", lambda *c, timeout=60: A.subprocess.CompletedProcess(c, 0, "1\n", ""))
     assert A.restart_after(["walter-engine"]) == {"walter-engine": "deferred:busy"}           # a turn in flight
     assert "systemctl restart <unité>" in A.REPAIR_BRIEF and '"restart"' in A.REPAIR_BRIEF
+
+
+def test_a_closed_route_is_repaired_not_left_external():
+    # 2026-11-22, Monsieur (Arena unread for 50 h: the Camoufox exit was closed, Chromium was usable): an outside cause
+    # whose only OUR route is closed is a repair (take another route Walter controls), not "external".
+    assert "notre chemin vers elle" in A.REPAIR_BRIEF and "autre moteur ou sortie de Browse" in A.REPAIR_BRIEF
+    assert "par tous nos chemins" in A.REPAIR_BRIEF
+    assert "Not when only OUR route to it is closed" in A.PROMPT
