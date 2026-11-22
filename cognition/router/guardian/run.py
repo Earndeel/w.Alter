@@ -22,6 +22,9 @@ RETRY_AFTER_H = 5         # between two runs on the same incident: the next pass
 TEST_GRACE_H = 6          # a failing test is often someone's work in progress: act only if it lasts
 MAX_REPAIRS_PER_PASS = 3
 EXTERNAL_NOTICE_H = 48    # an outside outage is worth a message only when it lasts this long
+SOURCE_NAMES = {"arena": "Arena (LMArena)", "aa": "Artificial Analysis", "aa_eval": "Artificial Analysis (évaluations)",
+                "da": "Design Arena", "mm": "Artificial Analysis (médias)", "bridgebench": "BridgeBench", "mteb": "MTEB",
+                "agentset": "Agentset", "aa_stt": "Artificial Analysis (voix)", "aa_decision": "AA Decision"}
 
 _CLOSED_OK = ("fixed", "resolved")
 
@@ -203,7 +206,10 @@ def handle(conn, inc: dict, budget: list[int], dry_run: bool = False) -> None:
             return _set(conn, inc, "needs_owner", {"outcome": "needs_owner", "cause": inc["detail"].get("probe"),
                                                    "summary_fr": f'Le fournisseur {inc["subject"]} refuse nos appels '
                                                                  f'(clé ou crédit) : {inc["detail"].get("probe")}.'})
-    if kind in ("source_stale", "source_error") and inc["attempts"] == 0 and inc["status"] == "open":
+    # A public page is free to read again: an outside cause (2026-11-20: the Mac's exit closed while it was on its VPN)
+    # is retried every pass, not left until the next 48 h cycle.
+    if kind in ("source_stale", "source_error") and (inc["status"] == "external" or
+                                                     (inc["attempts"] == 0 and inc["status"] == "open")):
         again = reread_source(inc["subject"])
         if again["ok"]:
             return _set(conn, inc, "resolved", {"outcome": "resolved", "reread": again})
@@ -228,8 +234,15 @@ def _message(inc: dict) -> str | None:
         q = v.get("question_fr")
         return f'{head} — besoin de vous\n\n{v.get("summary_fr") or inc["subject"]}' + (f"\n\n{q}" if q else "")
     if inc["status"] == "external" and _age_h(inc["opened_at"]) >= EXTERNAL_NOTICE_H:
+        if inc["kind"] in ("source_stale", "source_error"):    # a benchmark, not a provider (2026-11-22, owner)
+            why = v.get("cause") or (inc["detail"] or {}).get("reread_error") or (inc["detail"] or {}).get("error")
+            return (f'{head} — benchmark illisible\n\nLe classement {SOURCE_NAMES.get(inc["subject"], inc["subject"])} '
+                    f'ne se lit plus depuis {_age_h(inc["opened_at"]):.0f} h'
+                    + (f' : {str(why)[:200]}' if why else '') + '. Le Router garde ses dernières données de ce '
+                    "classement et réessaie à chaque passage ; aucun appel de modèle n'est touché.")
+        probe = (inc["detail"] or {}).get("probe")
         return (f'{head} — panne extérieure\n\n{inc["subject"]} ne répond plus correctement depuis '
-                f'{_age_h(inc["opened_at"]):.0f} h ({(inc["detail"] or {}).get("probe", "")[:120]}). '
+                f'{_age_h(inc["opened_at"]):.0f} h' + (f' ({probe[:120]})' if probe else '') + '. '
                 "Le routeur passe par les autres fournisseurs ; rien à faire de votre côté.")
     return None
 

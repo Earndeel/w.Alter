@@ -960,7 +960,8 @@ Arena.ai (LMArena) boards, read from the pages' embedded data.
 
 - `_board_matches(key: str, board: dict | None)` — Keep each result attached to the declared public leaderboard identity.
 - `arena_board(page: str)` — Leaderboard rows embedded in an Arena.ai page (Next.js flight data): pairwise boards carry 'entries'
-- `_close_browser(session: str, *, timeout: float=5)` — Close only the dedicated public collection session, with a bounded wait.
+- `_cli(engine: str | None)` — 
+- `_close_browser(session: str, *, timeout: float=5, engine: str | None=None)` — Close only the dedicated public collection session, with a bounded wait.
 - `_browser_text(url: str, *, timeout: float=BROWSER_TIMEOUT, session: dict | None=None)` — Read a public Arena page via the supported CLI, isolated session, no login or cookie export.
 - `source_arena(parts: set[str] | None=None)` — Every board, or only requested keys. A challenged HTTP transport falls back for this collection only.
 

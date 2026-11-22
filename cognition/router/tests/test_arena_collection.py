@@ -23,7 +23,9 @@ def browser(monkeypatch, *, fail=None, metadata=None, payload=None):
             return subprocess.CompletedProcess(argv, 1, '', 'do-not-echo-fixture')
         if action == 'eval':
             expr = argv[4]
-            if 'CompressionStream' in expr:
+            if 'document.title' in expr:      # Cloudflare challenge check: already through
+                result = False
+            elif 'CompressionStream' in expr:
                 result = {'url':'https://arena.ai/leaderboard/chat/text', 'htmlBytes':len(PUBLIC_PAGE.encode()),
                           'encodedLength':len(encoded), **(metadata or {})}
             else:
@@ -185,3 +187,35 @@ def test_matching_french_board_keeps_its_own_identity(monkeypatch):
     doc, _, _ = arena.source_arena()
     assert set(doc['boards']) == {'text_french'}
     assert 'text-french-style_control/' in doc['boards']['text_french']['leaderboard_id']
+
+
+def test_a_closed_camoufox_exit_reads_the_board_on_chromium(monkeypatch):
+    """20/11 and 21/11: the Mac was on its VPN, Camoufox's exit closed on purpose, every board failed."""
+    monkeypatch.setattr(arena, 'ARENA_BOARDS', {'chat/text': 'text'})
+    monkeypatch.setattr(arena.time, 'sleep', lambda *a: None)
+    monkeypatch.setattr(arena, 'fetch_text', lambda url: (_ for _ in ()).throw(HTTPError(url, 403, 'cf', None, None)))
+    encoded = base64.b64encode(gzip.compress(PUBLIC_PAGE.encode())).decode()
+    calls = []
+
+    def run(argv, **kw):
+        calls.append(argv)
+        engine = argv[2] if argv[1] == '-e' else None
+        action, args = (argv[5], argv[6:]) if engine else (argv[3], argv[4:])
+        if engine is None and action == 'nav':
+            return subprocess.CompletedProcess(argv, 1, '', 'NS_ERROR_CONNECTION_REFUSED')
+        if action == 'eval':
+            expr = args[0]
+            if 'document.title' in expr:
+                result = sum(1 for c in calls if 'document.title' in c[-1]) == 1   # one challenge page first
+            elif 'CompressionStream' in expr:
+                result = {'url': 'https://arena.ai/leaderboard/chat/text', 'htmlBytes': len(PUBLIC_PAGE.encode()),
+                          'encodedLength': len(encoded)}
+            else:
+                start, end = map(int, re.search(r'slice\((\d+),(\d+)\)', expr).groups())
+                result = encoded[start:end]
+            return subprocess.CompletedProcess(argv, 0, json.dumps({'ok': True, 'result': result}), '')
+        return subprocess.CompletedProcess(argv, 0, 'tab', '')
+    monkeypatch.setattr(subprocess, 'run', run)
+    doc, _, _ = arena.source_arena()
+    assert len(doc['boards']['text']['rows']) == 2 and not doc['errors']
+    assert calls[-1][:3] == ['walter-browser', '-e', 'chromium'] and calls[-1][-1] == 'close'

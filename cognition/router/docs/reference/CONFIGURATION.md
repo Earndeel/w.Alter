@@ -93,6 +93,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | guardian/run.py | `TEST_GRACE_H` | 6 | a failing test is often someone's work in progress: act only if it lasts |
 | guardian/run.py | `MAX_REPAIRS_PER_PASS` | 3 |  |
 | guardian/run.py | `EXTERNAL_NOTICE_H` | 48 | an outside outage is worth a message only when it lasts this long |
+| guardian/run.py | `SOURCE_NAMES` | {"aa": "Artificial Analysis", "aa_decision": "AA Decision", "aa_eval": "Artificial Analysis (évaluations)", "aa_stt": "Artificial Analysis (voix)", "agentset": "Agentset", "arena": "Arena (LMArena)", "bridgebench": "BridgeBench", "da": "Design Arena", "mm": "Artificial Analysis (médias)", "mteb": "MTEB"} |  |
 | guardian/run.py | `_CLOSED_OK` | ["fixed", "resolved"] |  |
 | guardian/run.py | `DOCS_OWNER_AFTER_H` | 24 | a reference that cannot be regenerated for a day goes to the owner |
 | health.py | `RUN_MAX_AGE_H` | 54 | the cycle runs every 48 h |
@@ -236,6 +237,9 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | research/benchmarks/arena.py | `BOARD_NAMES` | {"document": "document-overall-raw", "image_edit": "image_edit-overall-raw", "image_to_video": "image_to_video-overall-raw", "image_to_webdev": "image_to_webdev-overall-raw", "search": "search-overall-raw", "text": "text-overall-style_control", "text_coding": "text-coding-style_control", "text_creative": "text-creative_writing-style_control", "text_french": "text-french-style_control", "text_to_image": "text_to_image-overall-raw", "text_to_video": "text_to_video-overall-raw", "video_edit": "video_to_video-overall-raw", "vision": "vision-overall-style_control", "webdev": "webdev-overall-raw"} |  |
 | research/benchmarks/arena.py | `BROWSER_TIMEOUT` | 90 | one public page, including navigation and bounded CLI reads |
 | research/benchmarks/arena.py | `BROWSER_BUDGET` | 600 | shared across the collection; no per-board timeout multiplication without a ceiling |
+| research/benchmarks/arena.py | `FALLBACK_ENGINE` | chromium | Freebox exit, always open (Camoufox goes out through the owner's Mac and closes, |
+| research/benchmarks/arena.py | `CHALLENGE_WAIT` | 30 | seconds for Cloudflare's « Un instant… » page to give way to the leaderboard |
+| research/benchmarks/arena.py | `_CHALLENGE` | /^(un instant\|just a moment\|attention required)/i.test(document.title) |  |
 | research/benchmarks/bridgebench.py | `BRIDGEBENCH_URL` | https://www.bridgebench.ai/leaderboard |  |
 | research/benchmarks/design_arena.py | `DA_BASE` | https://www.designarena.ai |  |
 | research/benchmarks/design_arena.py | `CATEGORIES` | ["allcategories", "website", "uicomponent", "gamedev", "dataviz", "3d", "svg", "graphicdesign", "logo"] |  |

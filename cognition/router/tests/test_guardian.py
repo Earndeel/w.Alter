@@ -152,3 +152,24 @@ def test_library_page_is_republished_only_when_it_says_something_new():
     assert not library.differs(page.format(q=48, t="20/11/2026, 09:50 UTC"), old)
     assert library.differs(page.format(q=82, t="20/11/2026, 09:50 UTC"), old)
     assert library.differs(old, None)
+
+
+def test_an_unreadable_benchmark_is_named_as_such_never_as_a_provider():
+    """2026-11-22 (owner, « pourquoi je viens de recevoir ça ? »): « arena ne répond plus… passe par les autres
+    fournisseurs () » — Arena is a ranking, not a provider, and the empty brackets said nothing."""
+    inc = {**_inc("external", 50), "kind": "source_error", "subject": "arena",
+           "detail": {"error": "incomplete collection"}, "verdict": {"cause": "la sortie du Mac était fermée (VPN)"}}
+    msg = run._message(inc)
+    assert "benchmark illisible" in msg and "Arena (LMArena)" in msg and "fournisseur" not in msg
+    assert "VPN" in msg and "()" not in msg
+    assert "()" not in run._message({**_inc("external", 50), "detail": {}})
+
+
+def test_an_outside_source_outage_is_read_again_every_pass(monkeypatch):
+    seen = []
+    monkeypatch.setattr(run, "reread_source", lambda kind: seen.append(kind) or {"ok": True, "snapshot_id": 1})
+    monkeypatch.setattr(run, "_set", lambda conn, inc, status, verdict=None, **kw: seen.append(status))
+    inc = {"kind": "source_error", "subject": "arena", "status": "external", "attempts": 1, "detail": {},
+           "opened_at": datetime.now(timezone.utc) - timedelta(hours=50), "last_attempt_at": None}
+    run.handle(None, inc, [3])
+    assert seen == ["arena", "resolved"]

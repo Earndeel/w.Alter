@@ -66,10 +66,20 @@ class ArenaBrowserError(RuntimeError):
     """Public browser transport unavailable; no raw CLI diagnostics or page content is exposed."""
 
 
-def _close_browser(session: str, *, timeout: float = 5) -> None:
+FALLBACK_ENGINE = "chromium"   # Freebox exit, always open (Camoufox goes out through the owner's Mac and closes,
+                               # on purpose, while the Mac is on its VPN: 20/11 11:21 and 21/11 06:10, every board failed)
+CHALLENGE_WAIT = 30           # seconds for Cloudflare's « Un instant… » page to give way to the leaderboard
+_CHALLENGE = "/^(un instant|just a moment|attention required)/i.test(document.title)"
+
+
+def _cli(engine: str | None) -> list[str]:
+    return ["walter-browser", *(["-e", engine] if engine else [])]
+
+
+def _close_browser(session: str, *, timeout: float = 5, engine: str | None = None) -> None:
     """Close only the dedicated public collection session, with a bounded wait."""
     try:
-        result = subprocess.run(["walter-browser", "-s", session, "close"], capture_output=True,
+        result = subprocess.run([*_cli(engine), "-s", session, "close"], capture_output=True,
                                 text=True, timeout=timeout)
     except (OSError, subprocess.SubprocessError):
         raise ArenaBrowserError("public browser cleanup unavailable or timed out") from None
@@ -94,7 +104,7 @@ def _browser_text(url: str, *, timeout: float = BROWSER_TIMEOUT, session: dict |
         if remaining <= 0:
             raise ArenaBrowserError("public browser deadline exceeded")
         try:
-            result = subprocess.run(["walter-browser", "-s", session_id, action, *args], capture_output=True,
+            result = subprocess.run([*_cli(state.get("engine")), "-s", session_id, action, *args], capture_output=True,
                                     text=True, timeout=remaining)
         except (OSError, subprocess.SubprocessError) as exc:
             raise ArenaBrowserError("public browser command unavailable or timed out") from None
@@ -116,6 +126,9 @@ def _browser_text(url: str, *, timeout: float = BROWSER_TIMEOUT, session: dict |
             command("new", "arena-public")
             state["opened"] = True
         command("nav", url)
+        waited = time.monotonic() + CHALLENGE_WAIT
+        while command("eval", _CHALLENGE) is True and time.monotonic() < waited:
+            time.sleep(2)
         meta = command("eval", '(async()=>{const h=document.documentElement.outerHTML;'
                        'const s=new Blob([h]).stream().pipeThrough(new CompressionStream("gzip"));'
                        'const a=new Uint8Array(await new Response(s).arrayBuffer());let b="";'
@@ -150,7 +163,7 @@ def _browser_text(url: str, *, timeout: float = BROWSER_TIMEOUT, session: dict |
         # A close failure rejects a successful read, but must not hide the primary transport failure.
         if own_session:
             try:
-                _close_browser(session_id, timeout=min(5, timeout))
+                _close_browser(session_id, timeout=min(5, timeout), engine=state.get("engine"))
             except ArenaBrowserError:
                 if primary_error is None:
                     raise
@@ -192,6 +205,19 @@ def source_arena(parts: set[str] | None = None) -> tuple[dict, datetime, str]:
                         try:
                             board = arena_board(_browser_text(ARENA_URL + path,
                                 timeout=min(BROWSER_TIMEOUT, remaining), session=browser_session))
+                        except ArenaBrowserError:
+                            if browser_session.get("engine") == FALLBACK_ENGINE:
+                                raise
+                            if browser_session.get("id"):   # Camoufox's exit closed: the same read on Chromium
+                                try:
+                                    _close_browser(browser_session["id"])
+                                except ArenaBrowserError:
+                                    pass
+                            browser_session.clear()
+                            browser_session["engine"] = FALLBACK_ENGINE
+                            board = arena_board(_browser_text(ARENA_URL + path, timeout=min(
+                                BROWSER_TIMEOUT, max(1, BROWSER_BUDGET - browser_used - (time.monotonic() - started))),
+                                session=browser_session))
                         finally:
                             browser_used += max(0, time.monotonic() - started)
                     if _board_matches(key, board):
@@ -214,7 +240,7 @@ def source_arena(parts: set[str] | None = None) -> tuple[dict, datetime, str]:
     finally:
         if browser_session.get("id"):
             try:
-                _close_browser(browser_session["id"])
+                _close_browser(browser_session["id"], engine=browser_session.get("engine"))
             except ArenaBrowserError:
                 if primary_error is None:
                     raise

@@ -9454,9 +9454,14 @@
             "signature": "page: str"
           },
           {
+            "description": "",
+            "name": "_cli",
+            "signature": "engine: str | None"
+          },
+          {
             "description": "Close only the dedicated public collection session, with a bounded wait.",
             "name": "_close_browser",
-            "signature": "session: str, *, timeout: float=5"
+            "signature": "session: str, *, timeout: float=5, engine: str | None=None"
           },
           {
             "description": "Read a public Arena page via the supported CLI, isolated session, no login or cookie export.",
@@ -16496,6 +16501,23 @@
       {
         "comment": "",
         "file": "guardian/run.py",
+        "name": "SOURCE_NAMES",
+        "value": {
+          "aa": "Artificial Analysis",
+          "aa_decision": "AA Decision",
+          "aa_eval": "Artificial Analysis (évaluations)",
+          "aa_stt": "Artificial Analysis (voix)",
+          "agentset": "Agentset",
+          "arena": "Arena (LMArena)",
+          "bridgebench": "BridgeBench",
+          "da": "Design Arena",
+          "mm": "Artificial Analysis (médias)",
+          "mteb": "MTEB"
+        }
+      },
+      {
+        "comment": "",
+        "file": "guardian/run.py",
         "name": "_CLOSED_OK",
         "value": [
           "fixed",
@@ -18395,6 +18417,24 @@
         "value": 600
       },
       {
+        "comment": "Freebox exit, always open (Camoufox goes out through the owner's Mac and closes,",
+        "file": "research/benchmarks/arena.py",
+        "name": "FALLBACK_ENGINE",
+        "value": "chromium"
+      },
+      {
+        "comment": "seconds for Cloudflare's « Un instant… » page to give way to the leaderboard",
+        "file": "research/benchmarks/arena.py",
+        "name": "CHALLENGE_WAIT",
+        "value": 30
+      },
+      {
+        "comment": "",
+        "file": "research/benchmarks/arena.py",
+        "name": "_CHALLENGE",
+        "value": "/^(un instant|just a moment|attention required)/i.test(document.title)"
+      },
+      {
         "comment": "",
         "file": "research/benchmarks/bridgebench.py",
         "name": "BRIDGEBENCH_URL",
@@ -19699,7 +19739,7 @@
     "guardian/checks.py": "510e008432bbcf0c31287163bed9afdf42242380486fc6039b86dd7eba51f341",
     "guardian/playbook.json": "dd413285fa40d68b4539bd2469a74d825dd576cf03910add0a47ff5cb5fda5e6",
     "guardian/repair.py": "50604a48872e4684ba7a8cbe031eafde5ec7cbfe1c04697927dd9447d3dd29cd",
-    "guardian/run.py": "58e51e4199d184c4213eae760cd9407c4b7cf081f86d1fa04c55127a05064fc3",
+    "guardian/run.py": "c4fb1261f8b665ebee2f8516cf5a48350e1ad9de52a17d9b90161eb6c1745c6b",
     "health.py": "aeb89568df1f3c699a749117efac4c6d7074edc441b57de32672f50dbf38eac8",
     "instance.py": "244c85216abba400abdfbfa396139c66e68c8fbdf0991562e053cca7406947f7",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
@@ -19744,7 +19784,7 @@
     "research/benchmarks/aa_media.py": "071aa2f3e569abf11756c72a5181d530fb878f68afedeeed611c16687805537e",
     "research/benchmarks/aa_stt.py": "1df780e8e54d6a6a4e5eaea618f952de41bc3ff5878c8320d6a1efd49b320afe",
     "research/benchmarks/agentset.py": "1c73bb7619c1b0807e70b8177f4f2822e14cde7ad074af12767dcaa10dd81291",
-    "research/benchmarks/arena.py": "2344ef7649f4b850956c8943da65c89cf5be0efb96b6b125f2f07c3d3106547a",
+    "research/benchmarks/arena.py": "a96bc6fa227b2c12469eaa02d7ece8def228b3cb57e9b0f011a8887a04a5140e",
     "research/benchmarks/bridgebench.py": "70b09d7ab29a9b97598734808067d149e694c4f6f15c1bf5bf1e79236e9a2e26",
     "research/benchmarks/design_arena.py": "e999ca9aacd247194488aca9dda7ef4b524dc61e1c695ef77b487f049b52981f",
     "research/benchmarks/mteb.py": "81a7f0df351157f3cdf8e26a7378191d2a1e4e15197c17b56da2f09e9722baad",
