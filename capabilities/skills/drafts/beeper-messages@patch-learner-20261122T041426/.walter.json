@@ -1,0 +1,11 @@
+{
+ "base_sha": "3caec72feb25ed139e9018838fa2b5ce78c0c1623074a2ed4d91f5c742994879",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-22T04:14:26.107393+00:00",
+ "domain": "messaging",
+ "kind": "patch",
+ "reason": "The session demonstrated a reusable handoff from Beeper event metadata through Vault to batch transcription. Eight Instagram voice notes stored as .mp4 attachments were transcribed and supplied context missing from the written messages. A separate task update was refused for lack of approval. This belongs in Beeper message retrieval rather than a new transcription skill. [session walter/vm/b6948fc3-546e-4cb9-942c-c5e03809e6ce]",
+ "runtime": "learner",
+ "session_id": "walter/vm/b6948fc3-546e-4cb9-942c-c5e03809e6ce",
+ "target": "beeper-messages"
+}
