@@ -224,3 +224,29 @@ Compare the short m0 note with the requested Router m1 usage guide. Trace retrie
 ### 4. Report distinct findings
 
 State separately: which question set is called, whether recent main turns were actually rerouted, whether the short Router description is injected, and whether the full usage guide is injected or merely retrievable. Identify pending deployment gates without silently changing them. Explicitly state whether anything was modified.
+
+## Audit the live Router cycle, agent launches, and recommendation inputs
+
+1. Separate scheduled checks from actual model calls. Run `systemctl list-timers --all 'walter-router*'`, `systemctl cat walter-router-refresh.timer walter-router-guardian.timer walter-router-refresh.service`, and `journalctl -u walter-router-refresh.service --since '14 days ago' -o short-iso --no-pager`. Read the live timer definitions rather than assuming the 48 h refresh and 6 h guardian schedules are unchanged. From `cd /walter/cognition/router`, trace the cycle in `bin/walter-router-cycle`, the guardian checks in `guardian/checks.py`, and the conditional agent launches in `guardian/run.py` and `guardian/advice.py`. Do not count a guardian pass as an L3 call; it performs ordinary checks and only launches repair under its configured conditions.
+
+2. Count actual Router missions from the Engine run table. The VM may not have host `psql`; use the container client without reading or printing `/etc/walter/database.url`:
+
+```sh
+docker exec walter-pg psql -U walter -d walter -Atc "SELECT started_at, origin->>'request_id', level, status, round(extract(epoch FROM ended_at-started_at)/60, 1) AS minutes, routing->'requested'->>'level' AS requested_level, routing->>'applied' AS override_applied FROM runs.runs WHERE started_at > now()-interval '14 days' AND origin->>'request_id' ILIKE '%router%' ORDER BY started_at;"
+```
+
+Group by mission type from the request ID. Report Engine run `level`, requested routing level, and whether the override applied separately; an L4 run with a requested L1 and `applied=false` is not evidence that L1 served it. Use `models.runs` for refresh-cycle status, not for agent launch counts:
+
+```sh
+docker exec walter-pg psql -U walter -d walter -Atc "SELECT run_id, status, started_at, finished_at FROM models.runs ORDER BY run_id DESC LIMIT 6;"
+```
+
+3. Check which model data was refreshed and how complete it is before claiming the Router knows a feature:
+
+```sh
+docker exec walter-pg psql -U walter -d walter -Atc "SELECT kind, fetched_at, row_count FROM models.latest_snapshots ORDER BY kind; SELECT count(*) AS total, count(context_length) AS with_context FROM models.catalog; SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_schema='models' AND table_name IN ('catalog','canonical','offers','endpoints') ORDER BY table_name, ordinal_position;"
+```
+
+Trace source definitions in `research/sources.py` and field normalization in `analysis/parse.py` and `analysis/ingest.py`. Check offer `modes`, `interface`, and `pricing` against the corresponding latest `snapshot_id`, not historical rows. For a cross-source naming mismatch, trace the source names through canonical records to the current provider offer before attributing a price or capability to the model. Treat missing metadata as unknown, not as unsupported or equivalent across providers.
+
+4. Verify that collected data actually affects recommendations. Read `guardian/advice-brief.md` and `guardian/advice.py`, inspect the card builder in `analysis/catalog.py`, and run `bin/walter-router decision-needs` from the Router directory. Compare what the decision modules need with what the challenger-selection code checks and what the latest `analysis-run-*.json` under `/user/Lucas/logs/walter-router/` records. A requirement listed by `decision-needs` is not proof it gates a proposal. Likewise, distinguish scheduled source ingestion from outside research: compare the advice brief with `plan/news.py` before claiming that web research for subscription plans also discovers new models or benchmarks. Keep this audit read-only; do not trigger a refresh or change a poste just to verify it.
