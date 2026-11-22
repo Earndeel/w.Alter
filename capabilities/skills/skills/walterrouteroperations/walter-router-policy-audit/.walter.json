@@ -1,10 +1,7 @@
 {
- "created_at": "2026-11-22T04:14:14.808787+00:00",
- "description": "Use when auditing Walter Router tier rules, quota-spent fallbacks, subscription economics, or specialist routes on Monsieur's VM.",
- "domain": "walterrouteroperations",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
  "reason": "This recurring Router audit spans general tiers, specialists, subscriptions, and quota-state routing rather than coding-worker profiles. The session established the CLI and source paths for comparing policy with runtime execution and exposed concrete pitfalls: a missing plans subcommand, two incorrect SQL column assumptions, and an interrupted root-wide search. [session walter/vm/a002e412-99a8-4da6-86f0-72aba6771e9b]",
- "runtime": "learner",
- "session_id": "walter/vm/a002e412-99a8-4da6-86f0-72aba6771e9b",
- "target": "walter-router-policy-audit"
+ "store_sha": "3c53cfdbc5f467c37feb5db1b4e7ae704338a8a1c368cbce91e37f4a055c99ec"
 }
