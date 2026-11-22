@@ -8,9 +8,15 @@ the server's bare IP. Serves on the instance's [local] proxy (network.toml), e.g
 
   SOCKS5 (CONNECT)  and  HTTP proxy (CONNECT for https, absolute-URI requests for http)  on the same port.
 
-  open    the Mac answers over ssh, its tunnel `forbidden_vpn` is NOT connected, its SOCKS (`upstream_proxy`) is up
-          and its exit IP differs from every France exit of network.toml;
-  closed  otherwise (Mac on its France tunnel, asleep, offline): every connection is refused (fail closed).
+  open    the Mac answers over ssh, its SOCKS (`upstream_proxy`) is up and its exit IP is known and is not the
+          server's own IP; with `forbidden_vpn` set, also that tunnel is NOT connected and the exit IP differs from
+          every France exit of network.toml;
+  closed  otherwise (asleep, offline, unknown IP, the server's IP; or on `forbidden_vpn`): every connection is
+          refused (fail closed).
+
+Owner, 2026-11-22: « le Camoufox passe par le Mac quelle que soit la connexion, même si le Mac est sur WireGuard » —
+an instance without `forbidden_vpn` keeps this exit open while the Mac is on its tunnel (`vpn`, shown in the status):
+Camoufox then leaves by the tunnel's IP.
 
 A per-host budget (`per_host_per_minute`, `per_host_per_day` new connections) keeps an automated loop from burning
 the owner's IP; over budget the connection is refused and logged.
@@ -63,13 +69,14 @@ def load_config() -> dict:
     path = sh("walter", "instance", "config", "browse", "network.toml").stdout.strip()
     data = tomllib.loads(Path(path).read_text())
     loc = data.get("local", {})
-    for k in ("proxy", "upstream_proxy", "upstream_ssh", "forbidden_vpn"):
+    for k in ("proxy", "upstream_proxy", "upstream_ssh"):
         if not loc.get(k):
             sys.exit(f"network.toml [local] lacks {k}")
     france_ports = [int(e["port"]) for e in data.get("exit", {}).values() if e.get("country") == "FR" and e.get("port")]
     france_known = {e["public_ip"] for e in data.get("exit", {}).values() if e.get("country") == "FR" and e.get("public_ip")}
     return {"listen": urlparse(loc["proxy"]), "up": urlparse(loc["upstream_proxy"]), "ssh": loc["upstream_ssh"],
-            "vpn": loc["forbidden_vpn"], "per_min": int(loc.get("per_host_per_minute", 120)),
+            "vpn": loc.get("forbidden_vpn") or loc.get("vpn"), "vpn_forbidden": bool(loc.get("forbidden_vpn")),
+            "per_min": int(loc.get("per_host_per_minute", 120)),
             "per_day": int(loc.get("per_host_per_day", 3000)), "france_ports": france_ports,
             "france_known": france_known}
 
@@ -82,7 +89,27 @@ def port_open(host: str, port: int, timeout: float = 2) -> bool:
         return False
 
 
+_server: dict = {}
+
+
+def server_ip() -> str | None:
+    """The server's own public IP (never an exit for browsing), read directly once an hour."""
+    if not _server.get("ip") or time.time() - _server.get("at", 0) > 3600:
+        for url, _ in IP_SERVICES:
+            r = sh("curl", "-s", "--max-time", "12", url, timeout=20)
+            try:
+                ip = json.loads(r.stdout).get("ip")
+            except ValueError:
+                continue
+            if ip:
+                _server.update(ip=ip, at=time.time())
+                break
+    return _server.get("ip")
+
+
 def mac_on_vpn() -> bool | None:
+    if not cfg.get("vpn"):
+        return False
     r = sh("ssh", "-o", "ConnectTimeout=6", "-o", "BatchMode=yes", cfg["ssh"],
            f"scutil --nc status {json.dumps(cfg['vpn'])}", timeout=20)
     if r.returncode:
@@ -125,18 +152,27 @@ def decide() -> tuple[str, str]:
     on_vpn = mac_on_vpn()
     if on_vpn is None:
         return "closed", f"{cfg['ssh']} unreachable"
-    if on_vpn:
+    if on_vpn and cfg.get("vpn_forbidden"):
         return "closed", f"{cfg['ssh']} is on {cfg['vpn']} (France): its IP would be the France exit's"
     if not port_open(cfg["up"].hostname, cfg["up"].port):
         return "closed", f"{cfg['up'].netloc} (Mac SOCKS) down"
     if time.time() - state["checked_ip_at"] > IP_EVERY_S or not state["ip"]:
         ip, country = exit_ip(f"socks5h://{cfg['up'].netloc}")
-        state.update(ip=ip, country=country, checked_ip_at=time.time(), is_france_exit=bool(ip and ip in france_ips()))
+        state.update(ip=ip, country=country, checked_ip_at=time.time(),
+                     is_france_exit=bool(ip and cfg.get("vpn_forbidden") and ip in france_ips()))
+    if state.get("on_vpn") != on_vpn:            # the tunnel changed: read the exit IP again now
+        state["on_vpn"] = on_vpn
+        ip, country = exit_ip(f"socks5h://{cfg['up'].netloc}")
+        state.update(ip=ip, country=country, checked_ip_at=time.time(),
+                     is_france_exit=bool(ip and cfg.get("vpn_forbidden") and ip in france_ips()))
     if state.get("is_france_exit"):
         return "closed", f"Mac exit {state['ip']} is a France exit"
     if not state["ip"]:
         return "closed", "Mac exit IP unknown"
-    return "open", f"Mac real IP {state['ip']} ({state['country']})"
+    if state["ip"] == server_ip():
+        return "closed", f"Mac exit {state['ip']} is the server's own IP"
+    via = f" via its tunnel {cfg['vpn']}" if on_vpn else ""
+    return "open", f"Mac IP {state['ip']} ({state['country']}){via}"
 
 
 def save_state() -> None:
@@ -285,7 +321,7 @@ async def serve() -> None:
     cfg = load_config()
     srv = await asyncio.start_server(handle, cfg["listen"].hostname, cfg["listen"].port)
     log(f"listening on {cfg['listen'].netloc} (SOCKS5 + HTTP): the owner's real IP via {cfg['ssh']}, "
-        f"never while on {cfg['vpn']}; budget {cfg['per_min']}/min, {cfg['per_day']}/day per host")
+        f"{'never while on ' if cfg.get('vpn_forbidden') else 'also while on '}{cfg['vpn']}; budget {cfg['per_min']}/min, {cfg['per_day']}/day per host")
     async with srv:
         await asyncio.gather(srv.serve_forever(), supervise())
 
@@ -306,8 +342,10 @@ def probe() -> int:
     ip, country = exit_ip(f"socks5h://{cfg['listen'].netloc}", attempts=1)   # closed refuses at once
     st = json.loads(STATE.read_text()) if STATE.exists() else {}
     out["local_exit"] = {"ip": ip, "country": country, "route": st.get("route"), "why": st.get("why")}
-    if ip and (ip in fr or country == "FR"):
+    if ip and cfg.get("vpn_forbidden") and (ip in fr or country == "FR"):
         bad.append("local exit (:1084) leaves from a France IP")
+    if ip and ip == server_ip():
+        bad.append("local exit (:1084) leaves from the server's own IP")
     if ip and st.get("route") != "open":
         bad.append("local exit answered while closed")
     for unit, want in (("camoufox-max", cfg["listen"].netloc), ("cloakbrowser-max", "127.0.0.1:1083")):

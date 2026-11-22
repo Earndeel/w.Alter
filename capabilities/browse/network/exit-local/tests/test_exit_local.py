@@ -112,3 +112,31 @@ def test_exit_ip_none_when_nothing_answers_through_the_exit(monkeypatch):
     monkeypatch.setattr(X, "sh", lambda *cmd, **kw: X.subprocess.CompletedProcess(cmd, 97, "", ""))
     monkeypatch.setattr(X.time, "sleep", lambda s: None)
     assert X.exit_ip("socks5h://127.0.0.1:1083") == (None, None)
+
+
+def _decide_with(monkeypatch, *, forbidden, on_vpn, mac_ip, server="192.0.2.1"):
+    from urllib.parse import urlparse
+    X.cfg.clear()
+    X.cfg.update(ssh="mac", vpn="Lucas", vpn_forbidden=forbidden, up=urlparse("socks5://127.0.0.1:1082"))
+    X.state.update(ip=None, checked_ip_at=0.0, on_vpn=None, is_france_exit=False)
+    monkeypatch.setattr(X, "mac_on_vpn", lambda: on_vpn)
+    monkeypatch.setattr(X, "port_open", lambda *a, **k: True)
+    monkeypatch.setattr(X, "exit_ip", lambda proxy, **kw: (mac_ip, "FR"))
+    monkeypatch.setattr(X, "france_ips", lambda: {"203.0.113.7"})
+    monkeypatch.setattr(X, "server_ip", lambda: server)
+    return X.decide()
+
+
+def test_the_mac_on_its_wireguard_tunnel_keeps_camoufox_open(monkeypatch):
+    """Monsieur 2026-11-22: « le Camoufox passe par le Mac quelle que soit la connexion, même sur WireGuard »."""
+    route, why = _decide_with(monkeypatch, forbidden=False, on_vpn=True, mac_ip="203.0.113.7")
+    assert route == "open" and "Lucas" in why
+
+
+def test_an_instance_that_forbids_the_tunnel_still_closes(monkeypatch):
+    assert _decide_with(monkeypatch, forbidden=True, on_vpn=True, mac_ip="203.0.113.7")[0] == "closed"
+
+
+def test_never_the_servers_own_ip(monkeypatch):
+    route, why = _decide_with(monkeypatch, forbidden=False, on_vpn=False, mac_ip="192.0.2.1")
+    assert route == "closed" and "server" in why
