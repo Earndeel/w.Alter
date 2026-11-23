@@ -1,5 +1,8 @@
 {
+ "archived_at": "2026-11-23T04:15:49+00:00",
+ "archived_reason": "not read for 30 days",
  "content_since": "2026-10-23T12:39:40Z",
+ "domain": "learning",
  "hermes": {
   "path": "/root/.hermes/skills/devops/trainai-learning-access",
   "sha": "154a80dfcca799e0ed98fa9dde2aca2ea2df70d9992bbabe7c26593a9c222c24",
@@ -9,5 +12,6 @@
  "owner": "walter",
  "proposed_by": "hermes",
  "reason": "created by the Hermes agent (skill_manage)",
+ "reserve": true,
  "store_sha": "154a80dfcca799e0ed98fa9dde2aca2ea2df70d9992bbabe7c26593a9c222c24"
 }
