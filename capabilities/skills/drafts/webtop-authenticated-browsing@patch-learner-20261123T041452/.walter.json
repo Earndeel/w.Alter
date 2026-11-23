@@ -1,0 +1,11 @@
+{
+ "base_sha": "1e182197458b73122a10b21852baccc41f44f569ee7ec56d7c0751ebe67b3651",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-23T04:14:52.686100+00:00",
+ "domain": "web",
+ "kind": "patch",
+ "reason": "Adds a reproducible parallel-tab benchmark and memory-pressure triage to the existing Camoufox troubleshooting skill. The first comparison used serial browser reads; the follow-up read 13/13 pages in 129.5 seconds with one tab, but a five-tab run timed out after about two minutes while Camoufox was at its 2.5 GB limit and using swap. No memory change or successful parallel rerun was demonstrated. [session claude_code/vm/83965968-abe8-427b-92aa-076bc5b6023b]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/83965968-abe8-427b-92aa-076bc5b6023b",
+ "target": "webtop-authenticated-browsing"
+}
