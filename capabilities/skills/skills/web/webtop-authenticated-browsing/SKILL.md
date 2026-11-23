@@ -99,3 +99,38 @@ Avant une navigation authentifiée, vérifier la route active : les deux moteurs
 Ne jamais activer simultanément le tunnel Lucas du Mac et le tunnel de secours utilisant la même clé WireGuard : laisser le sélecteur gérer leur exclusion. Ne pas modifier le VPN du Mac pour ce contrôle.
 
 Si les journaux signalent `walter-secret file failed` ou `bw list failed`, vérifier `systemctl is-active walter-secrets-sync`, puis `walter-secret search wireguard freebox` sans afficher de valeurs secrètes. Comparer l’utilisateur et l’environnement du service avec ceux de l’appel manuel ; l’unité installée pendant cette session a nécessité `User=root`. Ne pas contourner cet échec en inscrivant une clé dans l’unité systemd. Refermer les sessions temporaires même si une vérification échoue.
+
+## Diagnose Camoufox stalls before benchmarking parallel tabs
+
+1. Check the live service and its memory limits before increasing concurrency. Use the running unit's `ExecStart` to find the active server code; do not assume the Browse source checkout is what systemd is running.
+
+```bash
+systemctl show camoufox-max -p ExecStart -p ControlGroup -p MemoryCurrent -p MemoryHigh -p MemoryMax -p MemorySwapCurrent -p MemorySwapMax
+systemctl cat camoufox-max
+curl -fsS --max-time 10 http://127.0.0.1:9377/health
+journalctl -u camoufox-max --since '10 min ago' --no-pager | tail -40
+```
+
+On Monsieur's VM, inspect `/etc/systemd/system/camoufox-max.service.d/10-memory-guard.conf` for the configured guard. On cgroup v2, compare memory and swap usage and take `memory.events` readings before and after the run to detect throttling or limit hits:
+
+```bash
+CG=$(systemctl show camoufox-max -p ControlGroup --value)
+if [ -n "$CG" ]; then
+  for f in memory.current memory.max memory.swap.current memory.events; do
+    p="/sys/fs/cgroup${CG}/$f"
+    if [ -r "$p" ]; then printf '\n%s\n' "$f"; cat "$p"; fi
+  done
+fi
+```
+
+2. Use a dedicated authenticated test session and the same fixed URL set for each run. Record discovery and detail extraction separately. For detail extraction, measure a one-tab baseline, then test two tabs and increase only while the service has headroom. Use a bounded worker pool and assign each worker its own tab ID; concurrent navigation through one shared tab is not a parallel-tab test. Confirm the tab routes and payloads in the live server code and `/opt/walter-core/bin/walter-browser` before scripting them. Set per-request timeouts and record wall time, successful reads, failures, and memory and swap usage. Do not compare serial browser navigation with batched API extraction as if both were running at their best concurrency.
+
+3. If parallel navigation times out while the service is at its memory ceiling and using swap, stop increasing concurrency. Report memory pressure as the leading diagnosis, not proof of a per-session lock or proof that more memory will fix it. Close only the session created for the benchmark, then rerun the health and memory checks. For the session used in this test:
+
+```bash
+/opt/walter-core/bin/walter-browser -s fbm-par close
+curl -fsS --max-time 10 http://127.0.0.1:9377/health
+systemctl show camoufox-max -p MemoryCurrent -p MemorySwapCurrent
+```
+
+If CLI cleanup fails, verify the live server exposes `DELETE /sessions/:id` before using `curl -fsS --max-time 60 -X DELETE http://127.0.0.1:9377/sessions/fbm-par` for that test session. Do not guess a `POST /session/close` route. Obtain approval before changing the memory guard or restarting the shared service, then rerun the same fixed workload to confirm any improvement.
