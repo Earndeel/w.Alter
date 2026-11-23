@@ -1,5 +1,8 @@
 {
+ "archived_at": "2026-11-23T04:15:49+00:00",
+ "archived_reason": "never read by any agent",
  "created_at": "2026-10-23T04:28:20.973624+00:00",
+ "domain": "video",
  "kind": "workflow",
  "origin": "walter-curator",
  "owner": "walter",
@@ -7,5 +10,6 @@
   "reference-video-fidelity",
   "ad-video-pipeline",
   "video-analysis-pipeline"
- ]
+ ],
+ "reserve": true
 }
