@@ -1,10 +1,7 @@
 {
- "created_at": "2026-11-24T04:13:37.181184+00:00",
- "description": "Use when Monsieur wants to turn a ChatGPT export into a representative, reviewable benchmark of real requests for W.Alter without importing the archive into Walter Memory.",
- "domain": "assistantevaluation",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
  "reason": "The session produced a reviewable 100-case pro/perso benchmark plus 100 reserves from 1,707 recovered conversations, without importing the export or running the benchmark. The work exposed reusable failure modes: the ZIP was already truncated at the source, an unpinned Codex failure replayed on paid Kie, equal label counts hid an ID mismatch, and a successful batch exit still left two rubrics missing. None of the listed skills covers this workflow. [session claude_code/vm/a8844991-6bfe-4a0d-b2e9-9d8ed5c0d5ce]",
- "runtime": "learner",
- "session_id": "claude_code/vm/a8844991-6bfe-4a0d-b2e9-9d8ed5c0d5ce",
- "target": "chatgpt-export-benchmark"
+ "store_sha": "663bfccb5228aa80cbb25ce8ce308ce34b3588a38601fbf414d7189022126dfa"
 }
