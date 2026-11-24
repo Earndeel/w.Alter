@@ -348,3 +348,10 @@ walter-browser -s openrouter-audit close
 ```
 
 Keep prompt inspection narrowly scoped to attribution, and avoid copying full private prompts into persistent procedure documentation.
+
+## Verify subscription entitlements for coding routes
+
+1. Compare the Router's declared model list with the current provider documentation for each subscription. Treat configuration as evidence of what is declared, not proof that a model is still available or that live routing works.
+2. Use `tools.walter_browse(query=...)` to locate official pages, then fetch them directly with `tools.walter_browse(url=url, content_only=True)`. Fetch both the subscription help page and the coding product's pricing or quota page: they answer different questions. Starting points: ChatGPT Plus `https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus` and Codex `https://chatgpt.com/codex/pricing/`; Claude Pro `https://support.claude.com/en/articles/8325606-what-is-the-pro-plan` (search Claude Help for the dedicated Claude Code usage article); Google AI Pro `https://support.google.com/googleone/answer/14534406?hl=en` and Antigravity `https://antigravity.google/pricing/` / `https://antigravity.google/docs/plans/`.
+3. If Browse returns a JSON string, decode it with `json.loads`; inspect `records` and read each relevant record's `content`. Check pricing footnotes as well as the main table. If the requested page yields no usable content, try its canonical or locale-specific URL or locate another official page. Do not turn search snippets into verified quota claims.
+4. Keep subscription access, coding-tool quotas and API billing separate. Record numeric limits only when explicitly stated, with the unit, reset window and applicable tier or model. Use a `limit_note` with a null numeric value for qualitative limits and dated model removals. Attach the source name, URL and short supporting quote; leave publication date null if unstated. Flag any declared model affected by a dated removal without claiming that the live route has already failed.
