@@ -1,0 +1,11 @@
+{
+ "created_at": "2026-11-24T04:14:47.826148+00:00",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "web-service-browser",
+  "human-in-the-loop-gate",
+  "webtop-authenticated-browsing"
+ ]
+}
