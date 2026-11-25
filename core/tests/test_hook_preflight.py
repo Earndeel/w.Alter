@@ -13,6 +13,9 @@ def hook(monkeypatch):
     spec = importlib.util.spec_from_file_location("walter_hook_under_test", HOOK)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    # The secret detector reads its own configuration on first use (walter_secrets runs `walter instance`, since
+    # 2026-11-17): load it for real before Popen is faked, so the fake only sees what the hook itself starts.
+    mod._privacy().detect("warm-up")
     sent = []
 
     class FakePopen:

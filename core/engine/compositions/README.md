@@ -32,3 +32,8 @@ dossier neutralisé) : identiques à deux écarts près, tous deux sans effet su
 Modifier `@instance/config/core/engine.toml`, puis `walter harness install dsh` (aperçu) et `--apply`. Ensuite
 régénérer le manifeste du gel (`engine/kernel/verify.py snapshot /opt/dsh --home /opt/dsh/home`) : l'empreinte du
 fichier de profil change, celle de la configuration composée seulement si la valeur change réellement.
+
+## Tests (retour arrière seulement, depuis le 25/11/2026)
+DSH est désinstallé depuis le 18/11 : les tests de la composition DSH ont quitté la suite active (`tests/`) pour
+`engine/compositions/tests/test_composition_dsh.py`. Ils se mettent d'eux-mêmes de côté tant que `/opt/dsh` est absent ;
+après une restauration de DSH : `walter-core-test -q engine/compositions/tests/`.

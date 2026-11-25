@@ -15,7 +15,7 @@
                    "params": {"unit": ["walter-engine", "dsh-web", "walter-telegram", "cloudflared-tunnel", "tailscaled"]}},
   "restart_stale": {"level": "G1", "describe": "restart a service running code older than the code on disk (gated in code: re-checked, deferred while an engine turn is in flight, once per hour per service)",
                     "command": ["walter", "deploy", "restart", "{unit}"], "async": true, "timeout_seconds": 180,
-                    "params": {"unit": ["camoufox-max", "cloakbrowser-max", "raw-vault-s3", "walter-browse-display", "walter-context-preflight", "walter-devboard-bus", "walter-devboard-docs.path", "walter-devboard-web", "walter-engine", "walter-exit-default", "walter-exit-mac", "walter-llm", "walter-logs-watch", "walter-memory-gateway", "walter-memory-overland", "walter-memory-pipeline", "walter-router-control", "walter-router-quota", "walter-secrets-sync", "walter-skills", "walter-skills-bus", "walter-telegram"]}}
+                    "params": {"unit": ["beeper-server", "camoufox-max", "cloakbrowser-max", "raw-vault-s3", "walter-browse-display", "walter-context-preflight", "walter-devboard-bus", "walter-devboard-docs.path", "walter-devboard-web", "walter-engine", "walter-exit-default", "walter-exit-mac", "walter-llm", "walter-logs-watch", "walter-memory-beeper-watch", "walter-memory-gateway", "walter-memory-overland", "walter-memory-pipeline", "walter-router-control", "walter-router-quota", "walter-secrets-sync", "walter-skills", "walter-skills-bus", "walter-telegram"]}}
  },
  "fallback": {"service_down": {"action": "restart_unit", "params": {"unit": "unit"}},
               "deploy_stale": {"action": "restart_stale", "params": {"unit": "unit"}}},

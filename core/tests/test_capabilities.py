@@ -104,7 +104,11 @@ class CapabilityTests(unittest.TestCase):
         walter_generate / walter_plans); the harness keeps its own model, generation is flagged as costly."""
         self.assertEqual(set(self.mcp.tools), {'walter_modules', 'secret_search', 'secret_reference', 'walter_browse',
                                              'walter_route', 'walter_run', 'walter_decide', 'walter_plans', 'walter_web',
-                                             'audio_transcribe', 'computer_use', 'module_guide', 'module_index'})
+                                             'audio_transcribe', 'computer_use', 'module_guide', 'module_index',
+                                             'beeper_read'})
+        # Beeper (native channel, live since 2026-11-24): an external dev client only reads; sending stays in the Engine
+        self.assertTrue(self.mcp.metadata['beeper_read']['annotations'].readOnlyHint)
+        self.assertNotIn('beeper_send_message', self.mcp.tools)
         self.assertNotIn('grants', inspect.signature(self.mcp.tools['computer_use']).parameters)
         self.assertNotIn('permissions', inspect.signature(self.mcp.tools['computer_use']).parameters)
         self.assertNotIn('command', inspect.signature(self.mcp.tools['secret_reference']).parameters)
