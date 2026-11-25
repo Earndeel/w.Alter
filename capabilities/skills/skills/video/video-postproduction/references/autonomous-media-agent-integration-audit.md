@@ -108,3 +108,20 @@ Normalize every clip before concat: target scale/pad, FPS, SAR, timebase, pixel 
 In Scena, reuse provider-agnostic `video_jobs`: `model='oracle-ffmpeg'`, `task_type='video_composition'`, `cost_credits=0`, and the legacy `piapi_task_id` for the external sidecar job ID. Authenticate callbacks, validate the output URL against the configured sidecar base, correlate only through the D1 row, and ignore callback-supplied client/workflow metadata for authorization. The workflow resume call is `recordWorkflowAsyncResult(env, runId, stepKey, status, payload)`; background continuation uses `ctx.waitUntil`, never `env.waitUntil`.
 
 Add the render tool to both the agent async-stop set and workflow runner async-tool set. After callback, technical probe is not creative QA: feed the complete master as `video_url` to multimodal QA, permit at most one no-credit rerender for deterministic edit/crop/logo/subtitle/audio defects, and route identity/product/anatomy/scene/motion defects to human review before paid regeneration. Use the real workflow context field `validationGate` rather than inventing `gate`, and inspect that type’s actual text field before composing the final approval prompt.
+
+## Autonomous media-agent integration gate
+
+When evaluating or wiring this workflow into an autonomous agent, distinguish six capabilities instead of treating “AI video agent” as one feature:
+
+1. **Reasoning and planning** — can turn a brief into shots, clip roles, a timeline, and constraints.
+2. **Provider generation** — can submit, poll, and reconcile independent image/video/audio jobs.
+3. **Post-production execution** — exposes a callable tool whose handler reaches a runtime that can actually run FFmpeg or an equivalent renderer.
+4. **Post-render QA** — propagates the completed output URL into real technical, visual, audio, and brief-compliance checks.
+5. **Correction routing** — converts failed QA into a bounded retry of the exact generation or edit stage that caused the defect.
+6. **Release sequencing** — delivers only after QA passes or an explicit human override/approval is recorded.
+
+Never infer capabilities 3–6 from workflow labels, prompt text, documentation, or the mere presence of FFmpeg on another machine. Trace the complete runtime path: **tool schema → model exposure → dispatcher → handler → execution runtime → persisted artifact → async callback/resume → QA decision → delivery**. For edge runtimes that cannot spawn FFmpeg, use an authenticated media-worker/sidecar job API; a binary installed on an operator host is not automatically available to the agent.
+
+The safe asynchronous order is: **provider completes → persist canonical outputs → enqueue assembly/post-production → probe and inspect rendered master → correct or request approval → deliver**. Sending provider output directly from its webhook before QA defeats the quality gate, even if a later workflow step is named `final_quality_control`.
+
+See `references/autonomous-media-agent-integration-audit.md` for a dated capability-audit pattern, evidence checklist, media-worker contract, and acceptance tests.

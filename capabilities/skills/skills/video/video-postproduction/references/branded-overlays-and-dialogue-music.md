@@ -113,3 +113,14 @@ Verification for this fast path:
 ### MD5 rule
 
 Decoded-audio MD5 equality is valid only when audio is intentionally copied unchanged (for example, subtitle burn-in with `-c:a copy`). Once music, fades, ducking, gain, or limiting is added, the audio must differ. Verify the mix with segment-level levels and peak/headroom checks instead of expecting matching hashes.
+
+## Premium-ad creative gate
+
+When the user asks for a qualified advertisement, do not start by concatenating the requested role labels. First audit the available media as a visual set:
+
+1. Build a contact sheet for every candidate with start, midpoints, last frame, and (for 10-second clips) roughly 0/2.5/5/7.5/last seconds. Score shot variety, product visibility, camera language, lighting, presenter continuity, and end-frame usability.
+2. Do not mix a cinematic/generated product sequence with raw selfie/UGC footage merely because the subjects are different or the brief says `farmer + woman`. That creates a visibly amateur seam. Prefer a coherent same-presenter pair when the available assets make that the only commercial-looking option; otherwise report the trade-off and identify the missing bridge/regenerated shot needed to honor the subject change.
+3. Treat provider-generated typography, logos, legal/certification claims, URLs, and end cards as untrusted image content. Never ship malformed generated text or invented claims. Replace the end card with deterministic typography/layout (Pillow, Remotion, or FFmpeg drawtext) using only verified copy supplied by the brief.
+4. Wrap and size every end-card line for the actual 720×1280 canvas. Inspect the full-resolution card, not only a thumbnail, for right-edge clipping, CTA overflow, accent/diacritic errors, contrast, and safe margins.
+5. Use an intentional transition grammar (hard cut, short fade-to-black, or a justified crossfade) instead of an accidental seam. If `xfade` is used, normalize every video input to the same frame rate and timebase first (`fps=24,settb=1/24` is a safe pattern for the common Flow exports).
+6. Calculate video and audio durations independently. A crossfade reduces the sum by its duration; pad/fade the audio explicitly (`apad` + `atrim`) so the audio stream ends exactly with the video, including the final card.
