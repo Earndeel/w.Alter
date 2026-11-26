@@ -534,6 +534,18 @@ TASK_SELECT = f"""select t.task_id, t.goal, t.status, {THREAD_SQL} thread_id, t.
                  from runs.tasks t"""
 
 
+def listed_channels(channels: list[str] | str | None, thread_id: str | None = None,
+                    session_id: str | None = None) -> list[str] | None:
+    """The channels a task listing shows (07-CONVERGENCE § 6.8, 17/11; one rule for the CLI, the MCP tool and the
+    gateway, 26/11): the owner's list never shows a Lab or test channel's objectives; a list narrowed to a thread or a
+    session shows what was worked there, whatever the channel. channels: a list, a comma-separated string, 'all'."""
+    if channels == "all" or (channels is None and (thread_id or session_id)):
+        return None
+    if isinstance(channels, str):
+        channels = [c.strip() for c in channels.split(",")]
+    return [c for c in (channels or ["owner"]) if c] or ["owner"]
+
+
 def tasks_list(thread_id: str | None = None, session_id: str | None = None, status: str | list | None = None,
                limit: int = 10, channels: list[str] | None = None) -> list[dict]:
     """The owner's objectives, most recently active first, in the binding shape (SOCLE.md, contracts between lots):

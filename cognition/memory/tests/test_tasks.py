@@ -477,3 +477,22 @@ def test_a_test_session_finds_its_own_objectives_and_never_the_owners():
     runs.start(origin=origin(s), goal="reprends")
     seen = {c["id"] for c in runs.objective_candidates(goal, session_id=s)["candidates"]}
     assert th_test not in seen and th_owner in seen
+
+
+def test_gateway_list_shows_the_owners_objectives_unless_narrowed(client):
+    """Owner 26/11: a test objective never stands among the owner's objectives in a pack (the gateway now applies the
+    rule the CLI and the MCP tool had since 17/11); narrowed to a thread, what was worked there, whatever the channel."""
+    ids = {}
+    for ch in ("owner", "test"):
+        th = thread()
+        r = runs.start(origin=origin(channel=ch), goal=f"objectif {ch}")
+        ids[ch] = (runs.update(r, thread_id=th, act="new", requested=CODING)["task_id"], th)
+    listed = {t["task_id"] for t in client.post("/v1/tasks/list", json={"limit": 50}).json()["tasks"]}
+    assert ids["owner"][0] in listed and ids["test"][0] not in listed
+    assert [t["task_id"] for t in client.post("/v1/tasks/list", json={"thread_id": ids["test"][1]}).json()["tasks"]] \
+        == [ids["test"][0]]
+    tests = {t["task_id"] for t in client.post("/v1/tasks/list", json={"channels": ["test"], "limit": 50}).json()["tasks"]}
+    assert ids["test"][0] in tests and ids["owner"][0] not in tests
+    assert runs.listed_channels(None) == ["owner"] and runs.listed_channels("all") is None
+    assert runs.listed_channels(None, thread_id="x") is None and runs.listed_channels("owner, test") == ["owner", "test"]
+    assert runs.listed_channels("") == ["owner"]

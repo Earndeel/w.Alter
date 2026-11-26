@@ -312,6 +312,7 @@ class TasksListIn(BaseModel):
     session_id: str | None = None
     status: str | list[str] | None = None     # one status, a list, "all"; default the active ones (open, suspended)
     limit: int = 10
+    channels: str | list[str] | None = None   # default: the owner's, unless narrowed to a thread or a session
 
 
 class TaskUpdateIn(BaseModel):
@@ -332,7 +333,8 @@ class ExperienceIn(BaseModel):
 def post_tasks_list(body: TasksListIn):
     from . import runs
     return {"tasks": runs.tasks_list(thread_id=body.thread_id, session_id=body.session_id, status=body.status,
-                                     limit=max(1, min(body.limit, 50)))}
+                                     limit=max(1, min(body.limit, 50)),
+                                     channels=runs.listed_channels(body.channels, body.thread_id, body.session_id))}
 
 
 @app.post("/v1/tasks/update", dependencies=[Depends(auth)])

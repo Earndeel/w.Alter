@@ -539,8 +539,7 @@ def main(argv=None) -> None:
         if a.action == "list":
             # the owner's list never shows a Lab or test channel's objectives (07-CONVERGENCE § 6.8, 17/11); a list
             # narrowed to a thread or a session shows what was worked there, whatever the channel
-            ch = None if a.channels == "all" or (a.channels is None and (a.thread or a.session)) else \
-                [c.strip() for c in (a.channels or "owner").split(",") if c.strip()]
+            ch = runs.listed_channels(a.channels, a.thread, a.session)
             res = runs.tasks_list(thread_id=a.thread, session_id=a.session, status=a.status, limit=a.limit, channels=ch)
         elif a.action == "show":
             res = runs.task_get(a.task_id) or {"error": "unknown task"}
