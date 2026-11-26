@@ -189,11 +189,14 @@ def board(plan: ContextPlan | None = None, at: datetime | None = None) -> Block 
                  sources=[k for _, line, k in rows if line in lines])
 
 
-def session_state(plan: ContextPlan, message: str, session_key: str | None) -> Block | None:
+def session_state(plan: ContextPlan, message: str, session_key: str | None, socle_rules: bool = False) -> Block | None:
     """Layer 2, SessionState (Memory V1 P1.1): the owner's durable rules in force (always, stable) and the working
     state of this session's thread — interpreted decisions and constraints of the thread and of its subject in other
     runtimes, the owner's words not interpreted yet verbatim, the agent's plan. Rebuilt from Memory at each message, so
-    a compression or another runtime loses nothing."""
+    a compression or another runtime loses nothing.
+    socle_rules (owner 2026-11-26): the host said it carries the owner's universal consignes in its cached instructions
+    for this turn (Walter Engine's stable block): only the consignes limited to a project, domain, person or situation
+    come here. Without that word from the host nothing changes, so a host that could not read the block loses none."""
     from walter_memory import context
     source, thread = None, None
     if session_key and session_key.count("/") >= 2:
@@ -201,7 +204,7 @@ def session_state(plan: ContextPlan, message: str, session_key: str | None) -> B
         source = {"claude-code": "claude_code"}.get(source, source)
     budget = {k: 0 for k in ("profile", "people", "records", "knowledge", "evidence", "views")} | NOT_HERE | STATE_BUDGET
     r = context.get_context(message, budget=budget, include_profile=False,
-                            session=(source, thread) if source and thread else None)
+                            session=(source, thread) if source and thread else None, exclude_universal=socle_rules)
     if not r.get("text"):
         return None
     refs = [ref for s in (r.get("trace") or {}).get("sections", {}).values() for ref in (s.get("refs") or [])]
@@ -599,12 +602,12 @@ class Prefetch:
     functions get the same arguments: the pack is the same, only ready sooner. A result the plan does not ask for is
     dropped, never shown. Its cost is one memoized rerank call and about 0.3 s of CPU."""
 
-    def __init__(self, message: str, session_key: str | None):
+    def __init__(self, message: str, session_key: str | None, socle_rules: bool = False):
         w = _workers()
-        self.message, self.session_key = message, session_key
+        self.message, self.session_key, self.socle_rules = message, session_key, socle_rules
         self.memory_budget = {**MEMORY_BUDGET["L3"], **NOT_HERE}
         w.submit(_notes)                         # warms the shared notes; their blocks read the cache
-        self.state = w.submit(_timed, lambda: session_state(None, message, session_key))
+        self.state = w.submit(_timed, lambda: session_state(None, message, session_key, socle_rules))
         self.memory = w.submit(_timed, lambda: _memory_block(message, self.memory_budget))
 
     def taken(self, plan: ContextPlan, message: str, session_key: str | None) -> dict:
@@ -618,7 +621,8 @@ class Prefetch:
 
 
 def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, native_history: bool = True,
-           deadline: float | None = None, prefetch: Prefetch | None = None) -> tuple[list[Block], list[str]]:
+           deadline: float | None = None, prefetch: Prefetch | None = None,
+           socle_rules: bool = False) -> tuple[list[Block], list[str]]:
     """The blocks the plan asks for. L0: capabilities (+ records when unsure or a lookup is needed), and — at every
     level, two short Memory calls — the objectives of the plan's thread and a recent failed attempt at the same thing
     (SOCLE A3/A4: a light request is exactly the one that would otherwise be retried blind). Returns (blocks, notes
@@ -654,7 +658,7 @@ def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, n
     if "location" in (plan.personal or []):
         steps.append(("position", lambda: position(plan)))
     if plan.level != "L0":
-        steps += [("board", lambda: board(plan)), ("session_state", lambda: session_state(plan, message, session_key)),
+        steps += [("board", lambda: board(plan)), ("session_state", lambda: session_state(plan, message, session_key, socle_rules)),
                   ("subject", lambda: subject(plan))]
     steps += [("tasks", lambda: tasks(plan)), ("experience", lambda: experience(plan, message))]
     if plan.level != "L0":

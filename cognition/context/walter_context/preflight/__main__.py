@@ -258,7 +258,7 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
         if (shadow or want_pack) and (d.get("privacy_class") or "cloud_allowed") != "local_only":
             try:
                 from ..retrieval import Prefetch
-                pre = Prefetch(str(d.get("message") or ""), key)
+                pre = Prefetch(str(d.get("message") or ""), key, socle_rules=bool(d.get("socle_rules")))
             except Exception:  # noqa: BLE001 — gather() asks them itself
                 pre = None
         if prev is None and key:
@@ -316,7 +316,8 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
                 row["thread_blocks"] = {k: v for k, v in withheld.items() if k != "_chosen"}
             try:
                 blocks, notes = gather(plan_obj, req.message, session_key=key, deadline=due, prefetch=pre,
-                                       native_history=d.get("runtime") in ("claude_code", "codex", "dsh"))
+                                       native_history=d.get("runtime") in ("claude_code", "codex", "dsh"),
+                                       socle_rules=bool(d.get("socle_rules")))   # owner 2026-11-26: the host's block
                 skip = set(d.get("exclude_blocks") or [])      # what the host already shows natively (its profile)
                 blocks = [b for b in blocks if b.id not in skip]
                 row["mode"] = "inject" if want_pack else "shadow"
