@@ -250,7 +250,9 @@ tasks = 0
 experience = 0
 
 [pack.state_budget]                 # layer 2 (Memory V1 P1.1): every level but L0 without a thread
-rules = 350
+# Owner 2026-11-26 (budget bench of 26/11, 91 messages): at 350 Walter saw 31 % of the consignes that apply to the
+# message (2/91 complete), at 2 500 99.8 % (88/91); answers slightly better, +0.8 s median. Rollback: 350.
+rules = 2500
 working = 1200
 
 # Long owner messages (walter_context/longtext.py, 2026-11-17): the decision model reads head + tail + every sentence
