@@ -333,20 +333,36 @@ def apply_toolset(mcp,keep):
     for name in hidden:manager.remove_tool(name)
     if not hidden:return []
 
-    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False,openWorldHint=True))
+    from walter_platform import capabilities as caps
+    try:decls=caps.declarations()
+    except Exception:decls={}
+
+    @mcp.tool(name=caps.WALTER_CALL,description=caps.WALTER_CALL_DESCRIPTION,
+              annotations=ToolAnnotations(readOnlyHint=False,openWorldHint=True))
     async def walter_call(tool: str='',arguments: dict|None=None,describe: bool=False) -> str:
-        """Call a W.Alter tool that is not in your tool list (the module presentations name them: vault_get,
-        memory_events, logs_timeline, skill_propose…). Without tool: their names and one-line summaries.
-        With describe=true: that tool's full description and parameters. Otherwise runs it with `arguments`."""
-        if not tool:
-            return json.dumps({'tools':[{'name':n,'summary':_summary(t.description)} for n,t in sorted(hidden.items())]},
-                              ensure_ascii=False)
-        target=hidden.get(tool)
-        if target is None:
-            return json.dumps({'error':'not_a_hidden_tool','hint':'call listed tools directly','hidden':sorted(hidden)})
-        if describe:
-            return json.dumps({'name':tool,'description':target.description,'parameters':target.parameters},ensure_ascii=False)
-        result=await target.run(arguments or {})
+        asked=caps.resolve_call({'tool':tool,'arguments':arguments,'describe':describe})
+        if asked['mode']=='list':
+            return json.dumps(caps.listing({n:{'description':t.description,'module':caps.spec_of(decls,n).get('module')}
+                                            for n,t in hidden.items()}),ensure_ascii=False)
+        target=hidden.get(asked.get('tool'))
+        if asked['mode']=='error' or target is None:
+            # existing clients read error='not_a_hidden_tool' (kept); `code` is the shared vocabulary (lot 3e)
+            import difflib
+            name=asked.get('tool') or str(tool or '')
+            listed=name in {t.name for t in mcp._tool_manager.list_tools()}
+            code='invalid_request' if asked['mode']=='error' or listed else 'not_found'
+            if asked['mode']=='error' and not name:
+                return json.dumps({**asked['error'],'code':'invalid_request'},ensure_ascii=False)
+            return json.dumps({'error':'not_a_hidden_tool','code':code,'hint':'call listed tools directly',
+                               'hidden':sorted(hidden),
+                               'candidates':difflib.get_close_matches(name,sorted(hidden),n=3,cutoff=0.5)},ensure_ascii=False)
+        if asked['mode']=='describe':
+            return json.dumps(caps.describe_record(asked['tool'],target.description,target.parameters,caps.spec_of(decls,asked['tool'])),ensure_ascii=False)
+        problems=caps.check_arguments(target.parameters,asked['arguments'])
+        if problems['missing'] or problems['unknown']:
+            from mcp.server.fastmcp.exceptions import ToolError   # an error stays an error (isError), schema inside
+            raise ToolError(json.dumps(caps.argument_error(asked['tool'],target.parameters,problems),ensure_ascii=False))
+        result=await target.run(asked['arguments'])
         return result if isinstance(result,str) else json.dumps(result,ensure_ascii=False,default=str)
     return sorted(hidden)
 

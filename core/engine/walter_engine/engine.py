@@ -120,7 +120,7 @@ COMMENT_LINE = re.compile(r"\A\s*<!--.*?-->\s*", re.S)
 from .jobs import Job, Jobs
 from .llm import Answer, Client, LLMError
 from .policy import Policy
-from .tools import Exec, Registry, Result, as_result, clip, elapsed_ms, parse_args
+from .tools import Exec, Registry, Result, as_result, capabilities, clip, elapsed_ms, parse_args
 from .tools import agents as agent_tools
 from .tools import builtin
 from .tools.mcp import PREFIX as MCP_PREFIX, McpClient
@@ -791,23 +791,42 @@ class Engine:
     async def execute_tool(self, a: Agent, name: str, args: dict, *, via: str = "model", cancel: asyncio.Event | None = None,
                            parent_call: str | None = None, turn: int | None = None, step: int | None = None,
                            call_id: str | None = None, journal_call: bool = True) -> Result:
-        """The one path of every call (the model's, Python's `await tools.x()`, the API's): policy, approval, journal."""
+        """The one path of every call (the model's, Python's `await tools.x()`, the API's): the generic door resolved
+        to the tool it opens, arguments checked against the tool's schema, policy, approval, the resource lock, the
+        journal; an effectful call whose answer is lost says so (lot 3e: one executor, whatever the door)."""
         cancel = cancel or a.cancel
+        caps = capabilities()
+        door = None
+        if name == MCP_PREFIX + caps.WALTER_CALL:   # the generic door is an alias, never a second pipeline
+            asked = caps.resolve_call(args)
+            if asked["mode"] == "run":
+                inner = MCP_PREFIX + asked["tool"]
+                if inner in self.registry.tools and self.registry.tools[inner].source == "mcp:walter":
+                    door, name, args = caps.WALTER_CALL, inner, asked["arguments"]
+                else:
+                    return Result(json.dumps(caps.unknown_tool(asked["tool"], self.mcp.similar(asked["tool"])),
+                                             ensure_ascii=False), True, meta={"door": caps.WALTER_CALL})
+            elif asked["mode"] == "error":
+                return Result(json.dumps(asked["error"], ensure_ascii=False), True, meta={"door": caps.WALTER_CALL})
         tool = self.registry.tools.get(name)
+        spec = self.registry.spec(name)
         call_id = call_id or f"{via}-{uuid.uuid4().hex[:12]}"
         nested = journal_call
         if nested:
             a.session.append("tool/call", {"turn": turn, "step": step, "callId": call_id, "name": name, "nested": True,
-                                           "via": via, "parentCall": parent_call,
+                                           "via": via, "parentCall": parent_call, **({"door": door} if door else {}),
                                            "arguments": json.dumps(args, ensure_ascii=False, default=str)[:20000]})
         t0 = time.monotonic()
-        missing = [k for k in ((tool.parameters or {}).get("required") or ()) if args.get(k) in (None, "")] if tool else []
+        problems = caps.check_arguments(tool.parameters, args) if tool else {}
         if tool is None:
             res = Result(f"no tool named {name}" + ("" if self.mcp.tools else " (Walter tools are starting; try again)"), True)
-        elif missing:                     # never run a tool on a guessed default (`read` without file_path = the cwd)
-            props = ", ".join(sorted((tool.parameters or {}).get("properties") or {}))
-            res = Result(f"{name}: missing required argument(s) {', '.join(missing)} (arguments: {props})", True,
-                         meta={"invalid_arguments": missing})
+        elif problems.get("missing") or problems.get("unknown"):
+            # never run a tool on a guessed default (`read` without file_path = the cwd), never drop an argument
+            # silently (logs_get(ref=…) against an older schema): the error carries the tool's own schema
+            err = caps.argument_error(name.removeprefix(MCP_PREFIX), tool.parameters, problems)
+            res = Result(json.dumps(err, ensure_ascii=False), True,
+                         meta={"invalid_arguments": problems.get("missing") or problems.get("unknown"),
+                               "error": "invalid_request"})
         else:
             decision = await self.policy.judge(tool=name, args=args, door=a.policy_door, depth=a.depth,
                                                 principal=a.principal)
@@ -822,16 +841,31 @@ class Engine:
                     self._record_run(a)
                 ex = Exec(engine=self, agent=a, call_id=call_id, name=name, cancel=cancel, turn=turn, step=step,
                           parent_call=parent_call, via=via)
+                # Walter tools are locked by the MCP server (across every client process); the engine's own here
+                key = None if tool.source == "mcp:walter" else caps.lock_key(spec, args, session=a.key)
+                started = False
                 try:
-                    res = as_result(await tool.run(args, ex))
+                    async with self.registry.locks.hold(key, holder=f"{a.key}:{call_id}"):
+                        if cancel.is_set():
+                            raise asyncio.CancelledError()
+                        started = True
+                        res = as_result(await tool.run(args, ex))
                 except asyncio.CancelledError:
                     if self.stopping:
                         raise
-                    res = Result("[interrupted]", True)
+                    res = Result("[interrupted]" if started else "[interrupted before it started]", True,
+                                 meta={"interrupted": True, "started": started})
                 except Exception as e:  # noqa: BLE001 — a tool's defect is the model's information, never the turn's end
                     log.warning("tool %s failed: %s", name, e)
                     res = Result(f"{type(e).__name__}: {str(e)[:2000]}", True)
-        res.meta = {**(res.meta or {}), "ms": elapsed_ms(t0)}
+                lost = (res.meta or {}).get("interrupted") and (res.meta or {}).get("started", True) \
+                    or (res.meta or {}).get("timeout")
+                if lost and caps.effectful(spec):
+                    # it may have taken effect: never retried here; the caller learns how to check and if a retry is safe
+                    why = "no answer within its time limit" if (res.meta or {}).get("timeout") else "interrupted while running"
+                    res = Result(json.dumps(caps.outcome_unknown(name.removeprefix(MCP_PREFIX), spec, why),
+                                            ensure_ascii=False), True, meta={**(res.meta or {}), "outcome": "unknown"})
+        res.meta = {**(res.meta or {}), "ms": elapsed_ms(t0), **({"door": door, "resolved": name} if door else {})}
         if nested:
             a.session.append("tool/result", {"turn": turn, "step": step, "callId": call_id, "name": name, "nested": True,
                                              "via": via, "content": clip(res.content, 20000), "isError": bool(res.is_error)})
@@ -840,7 +874,7 @@ class Engine:
             asyncio.get_running_loop().create_task(self.state_event(
                 a, "tool.result", {"tool": short, "ok": not res.is_error, "summary": res.content[:240] if res.is_error else "",
                                    "call_id": call_id}))
-        if res.is_error and tool is not None and not (res.meta or {}).get("policy") and res.content != "[interrupted]":
+        if res.is_error and tool is not None and not (res.meta or {}).get("policy") and not (res.meta or {}).get("interrupted"):
             # §7: a tool that fails a second time in the same turn is a change worth a decision (one failure is
             # ordinary trial and error, and Context's gate never asks twice for the same failure in a session)
             a.fails[short] = a.fails.get(short, 0) + 1

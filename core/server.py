@@ -613,6 +613,11 @@ _LAYER = "\n\n".join(x for x in (_LAYER, toolset_note(_HIDDEN)) if x)
 if _LAYER:
     mcp._mcp_server.instructions = BASE_INSTRUCTIONS + "\n\n" + _LAYER
 
+# One lock per declared resource (lot 3e): two calls on the same browser session, device, chat, task or skill never
+# interleave, whichever client process makes them. Installed before the policy so a refused call never waits.
+from walter_platform import capabilities as _capabilities  # noqa: E402
+_capabilities.install_locks(mcp)
+
 # Walter's one execution policy (core/security, lot E3): a call it refuses never reaches a tool, whatever the client.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "security"))
 from walter_security import mcp_guard  # noqa: E402

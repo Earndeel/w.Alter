@@ -6,6 +6,13 @@ path, `Registry.execute`, whoever makes it (the model directly, Python's `await 
 policy (never-list, door preset, child ≤ parent, disclosure check, approval), the run's context, the journal and the
 measurements apply the same way. Tools declare whether they may run beside others (`parallel`) or one at a time
 (`exclusive`, the default for anything that writes or executes).
+
+Lot 3e (2026-11-26): every tool has a capability declaration (`spec`: effects, concurrency, references,
+idempotency), the same vocabulary as the module contracts (`walter_platform.capabilities`). A Walter tool's comes
+from its module's contract; the engine's own tools declare theirs here (`NATIVE_SPECS`), next to their code.
+A call on a shared resource (a file, a sub-agent, a job, a Python kernel) holds that resource's lock while it runs,
+whichever door, agent or session makes it (`Registry.locks`); Walter tools are locked by the MCP server itself,
+across every client process.
 """
 from __future__ import annotations
 
@@ -14,6 +21,17 @@ import json
 import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
+
+from .. import config
+
+
+def capabilities():
+    """walter_platform.capabilities of the core this engine belongs to (shared with the MCP server)."""
+    import sys
+    if str(config.CORE_ROOT) not in sys.path:
+        sys.path.insert(0, str(config.CORE_ROOT))
+    from walter_platform import capabilities as caps
+    return caps
 
 
 @dataclass
@@ -47,6 +65,7 @@ class Tool:
     parallel: bool = False
     source: str = "engine"            # engine | mcp:walter
     hidden: bool = False              # reachable from Python only (not offered to the model)
+    spec: dict | None = None          # capability declaration (lot 3e); None = undeclared (effectful, serial)
 
     def schema(self) -> dict:
         return {"type": "function", "function": {"name": self.name, "description": self.description,
@@ -64,6 +83,37 @@ def clip(text: str, limit: int, *, head_ratio: float = 0.4) -> str:
 
 def obj(properties: dict, required: list[str] | None = None) -> dict:
     return {"type": "object", "properties": properties, "required": required or [], "additionalProperties": False}
+
+
+# The engine's own tools: what each one does to the world and what it shares (same vocabulary as the module
+# contracts). `parallel` in a model batch stays the Tool's own flag; a resource is locked whatever the door.
+_ANY = ["local_write", "external_state", "outgoing", "cost"]
+NATIVE_SPECS = {
+    "bash": {"effects": _ANY, "concurrency": "serial", "idempotency": "none"},
+    "read": {"effects": ["none"], "concurrency": "parallel", "consumes": ["file"]},
+    "read_image": {"effects": ["none"], "concurrency": "serial", "consumes": ["file"]},
+    "write": {"effects": ["local_write"], "concurrency": {"resource": "file", "key": "file_path"},
+              "produces": ["file"], "idempotency": "natural"},
+    "edit": {"effects": ["local_write"], "concurrency": {"resource": "file", "key": "file_path"},
+             "consumes": ["file"], "produces": ["file"], "idempotency": "none"},
+    "glob": {"effects": ["none"], "concurrency": "parallel", "produces": ["file"]},
+    "grep": {"effects": ["none"], "concurrency": "parallel", "produces": ["file"]},
+    "job_output": {"effects": ["none"], "concurrency": "parallel", "consumes": ["job"]},
+    "job_kill": {"effects": ["external_state"], "concurrency": {"resource": "job", "key": "job_id"},
+                 "consumes": ["job"], "idempotency": "natural"},
+    "job_list": {"effects": ["none"], "concurrency": "parallel", "produces": ["job"]},
+    "present": {"effects": ["record"], "concurrency": "serial", "consumes": ["file"], "idempotency": "none"},
+    "ask_user_question": {"effects": ["none"], "concurrency": "parallel"},
+    "context_recover": {"effects": ["none"], "concurrency": "parallel", "consumes": ["call"]},
+    "subagent": {"effects": ["cost"], "concurrency": "serial", "produces": ["agent", "job"], "idempotency": "none"},
+    "send_message": {"effects": ["cost"], "concurrency": {"resource": "agent", "key": "agent_id"},
+                     "consumes": ["agent"], "idempotency": "none"},
+    "interrupt_agent": {"effects": ["external_state"], "concurrency": {"resource": "agent", "key": "agent_id"},
+                        "consumes": ["agent"], "idempotency": "natural"},
+    "list_agents": {"effects": ["none"], "concurrency": "parallel", "produces": ["agent"]},
+    # one persistent kernel per conversation: two cells of the same kernel never interleave
+    "python": {"effects": _ANY, "concurrency": {"resource": "python-kernel", "key": "$session"}, "idempotency": "none"},
+}
 
 
 # French words of a discovery query → the English vocabulary the tools are described in (accents folded)
@@ -102,9 +152,17 @@ class Registry:
     def __init__(self):
         self.tools: dict[str, Tool] = {}
         self.exclusive = asyncio.Lock()
+        self.locks = capabilities().ResourceLocks()      # in-process: every agent, session and door of the engine
 
     def add(self, tool: Tool) -> None:
+        if tool.spec is None and tool.source == "engine":
+            tool.spec = NATIVE_SPECS.get(tool.name)
         self.tools[tool.name] = tool
+
+    def spec(self, name: str) -> dict:
+        t = self.tools.get(name)
+        caps = capabilities()
+        return {**caps.DEFAULT_SPEC, **(t.spec or {})} if t else dict(caps.DEFAULT_SPEC)
 
     def remove_source(self, source: str) -> None:
         for name in [n for n, t in self.tools.items() if t.source == source]:

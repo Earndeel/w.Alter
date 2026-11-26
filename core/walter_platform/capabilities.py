@@ -325,3 +325,38 @@ def with_cursor(read: str, page):
         if token:
             page = {**page, "cursor": token}
     return page
+
+
+# ── the MCP server's dispatch: one lock per resource across every client process ─────────────────────────────────
+def install_locks(mcp, decls: dict | None = None, *, lock_dir: Path | None = None):
+    """Wrap a FastMCP server's tool dispatch: a call on a declared resource (a browser session, the computer, a chat,
+    a task, a skill…) waits while another call holds it — from this process or another one (Engine, Claude Code and
+    Codex each run their own server process). walter_call is locked as the tool it opens. Returns the locks."""
+    import logging
+    log = logging.getLogger("walter.capabilities")
+    if decls is None:
+        try:
+            decls = declarations()
+        except Exception as e:  # noqa: BLE001 — without declarations nothing is locked (today's behaviour)
+            log.warning("capability declarations unreadable (%s): no resource lock", e)
+            decls = {}
+    locks = ResourceLocks(interprocess=True, lock_dir=lock_dir)
+    try:
+        locks.lock_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    except OSError as e:
+        log.warning("lock directory %s unusable (%s): locks stay within this process", locks.lock_dir, e)
+        locks.interprocess = False
+    manager = mcp._tool_manager
+    original = manager.call_tool
+
+    async def locked(name, arguments, context=None, convert_result=False):
+        tool, args = name, arguments or {}
+        if name == WALTER_CALL:
+            asked = resolve_call(args)
+            tool, args = (asked["tool"], asked["arguments"]) if asked["mode"] == "run" else (None, {})
+        key = lock_key(spec_of(decls, tool), args) if tool else None
+        async with locks.hold(key, holder=f"pid{os.getpid()}:{name}"):
+            return await original(name, arguments, context=context, convert_result=convert_result)
+
+    manager.call_tool = locked
+    return locks
