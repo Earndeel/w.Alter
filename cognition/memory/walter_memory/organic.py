@@ -12,6 +12,7 @@ DEFAULTS = {"generations": {"enforce": True}, "extraction": {"mode": "active"}, 
             "periods": {"tz": "Asia/Bangkok"}, "kardex": {"mode": "daily", "per_run": 5, "days": 60, "max_messages": 160},
             "privacy": {"cloud_context": "cloud_allowed", "pseudonymise": True, "kardex_cloud": "policy"},
             "stages": {},
+            "rules": {"always": "all", "relevance_only_channels": ["contact"], "relevance_only_subjects": ["project:"]},
             "reconcile": {"mode": "decision", "candidates": 5, "batch": 12, "min_confidence": 0.5,
                           "state_ttl_days": 7}}
 

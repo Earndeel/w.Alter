@@ -63,6 +63,17 @@ state_ttl_days = 7      # a transient state without an end date expires after th
 # "shadow" = extraction keeps its 20-minute policy, states only recorded (extraction.working_shadow); "off" = neither.
 mode = "adaptive"
 
+[rules]
+# Règles de Monsieur injectées à chaque message (couche stable de Context ; plan payload, lot 1, 2026-11-23).
+# "all" = toute règle en vigueur peut remplir la couche, les plus récentes d'abord (comportement d'avant) ;
+# "instructions" = seules les consignes que Monsieur a données à Walter lui-même, hors sujet d'un projet, sont
+# toujours candidates ; les règles apprises dans ses conversations avec ses contacts (canal contact) ou propres à un
+# projet ne viennent que si le message s'y rapporte (proximité locale). Retour arrière immédiat : remettre "all".
+# Sans message (appel du Router), rien n'est filtré.
+always = "instructions"
+relevance_only_channels = ["contact"]
+relevance_only_subjects = ["project:"]
+
 [consolidation]
 # P1.2: g1 subject views rebuilt from current V1 knowledge and evidence (status 'shadow': built, not served).
 # "active" (2026-11-03) = views served, reconsolidation applies only the safe proposals (strict duplicates, finished

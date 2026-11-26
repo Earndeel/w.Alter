@@ -441,6 +441,20 @@ RULES_BUDGET = 350
 RULE_SIM = 0.35                   # local cosine above which a rule is related to the message
 
 
+def _always_shown(r: dict) -> bool:
+    """[rules] always (organic.toml, payload plan lot 1, owner 2026-11-23): "all" = every rule in force may fill the
+    layer by recency (before); "instructions" = only what the owner told Walter itself, outside a project subject —
+    rules learnt from his contacts' conversations (channel contact) or about one project come only when the message
+    is related to them (local cosine above RULE_SIM). Without a query nothing is filtered (no relevance signal)."""
+    from . import organic
+    cfg = organic.settings().get("rules") or {}
+    if cfg.get("always", "all") != "instructions":
+        return True
+    if (r.get("channel") or "") in (cfg.get("relevance_only_channels") or ()):
+        return False
+    return not any((r.get("subject") or "").startswith(p) for p in (cfg.get("relevance_only_subjects") or ()))
+
+
 def owner_rules(query: str = "", *, audience: str = "cloud_model", budget: int = RULES_BUDGET,
                 exclude: set[str] | None = None, limit: int = 40) -> dict:
     """The stable layer (P1.1/P1.8): the owner's durable rules in force — constraints, preferences and corrections he
@@ -459,6 +473,7 @@ def owner_rules(query: str = "", *, audience: str = "cloud_model", budget: int =
         rows = conn.execute("""
             select d.item_id::text as id, d.kind, d.content, d.created_at, coalesce(d.valid_from, d.created_at) as at,
                    d.privacy_class, d.stage, d.scope, d.epistemic, d.attributes->'replacement_proposed'->>'by' as replaced,
+                   d.attributes->>'subject' as subject, d.attributes->>'channel' as channel,
                    case when %s::text is null then null else 1 - (c.embedding <=> %s::vector) end as sim
             from core.derived_items d
             left join lateral (select embedding from search.chunks c where c.kind = 'derived' and c.ref_id = d.item_id
@@ -470,6 +485,8 @@ def owner_rules(query: str = "", *, audience: str = "cloud_model", budget: int =
               and (d.valid_to is null or d.valid_to > now())
             order by d.created_at desc limit 400""", (qv, qv, list(RULE_KINDS), allowed)).fetchall()
     rows = [r for r in rows if r["id"] not in exclude]
+    if qv is not None:
+        rows = [r for r in rows if _always_shown(r) or (r["sim"] or 0) > RULE_SIM]
     if not rows:
         return {"text": "", "ids": [], "privacy_class": "cloud_allowed", "tokens": 0}
     # closest to the query first (when clearly related), then the most recent
@@ -478,7 +495,10 @@ def owner_rules(query: str = "", *, audience: str = "cloud_model", budget: int =
     items = [{"id": r["id"], "text": r["content"], "stage": r["stage"], "scope": r["scope"], "epistemic": r["epistemic"],
               "at": r["at"], "privacy_class": r["privacy_class"], "kind": r["kind"], "replaced": r["replaced"]}
              for r in rows[:limit]]
-    items = densify(items)
+    # densify keeps the LAST of a set of near-duplicates (its lists run oldest → newest); here the most related, then
+    # the most recent, come first: reversed, so the copy kept is the newest one, in its place (23/11: the oldest
+    # wording and date of a repeated rule was the one shown)
+    items = densify(items[::-1])[::-1]
     lines, used, shown = [], 0, []
     for i in items:
         line = f"- {_compact(i['text'], i['id'])} ({i['at']:%d/%m/%Y})" + \
