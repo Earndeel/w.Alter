@@ -173,7 +173,10 @@
     "tools": [
       "skills_search",
       "skills_index",
-      "skill_read"
+      "skill_read",
+      "skills_manifest",
+      "skill_propose",
+      "skill_patch"
     ],
     "index": {
       "command": [
@@ -183,6 +186,97 @@
       "section_arg": "--domain",
       "paged": true,
       "sections": "domains (without section: the list of domains)"
+    },
+    "capabilities": {
+      "skills_search": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "produces": [
+          "skill"
+        ],
+        "returns": {
+          "type": "string"
+        }
+      },
+      "skills_index": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "produces": [
+          "skill"
+        ],
+        "returns": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array"
+            },
+            "next_offset": {
+              "type": "integer"
+            },
+            "cursor": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "skill_read": {
+        "effects": [
+          "record"
+        ],
+        "concurrency": "parallel",
+        "consumes": [
+          "skill"
+        ],
+        "idempotency": "natural",
+        "returns": {
+          "type": "string"
+        }
+      },
+      "skills_manifest": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "returns": {
+          "type": "string"
+        }
+      },
+      "skill_propose": {
+        "effects": [
+          "record"
+        ],
+        "concurrency": {
+          "resource": "skill",
+          "key": "name"
+        },
+        "produces": [
+          "skill"
+        ],
+        "idempotency": "none",
+        "returns": {
+          "type": "string"
+        }
+      },
+      "skill_patch": {
+        "effects": [
+          "record"
+        ],
+        "concurrency": {
+          "resource": "skill",
+          "key": "name"
+        },
+        "consumes": [
+          "skill"
+        ],
+        "idempotency": "none",
+        "returns": {
+          "type": "string"
+        }
+      }
     }
   },
   "components": [
