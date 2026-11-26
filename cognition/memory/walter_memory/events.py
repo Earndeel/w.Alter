@@ -343,12 +343,36 @@ def compact(rows: list[dict], text: str | None = None, width: int = 500, budget:
         edge = (str(rows[len(out) - 1]["occurred_at"]) if newest_first else str(rows[len(out)]["occurred_at"])) \
             if more and out else None
         nxt = ({"until": edge} if newest_first else {"since": edge}) if edge else None
+        from .refs import encode_cursor
+        cursor = encode_cursor("events", nxt) if nxt else None   # lot 3e: the one paging form, passed back as is
         return {"source": rows[0]["source"], "thread_id": rows[0]["thread_id"], "events": out, "truncated": more,
-                **({"next": nxt, "hint": f"{more} more not shown: call again with {nxt} to continue without overlap"}
+                **({"next": nxt, "cursor": cursor,
+                    "hint": f"{more} more not shown: call again with cursor={cursor!r} (or {nxt}) to continue without overlap"}
                    if nxt else {})}
     return {"events": out, "truncated": more,
             **({"hint": f"{more} more not shown: narrow with since/until, or read one event in full by event_id"}
                if more else {})}
+
+
+def with_refs(rows: list[dict], *, max_privacy: str = "local_only") -> list[dict]:
+    """Full events as read by event_id (lot 3e): each with its `typed_ref`, and `reply_to_event_id` when the message it
+    answers is a known event the same reader may read (`reply_to` keeps the source's own message id). Nothing about an
+    event the reader may not read is revealed, not even that it exists."""
+    out = []
+    for r in rows:
+        r = {**r, "typed_ref": f"event:{r['event_id']}"} if r.get("event_id") else dict(r)
+        if r.get("reply_to") and r.get("source"):
+            try:
+                with connection() as conn:
+                    hit = conn.execute("""select event_id::text from core.events where source = %s and source_id = %s
+                                          and (thread_id is not distinct from %s) limit 1""",
+                                       (r["source"], r["reply_to"], r.get("thread_id"))).fetchone()
+                if hit and get_events(event_id=hit["event_id"], limit=1, max_privacy=max_privacy):
+                    r["reply_to_event_id"] = hit["event_id"]
+            except Exception:  # noqa: BLE001 — an enrichment, never a failure of the read
+                pass
+        out.append(r)
+    return out
 
 
 def stats() -> list[dict]:

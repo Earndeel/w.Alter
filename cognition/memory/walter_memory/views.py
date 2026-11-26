@@ -525,6 +525,38 @@ def _tokens(text: str) -> int:
     return len(text) // 4 + 1
 
 
+def read_derived(item_id: str, *, privacy: str = "cloud_allowed") -> dict:
+    """One knowledge item by the `derived:<id>` reference memory_search returns (lot 3e: no read took it before):
+    its text, kind, stage and status, validity, and the canonical evidence it is built from (event ids for
+    memory_events, object ids for vault_get). A cloud reader gets it only if memory_search could have shown it: the
+    same canonical check (privacy of the item AND of all its provenance, generation, quarantine, currency), with
+    credentials masked; otherwise the answer is that there is no such item, nothing more."""
+    import re as _re
+    from .db import connection
+    if not _re.fullmatch(r"[0-9a-fA-F-]{36}", str(item_id or "")):
+        return {"error": "invalid_request", "message": "derived:<uuid> expected (the typed_ref of memory_search)"}
+    with connection() as conn:
+        d = conn.execute("""select item_id::text as ref_id, kind as label, content as text, status, stage, epistemic,
+                                   confidence, valid_from, valid_to, created_at, generation, privacy_class,
+                                   source_event_ids, source_object_ids, derived_by as source
+                            from core.derived_items where item_id = %s::uuid""", (item_id,)).fetchone()
+        if not d:
+            return {"error": f"no knowledge item derived:{item_id}"}
+        row = {**d, "kind": "derived"}
+        if privacy != "local_only":
+            from .read_policy import filter_cloud_rows
+            kept = filter_cloud_rows(conn, [row])
+            if not kept:
+                return {"error": f"no knowledge item derived:{item_id}"}
+            row = kept[0]
+    return {"typed_ref": f"derived:{row['ref_id']}", "kind": row["label"], "text": row["text"], "status": row["status"],
+            "stage": row.get("stage"), "epistemic": row.get("epistemic"), "confidence": row.get("confidence"),
+            "valid_from": row.get("valid_from"), "valid_to": row.get("valid_to"), "generation": row.get("generation"),
+            "derived_by": row.get("source"),
+            "evidence": [f"event:{e}" for e in row.get("source_event_ids") or []]
+                        + [f"object:{o}" for o in row.get("source_object_ids") or []]}
+
+
 def read(q: dict) -> dict:
     from .db import connection
     depth = q.get("depth")

@@ -218,8 +218,259 @@
       "memory_search",
       "memory_events",
       "person_lookup",
-      "memory_retain"
-    ]
+      "memory_retain",
+      "memory_recall",
+      "memory_reflect",
+      "memory_view",
+      "tasks_list",
+      "task_create",
+      "task_update"
+    ],
+    "capabilities": {
+      "memory_context": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "produces": [
+          "entity",
+          "view"
+        ],
+        "returns": {
+          "type": "string"
+        }
+      },
+      "memory_search": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "produces": [
+          "event",
+          "derived",
+          "object"
+        ],
+        "returns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "ref_id": {
+                "type": "string"
+              },
+              "typed_ref": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "occurred_at": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "memory_events": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "consumes": [
+          "event",
+          "thread"
+        ],
+        "produces": [
+          "event",
+          "thread",
+          "object"
+        ],
+        "returns": {
+          "type": "object",
+          "properties": {
+            "events": {
+              "type": "array"
+            },
+            "truncated": {
+              "type": "integer"
+            },
+            "next": {
+              "type": "object"
+            },
+            "cursor": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "person_lookup": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "produces": [
+          "entity",
+          "thread"
+        ],
+        "returns": {
+          "type": "object",
+          "properties": {
+            "entity_id": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "memory_retain": {
+        "effects": [
+          "record"
+        ],
+        "concurrency": "parallel",
+        "idempotency": "natural",
+        "produces": [
+          "event"
+        ],
+        "returns": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "memory_recall": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "produces": [
+          "event",
+          "derived"
+        ],
+        "returns": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "memory_reflect": {
+        "effects": [
+          "cost"
+        ],
+        "concurrency": "parallel",
+        "produces": [
+          "event",
+          "derived"
+        ],
+        "returns": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "memory_view": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "consumes": [
+          "derived",
+          "view",
+          "entity"
+        ],
+        "produces": [
+          "event",
+          "derived",
+          "view"
+        ],
+        "returns": {
+          "type": "string"
+        }
+      },
+      "tasks_list": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "consumes": [
+          "thread"
+        ],
+        "produces": [
+          "task",
+          "entity",
+          "thread"
+        ],
+        "returns": {
+          "type": "object",
+          "properties": {
+            "tasks": {
+              "type": "array"
+            }
+          }
+        }
+      },
+      "task_create": {
+        "effects": [
+          "record"
+        ],
+        "concurrency": "parallel",
+        "consumes": [
+          "entity"
+        ],
+        "produces": [
+          "task"
+        ],
+        "idempotency": "natural",
+        "returns": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "string"
+            },
+            "verified": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "task_update": {
+        "effects": [
+          "record"
+        ],
+        "concurrency": {
+          "resource": "memory-task",
+          "key": "task_id"
+        },
+        "consumes": [
+          "task"
+        ],
+        "idempotency": "natural",
+        "returns": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
   },
   "components": [
     {

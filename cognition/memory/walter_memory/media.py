@@ -454,6 +454,9 @@ def main(argv: list[str]) -> int:
         r = objects.search(a.text, kind=a.kind, source=a.source, limit=max(1, min(a.limit, 100)),
                            max_privacy="cloud_allowed" if a.cloud_safe else "local_only", thread_id=a.thread,
                            event_id=a.event, since=a.since, until=a.until)
+        # lot 3e: the argument vault_get takes, and the typed reference, beside the existing `id`
+        r = [{**x, "object_id": x["id"], "typed_ref": f"object:{x['id']}"} if isinstance(x, dict) and x.get("id") else x
+             for x in r] if isinstance(r, list) else r
     print(json.dumps(r, default=str, ensure_ascii=False, indent=1))
     return 0
 

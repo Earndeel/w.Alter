@@ -63,6 +63,7 @@ def main(argv=None) -> None:
     e.add_argument("--thread"); e.add_argument("--since"); e.add_argument("--text"); e.add_argument("--limit", type=int, default=20)
     e.add_argument("--until"); e.add_argument("--id", dest="event_id"); e.add_argument("--order", choices=["asc", "desc"], default="desc")
     e.add_argument("--compact", type=int, default=0, metavar="CHARS", help="agent form: content window of CHARS, no payload")
+    e.add_argument("--cursor", help="the `cursor` of a previous answer (continues the same read, lot 3e)")
     t = sub.add_parser("types"); t.add_argument("action", choices=["list", "sync"])
     o = sub.add_parser("objects"); o.add_argument("action", choices=["search", "get", "put", "stats"])
     o.add_argument("ref", nargs="?"); o.add_argument("--dest"); o.add_argument("--source", default="vault")
@@ -145,6 +146,7 @@ def main(argv=None) -> None:
     lg.add_argument("--after-seq", type=int, default=0, help="digest: resume after this seq")
     lg.add_argument("--cloud-safe", action="store_true", help="hide local_only, pseudonymise redacted_cloud")
     lg.add_argument("--json", action="store_true")
+    lg.add_argument("--ref", help="timeline/get: a logs_search ref ('session#seq' or 'log:session#seq')")
     vw = sub.add_parser("views", help="Memory Views (lot 3): attach exchanges to subjects, read a view at a depth")
     vw.add_argument("action", choices=["run", "read", "board", "stats", "find"])
     vw.add_argument("key", nargs="?", default="", help="read: a view key (subject:…)")
@@ -217,10 +219,23 @@ def main(argv=None) -> None:
     elif a.cmd == "stats":
         cmd_stats(a)
     elif a.cmd == "events":
+        from . import refs
+        try:
+            if a.event_id:
+                a.event_id = refs.expect(a.event_id, "event")
+            if a.thread:
+                a.thread = refs.expect(a.thread, "thread")
+            if a.cursor:      # opaque: only the window bounds of this same read, never a privacy or filter override
+                page = refs.decode_cursor("events", a.cursor, {"since", "until"})
+                a.since, a.until = page.get("since") or a.since, page.get("until") or a.until
+        except refs.RefError as err:
+            _print({"error": "invalid_request", "message": str(err)})
+            raise SystemExit(2)
         rows = events.get_events(source=a.source, event_types=a.type, thread_id=a.thread, since=a.since, until=a.until,
                                  text=a.text, limit=a.limit, order=a.order, event_id=a.event_id,
                                  max_privacy="cloud_allowed" if a.cloud_safe else "local_only")
-        _print(events.compact(rows, a.text, a.compact) if a.compact else rows)
+        _print(events.compact(rows, a.text, a.compact) if a.compact else
+               events.with_refs(rows, max_privacy="cloud_allowed" if a.cloud_safe else "local_only"))
     elif a.cmd == "types":
         _print(types.list_types() if a.action == "list" else {"synced": types.sync_seed()})
     elif a.cmd == "objects":
@@ -228,13 +243,19 @@ def main(argv=None) -> None:
             _print(objects.search(a.ref or "", kind=a.kind, source=a.source if a.source != "vault" else None,
                                   limit=a.limit, max_privacy="cloud_allowed" if a.cloud_safe else "local_only"))
         elif a.action == "get":
+            from . import refs
+            try:
+                a.ref = refs.expect(a.ref or "", "object")
+            except refs.RefError as err:
+                _print({"error": "invalid_request", "message": str(err)})
+                raise SystemExit(2)
             print(objects.get_object(a.ref, a.dest, dest_dir=a.dest_dir,
                                      max_privacy="cloud_allowed" if a.cloud_safe else "local_only"))
         elif a.action == "stats":
             _print(objects.stats())
         else:
             from datetime import datetime
-            row = objects.put_object(a.ref, a.source, links=[tuple(x.split(":", 1)) for x in a.link],
+            row = objects.put_object(a.ref, a.source, links=objects.resolve_links(a.link),
                                      captured_at=datetime.fromisoformat(a.captured) if a.captured else None,
                                      privacy_class=a.privacy)
             _print({k: row[k] for k in ("id", "created", "kind", "storage_zone", "privacy_class", "storage_key")})
@@ -281,8 +302,12 @@ def main(argv=None) -> None:
         res = search.search(a.query, limit=a.limit, sources=a.source, labels=a.label, since=a.since, until=a.until,
                             include_derived=not a.no_derived, rerank=a.rerank, history=a.history,
                             max_privacy="cloud_allowed" if a.cloud_safe else "local_only")
-        _print([{k: (r[k][:300] if k == "text" else r.get(k)) for k in ("occurred_at", "source", "label", "actor", "text", "kind",
-                                                                         "ref_id", "generation", "latency_ms")} for r in res])
+        _print([{**{k: (r[k][:300] if k == "text" else r.get(k)) for k in ("occurred_at", "source", "label", "actor", "text",
+                                                                            "kind", "ref_id", "generation", "latency_ms")},
+                 # lot 3e: the reference the matching read takes (event → memory_events, derived → memory_view,
+                 # object → vault_get), beside kind/ref_id which keep their meaning
+                 **({"typed_ref": f"{r['kind']}:{r['ref_id']}"} if r.get("kind") in ("event", "derived", "object") else {})}
+                for r in res])
     elif a.cmd == "social":
         from . import social
         if a.action == "refresh":
@@ -402,6 +427,18 @@ def main(argv=None) -> None:
     elif a.cmd == "logs":
         from . import logs
         mp = "cloud_allowed" if a.cloud_safe else "local_only"
+        from . import refs
+        if a.action in ("timeline", "get") and (a.ref or "#" in (a.query or "") or refs.split(a.query)[0]):
+            # the ref logs_search prints, given as is (16 failed calls replayed 26/11: X1)
+            try:
+                session, seq = refs.log_ref(a.ref or a.query)
+            except refs.RefError as err:
+                _print({"error": "invalid_request", "message": str(err)})
+                raise SystemExit(2)
+            a.query, a.seq = session, (a.seq if a.seq is not None else seq)
+        if a.action == "get" and a.seq is None:
+            _print({"error": "invalid_request", "message": "logs get needs a seq: pass ref='session#seq' from logs_search"})
+            raise SystemExit(2)
         with connection() as conn:
             if a.action == "search":
                 res = logs.search(conn, a.query, runtime=a.runtime, types=a.type, tool=a.tool, session=a.session,
@@ -588,6 +625,8 @@ def main(argv=None) -> None:
         if a.action == "run":
             res = views.run(since=_dt.fromisoformat(a.since) if a.since else None,
                             until=_dt.fromisoformat(a.until) if a.until else None, limit=a.limit, dry=a.dry)
+        elif a.action == "read" and (a.key or "").startswith("derived:"):
+            res = views.read_derived(a.key.partition(":")[2], privacy="local_only" if a.local else "cloud_allowed")
         elif a.action == "read":
             res = views.read({"depth": a.depth, "key": a.key or None, "domain": a.domain, "horizon": a.horizon,
                               "max_tokens": a.max_tokens, "privacy": "local_only" if a.local else "cloud_allowed",

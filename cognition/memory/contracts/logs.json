@@ -139,7 +139,68 @@
       "logs_search",
       "logs_timeline",
       "logs_get"
-    ]
+    ],
+    "capabilities": {
+      "logs_search": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "produces": [
+          "log"
+        ],
+        "returns": {
+          "type": "string"
+        }
+      },
+      "logs_timeline": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "consumes": [
+          "log"
+        ],
+        "produces": [
+          "log"
+        ],
+        "returns": {
+          "type": "string"
+        }
+      },
+      "logs_get": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "consumes": [
+          "log"
+        ],
+        "produces": [
+          "log"
+        ],
+        "returns": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string"
+            },
+            "seq": {
+              "type": "integer"
+            },
+            "type": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "linked": {
+              "type": "array"
+            }
+          }
+        }
+      }
+    }
   },
   "components": [
     {

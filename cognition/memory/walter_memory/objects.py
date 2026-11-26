@@ -151,6 +151,30 @@ def put_object(path: str | Path, source: str, *, source_ref: dict | None = None,
     return row
 
 
+LINK_KINDS = ("entity", "event", "thread")     # typed links (lot 3e); any legacy "type:id" stays accepted as before
+
+
+def resolve_links(values: list[str]) -> list[tuple[str, str]]:
+    """vault_put links → core.object_links targets. `event:<id>` becomes the event's own per-message link when its
+    source has one (so the file shows in that message's attachments), `entity:<uuid>` and `thread:<id>` are kept as
+    typed targets; a legacy `type:id` (beeper_message:…, email:…) is unchanged."""
+    from .events import get_events, link_target
+    out = []
+    for v in values or []:
+        kind, sep, ident = str(v).partition(":")
+        if not sep or not kind or not ident:
+            raise ValueError(f"link {v!r}: expected kind:id (entity:<uuid>, event:<id>, thread:<id>)")
+        if kind == "event":
+            rows = get_events(event_id=ident, limit=1, max_privacy="local_only")
+            if not rows:
+                raise ValueError(f"link {v!r}: no such event")
+            native = link_target(rows[0].get("source"), rows[0].get("source_id"))
+            out.append(native or ("event", ident))
+        else:
+            out.append((kind, ident))
+    return out
+
+
 def find(ref: str) -> dict | None:
     col = "sha256" if re.fullmatch(r"[0-9a-f]{64}", ref) else "id::text"
     with connection() as conn:
