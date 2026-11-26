@@ -97,6 +97,12 @@ def test_a_stale_reference_is_one_docs_incident_not_also_a_test_failure(monkeypa
     assert f"test:{checks.REFERENCE_TEST}" in [p["key"] for p in checks.detect(None)]
 
 
+def test_the_reference_test_is_not_still_broken_while_docs_follows_it(monkeypatch):
+    monkeypatch.setattr(checks, "docs", lambda: [{"key": "docs", "kind": "docs_stale"}])
+    monkeypatch.setattr(run.subprocess, "run", lambda *a, **k: pytest.fail("the docs incident owns it: no pytest"))
+    assert not run.still_broken(None, {"kind": "test_failure", "subject": checks.REFERENCE_TEST})
+
+
 def test_parametrised_test_ids_with_spaces_are_kept_whole(monkeypatch, tmp_path):
     out = ("FAILED tests/test_k.py::test_v[20 variantes en brouillon-budget-grok] - AssertionError: x\n"
            "ERROR tests/test_c.py\n")

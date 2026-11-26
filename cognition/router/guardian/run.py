@@ -126,6 +126,8 @@ def still_broken(conn, inc: dict) -> bool:
     if kind in ("source_stale", "source_error"):
         return not reread_source(subject)["ok"]
     if kind == "test_failure":
+        if subject == checks.REFERENCE_TEST and checks.docs():   # the `docs` incident follows a stale reference
+            return False
         proc = subprocess.run([str(paths.ROOT / "venv" / "bin" / "python"), "-m", "pytest", "-q", "-p", "no:cacheprovider",
                                subject], cwd=paths.ROOT, capture_output=True, text=True, timeout=900)
         return proc.returncode != 0
