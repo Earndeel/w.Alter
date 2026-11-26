@@ -346,7 +346,9 @@ async def ask_user_question(args: dict, ex: Exec) -> Result:
 
 
 async def context_recover(args: dict, ex: Exec) -> Result:
-    ref = str(args.get("ref") or "")
+    ref = str(args.get("ref") or "").strip()
+    if ref.startswith("call:"):        # the typed form (lot 3e): call:<callId>
+        ref = ref[5:]
     offset = max(0, int(args.get("offset") or 0))
     if not ref or len(ref) > 200:
         return Result("invalid recovery reference", True)

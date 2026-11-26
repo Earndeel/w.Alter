@@ -215,7 +215,8 @@ def _service_code(value, check):
                 check(p)
 
 
-PRESENTATION_KEYS = {'audience', 'title', 'order', 'summary', 'manifest', 'manifest_command', 'guide', 'tools', 'index'}
+PRESENTATION_KEYS = {'audience', 'title', 'order', 'summary', 'manifest', 'manifest_command', 'guide', 'tools', 'index',
+                     'capabilities'}
 TOOL = re.compile(r'[a-z][a-z0-9_]{0,63}\Z')
 
 
@@ -234,8 +235,19 @@ def _presentation(value, check):
         check(value['guide'])
     if 'manifest_command' in value:
         _strings(value['manifest_command'], 'presentation.manifest_command', nonempty=True)
-    for tool in _strings(value.get('tools'), 'presentation.tools'):
+    tools = _strings(value.get('tools'), 'presentation.tools')
+    for tool in tools:
         _require(TOOL.fullmatch(tool), 'invalid presentation tool')
+    caps = value.get('capabilities')
+    if caps is not None:          # lot 3e: how each owned capability chains and runs (walter_platform.capabilities)
+        from .capabilities import validate_spec
+        _require(isinstance(caps, dict), 'invalid presentation capabilities')
+        for tool, spec in caps.items():
+            _require(tool in tools, 'a declared capability must be one of the module tools: ' + str(tool))
+            try:
+                validate_spec(tool, spec)
+            except ValueError as exc:
+                _require(False, str(exc))
     index = value.get('index')
     if index is not None:
         _require(isinstance(index, dict) and set(index) <= {'command', 'section_arg', 'paged', 'sections'},

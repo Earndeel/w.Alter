@@ -203,8 +203,113 @@
     "tools": [
       "walter_health",
       "module_guide",
-      "module_index"
-    ]
+      "module_index",
+      "walter_modules",
+      "beeper_read",
+      "beeper_send_message"
+    ],
+    "capabilities": {
+      "walter_health": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "returns": {
+          "type": "string"
+        }
+      },
+      "module_guide": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "returns": {
+          "type": "string"
+        }
+      },
+      "module_index": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "returns": {
+          "type": "object",
+          "properties": {
+            "module": {
+              "type": "string"
+            },
+            "section": {
+              "type": "string"
+            },
+            "items": {
+              "type": "array"
+            },
+            "next_offset": {
+              "type": "integer"
+            },
+            "cursor": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "walter_modules": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "returns": {
+          "type": "object",
+          "properties": {
+            "modules": {
+              "type": "array"
+            }
+          }
+        }
+      },
+      "beeper_read": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "consumes": [
+          "thread"
+        ],
+        "produces": [
+          "thread"
+        ],
+        "returns": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array"
+            },
+            "cursor": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "beeper_send_message": {
+        "effects": [
+          "outgoing"
+        ],
+        "concurrency": {
+          "resource": "beeper-chat",
+          "key": "chat_id"
+        },
+        "consumes": [
+          "thread"
+        ],
+        "idempotency": "none",
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "outcome_unknown"
+        ]
+      }
+    }
   },
   "components": [
     {

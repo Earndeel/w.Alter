@@ -129,6 +129,25 @@ class BeeperClient:
                        open_timeout=10, close_timeout=5, ping_interval=20, ping_timeout=20, max_size=8 << 20)
 
 
+_ALIASES = {"chatID": "chat_id", "accountID": "account_id", "messageID": "message_id", "senderID": "sender_id"}
+
+
+def with_aliases(value, *, chats: bool = False):
+    """Beeper's camelCase ids, plus the snake_case names Walter's tools take (`chat_id`…), added beside them (lot 3e):
+    what beeper_read returns goes straight into beeper_read / beeper_send_message. Nothing is renamed or removed."""
+    if isinstance(value, list):
+        return [with_aliases(v, chats=chats) for v in value]
+    if not isinstance(value, dict):
+        return value
+    out = {k: with_aliases(v, chats=chats and k == "items") for k, v in value.items()}
+    for camel, snake in _ALIASES.items():
+        if camel in out and snake not in out:
+            out[snake] = out[camel]
+    if chats and isinstance(out.get("id"), str) and out["id"].startswith("!") and "chat_id" not in out:
+        out["chat_id"] = out["id"]
+    return out
+
+
 def read(operation: str, *, chat_id: str = "", query: str = "", cursor: str = "", direction: str = "before",
          limit: int = 20, consumer: str = "engine") -> dict | list:
     if direction not in ("before", "after"):
@@ -172,8 +191,9 @@ def register(mcp, client: str, local_control: bool):
         Use full !... chat IDs. Returns one page and cursors; search is literal. Never marks messages read.
         Outgoing messages use beeper_send_message through Walter Engine's permission/disclosure checks."""
         try:
-            return json.dumps(read(operation, chat_id=chat_id, query=query, cursor=cursor,
-                                   direction=direction, limit=limit), ensure_ascii=False)
+            return json.dumps(with_aliases(read(operation, chat_id=chat_id, query=query, cursor=cursor,
+                                                direction=direction, limit=limit), chats=operation == "chats"),
+                              ensure_ascii=False)
         except Exception as exc:
             return json.dumps({"ok": False, "error": type(exc).__name__,
                                "hint": "Check beeper-server and its Walter Secrets grant."})

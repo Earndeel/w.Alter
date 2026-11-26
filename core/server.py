@@ -142,10 +142,18 @@ def skills_manifest() -> str:
 
 
 @mcp.tool()
-def skills_index(domain: str = "", offset: int = 0, limit: int = 20) -> str:
+def skills_index(domain: str = "", offset: int = 0, limit: int = 20, cursor: str = "") -> str:
     """Browse the Curator-maintained index. Empty domain lists domains only; select a domain for workflow/skill
-    purposes and workflow dependencies, then skill_read the chosen entry. next_offset paginates; no procedure bodies."""
-    return json.dumps(skills_client.index(domain, offset, limit), ensure_ascii=False)
+    purposes and workflow dependencies, then skill_read the chosen entry. Continue with the answer's `cursor` (or
+    next_offset as offset); no procedure bodies."""
+    from walter_platform import capabilities
+    read = f"skills_index:{domain}"
+    if cursor:
+        try:
+            offset = capabilities.page_offset(read, cursor)
+        except ValueError as e:
+            return json.dumps(capabilities.error("invalid_request", str(e)), ensure_ascii=False)
+    return json.dumps(capabilities.with_cursor(read, skills_client.index(domain, offset, limit)), ensure_ascii=False)
 
 
 @mcp.tool()
@@ -288,8 +296,8 @@ DEVBOARD_FIELDS = ("status", "title", "module", "owner", "change", "deadline", "
 
 @mcp.tool()
 def devboard_correct(ref: str, field: str, value: str, reason: str) -> str:
-    """Correct a card of the development board (ops/devboard), seulement quand Monsieur signale une carte fausse —
-    never on your own inference. ref = "W-12"; field = status (waiting_owner|in_progress|paused|done|abandoned) |
+    """Correct a card of the development board (ops/devboard), only when the owner reports a wrong card — never on
+    your own inference. ref = "W-12"; field = status (waiting_owner|in_progress|paused|done|abandoned) |
     title | module | owner | change | deadline (YYYY-MM-DD, "" to clear) | decision_link (a decision anchor);
     reason = his words. The correction wins over every later reading of the agents' sessions."""
     if field not in DEVBOARD_FIELDS:
@@ -308,7 +316,8 @@ def memory_search(query: str, limit: int = 10, source: str = "", since: str = ""
     evidence (messages with W.Alter, Beeper chats, e-mails, calendar, files' extracted text), each result with its
     source and date. Full-text + semantic + rerank. evidence_only=True skips derived knowledge (raw history only).
     since/until: ISO dates. Prefer this to find *when/where/who said what*; memory_recall for synthesised facts.
-    history=True also reads pre-V1 interpretations (archived memory generations), each marked as such."""
+    Each result has `typed_ref` (kind/ref_id unchanged): event:… → memory_events(event_id=…), derived:… →
+    memory_view(key=…), object:… → vault_get(object_id=…). history=True also reads pre-V1 interpretations (archived memory generations), each marked as such."""
     args = ["search", query, "--limit", str(max(1, min(int(limit), 50))), "--rerank", "--cloud-safe"]
     if history:
         args.append("--history")
@@ -346,8 +355,9 @@ def memory_view(key: str = "", query: str = "", depth: str = "overview", max_tok
     « où en suis-je »; key person:<name or id> = the relation with one person: who they are, what is known of the
     relation by who says it (the person / Monsieur / the data / a hypothesis), recent changes, exchanges as measures,
     commitments, possible follow-ups (nothing is created), contexts, measured rhythm, replaced information; a name
-    shared by several people lists them, never merged). Give
-    `query` instead to find the views closest to some words. Cloud-safe: local-only views are never returned."""
+    shared by several people lists them, never merged). Key
+    derived:<id> (a memory_search `typed_ref`) reads one knowledge item with its evidence. Give `query` instead to
+    find the views closest to some words. Cloud-safe: local-only views are never returned."""
     if key:
         d = depth if depth in ("index", "overview", "synthesis", "details", "sources", "state") else "overview"
         return _walter_memory("views", "read", key, "--depth", d, "--max-tokens", str(max(100, min(int(max_tokens), 8000))),
@@ -367,13 +377,14 @@ def person_lookup(name: str) -> str:
 
 @mcp.tool()
 def memory_events(text: str = "", source: str = "", event_type: str = "", thread_id: str = "", since: str = "",
-                  until: str = "", order: str = "newest", event_id: str = "", limit: int = 20) -> str:
+                  until: str = "", order: str = "newest", event_id: str = "", limit: int = 20, cursor: str = "") -> str:
     """Read W.Alter's canonical event history (what actually happened: messages, conversations with W.Alter,
     e-mails, calendar, files...). Exact substring search on content; filters: source (hermes, beeper, gmail,
     calendar, vault, claude_code, codex, dsh…), event_type (message.received, message.sent…), thread_id,
     since/until (ISO). order="oldest" for the first events (« le tout premier message sur X »), "newest" by default.
-    Answer = compact list (event_id, date, source, a window of the content around `text`); event_id="…" returns
-    that one event in full. A message with files carries `attachments` [{object_id, kind, mime, name, derived_kind,
+    Answer = compact list (event_id, date, source, a window of the content around `text`); event_id="…" (or
+    "event:…") returns that one event in full, with `typed_ref` and `reply_to_event_id` when the replied message is
+    readable. A truncated conversation answers `cursor`: pass it back as is to read the next page. A message with files carries `attachments` [{object_id, kind, mime, name, derived_kind,
     text}] — e.g. a voice note's transcript, a PDF's text (vault_get for the bytes, vault_search(thread=…) for all the
     files of a conversation). Use memory_search for synthesised knowledge, this for the original record. Rows follow
     Walter Memory's privacy policy for cloud readers (the owner's cloud ceiling); credentials are never exposed."""
@@ -382,7 +393,7 @@ def memory_events(text: str = "", source: str = "", event_type: str = "", thread
     args = ["events", "--limit", str(max(1, min(int(limit), 200))), "--cloud-safe",
             "--order", "asc" if order == "oldest" else "desc"]
     for flag, value in (("--text", text), ("--source", source), ("--type", event_type), ("--thread", thread_id),
-                        ("--since", since), ("--until", until), ("--id", event_id)):
+                        ("--since", since), ("--until", until), ("--id", event_id), ("--cursor", cursor)):
         if value:
             args += [flag, value]
     if not event_id:   # one event asked (limit=1, « the very first… »): its text whole, within the answer budget
@@ -398,8 +409,9 @@ def logs_search(query: str = "", runtime: str = "", event_type: str = "", tool: 
     compaction summaries. Words (full-text, accent-insensitive) or an exact string (paths, error messages, ids).
     Filters: runtime (hermes, claude_code, codex, dsh), event_type (user/message, assistant/message,
     assistant/reasoning, tool/call, tool/result, compaction/summary), tool (e.g. terminal, Bash, walter_route),
-    session (id or part of it), since/until (ISO). Each hit has a ref 'session#seq': open the surrounding flow with
-    logs_timeline(session, seq), the full event with logs_get. Secrets are masked; local-only content is hidden."""
+    session (id or part of it; a session is a walter-logs session id such as claude_code/vm/<uuid>), since/until
+    (ISO). Each hit has a ref 'session#seq': pass it as is as `ref` to logs_timeline (the surrounding flow) or
+    logs_get (the full event). Secrets are masked; local-only content is hidden."""
     args = ["logs", "search", query, "--limit", str(max(1, min(int(limit), 100))), "--cloud-safe"]
     for flag, value in (("--runtime", runtime), ("--type", event_type), ("--tool", tool), ("--session", session),
                         ("--since", since), ("--until", until)):
@@ -409,16 +421,19 @@ def logs_search(query: str = "", runtime: str = "", event_type: str = "", tool: 
 
 
 @mcp.tool()
-def logs_timeline(session: str, seq: int = -1, before: int = 5, after: int = 15, event_type: str = "",
-                  max_chars: int = 600) -> str:
+def logs_timeline(session: str = "", seq: int = -1, before: int = 5, after: int = 15, event_type: str = "",
+                  max_chars: int = 600, ref: str = "") -> str:
     """walter-logs: the flow of one agent session in order (message → reasoning → tool call → result → answer...).
-    session: id or part of it (from logs_search refs 'session#seq'); seq: anchor event (-1 = the latest events);
-    before/after: how many events around it; event_type: only one type; max_chars: text per event (logs_get for
-    the full text)."""
-    args = ["logs", "timeline", session, "--before", str(max(0, min(int(before), 100))),
+    ref: a logs_search ref 'session#seq' (or log:session#seq), as is — or session (id or part of it) + seq (anchor
+    event, -1 = the latest events); before/after: how many events around it; event_type: only one type; max_chars:
+    text per event (logs_get for the full text)."""
+    if not (ref or session):
+        return json.dumps({"error": "invalid_request", "message": "pass ref='session#seq' from logs_search, or session"})
+    head = ["--ref", ref] if ref else [session]
+    args = ["logs", "timeline", *head, "--before", str(max(0, min(int(before), 100))),
             "--after", str(max(0, min(int(after), 200))), "--max-chars", str(max(80, min(int(max_chars), 5000))),
             "--cloud-safe"]
-    if int(seq) >= 0:
+    if int(seq) >= 0 and not ref:
         args += ["--seq", str(int(seq))]
     if event_type:
         args += ["--type", event_type]
@@ -426,8 +441,13 @@ def logs_timeline(session: str, seq: int = -1, before: int = 5, after: int = 15,
 
 
 @mcp.tool()
-def logs_get(session: str, seq: int) -> str:
-    """walter-logs: one event in full (e.g. a complete tool result or reasoning), with the linked tool call/result."""
+def logs_get(session: str = "", seq: int = -1, ref: str = "") -> str:
+    """walter-logs: one event in full (e.g. a complete tool result or reasoning), with the linked tool call/result.
+    ref: a logs_search ref 'session#seq' (or log:session#seq), as is — or session + seq."""
+    if ref:
+        return _walter_memory("logs", "get", "--ref", ref, "--cloud-safe", timeout=60)
+    if not session or int(seq) < 0:
+        return json.dumps({"error": "invalid_request", "message": "pass ref='session#seq' from logs_search, or session and seq"})
     return _walter_memory("logs", "get", session, "--seq", str(int(seq)), "--cloud-safe", timeout=60)
 
 
@@ -440,7 +460,8 @@ def vault_search(text: str = "", kind: str = "", source: str = "", thread: str =
     conversation (a thread_id from memory_events), oldest first — « the voice notes of conversation X » =
     vault_search(kind="audio", thread=X); event_id: the files of one message. since/until: ISO dates (capture time).
     Each result carries its derived text (derived_kind transcript|extract|ocr|caption). Objects follow Walter
-    Memory's privacy policy for cloud readers (same rule as memory_events). Returns ids for vault_get."""
+    Memory's privacy policy for cloud readers (same rule as memory_events). Each result has `object_id` and
+    `typed_ref` (object:…) for vault_get."""
     args = ["media", "search", "--limit", str(max(1, min(int(limit), 100))), "--cloud-safe"]
     for flag, value in (("--kind", kind), ("--source", source), ("--thread", thread), ("--event", event_id),
                         ("--since", since), ("--until", until)):
@@ -451,7 +472,8 @@ def vault_search(text: str = "", kind: str = "", source: str = "", thread: str =
 
 @mcp.tool()
 def vault_get(object_id: str, dest_dir: str = "/tmp/walter-vault") -> str:
-    """Download one Raw Vault file (by id or sha256) to a local directory on the W.Alter VM, integrity-checked.
+    """Download one Raw Vault file (by id, object:<id> or sha256) to a local directory on the W.Alter VM,
+    integrity-checked.
     Returns the local path. Restricted objects are refused before any download or directory creation."""
     return _walter_memory("objects", "get", object_id, "--dest-dir", dest_dir, "--cloud-safe")
 
@@ -460,7 +482,8 @@ def vault_get(object_id: str, dest_dir: str = "/tmp/walter-vault") -> str:
 def vault_put(path: str, source: str = "", captured_at: str = "", links: list[str] | None = None) -> str:
     """Store a local file (path on the W.Alter VM) in the Raw Vault, once (deduplicated by content).
     source: where it comes from (default: the client name). captured_at: ISO date if known.
-    links: ["kardex_contact:5", "hermes_session:<id>", ...] to attach people/conversations."""
+    links: typed references to attach people, messages and conversations: ["entity:<uuid>" (person_lookup),
+    "event:<id>" (memory_events), "thread:<id>"]; older link forms (type:id) are still accepted."""
     args = ["objects", "put", path, "--source", source or CLIENT_TAG]
     if captured_at:
         args += ["--captured", captured_at]

@@ -132,12 +132,17 @@ def register(mcp,client='unknown',*,local_control=True):
         except Exception as exc:return _error(path or 'presentation',exc)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
-    def module_index(module: str,section: str='',offset: int=0,limit: int=20) -> str:
+    def module_index(module: str,section: str='',offset: int=0,limit: int=20,cursor: str='') -> str:
         """Level 2 of a W.Alter module: what it contains, kept up to date by the module itself (e.g. skills by
-        domain, router tasks). Without section: the overview; with section: one bounded page (next_offset)."""
+        domain, router tasks). Without section: the overview; with section: one bounded page; continue with the
+        answer's `cursor` (or next_offset as offset)."""
         try:
-            from walter_platform import presentation
-            return json.dumps(presentation.index(module,section,offset,limit),ensure_ascii=False)
+            from walter_platform import capabilities, presentation
+            read = f"module_index:{module}:{section}"
+            if cursor:
+                try:offset = capabilities.page_offset(read, cursor)
+                except ValueError as exc:return json.dumps(capabilities.error("invalid_request", str(exc)),ensure_ascii=False)
+            return json.dumps(capabilities.with_cursor(read, presentation.index(module,section,offset,limit)),ensure_ascii=False)
         except Exception as exc:return _error(module,exc)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))

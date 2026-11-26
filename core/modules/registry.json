@@ -178,7 +178,60 @@
           "walter_browse",
           "browser_session",
           "browser_sites"
-        ]
+        ],
+        "capabilities": {
+          "walter_browse": {
+            "effects": [
+              "external_state"
+            ],
+            "concurrency": {
+              "resource": "browser-session",
+              "key": "session_id"
+            },
+            "consumes": [
+              "browser_session"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "browser_session": {
+            "effects": [
+              "external_state"
+            ],
+            "concurrency": {
+              "resource": "browser-session",
+              "key": "session",
+              "key_default": "{site}-me"
+            },
+            "produces": [
+              "browser_session"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "session": {
+                  "type": "string"
+                },
+                "authenticated": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "browser_sites": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
       },
       "components": [
         {
@@ -657,7 +710,31 @@
         "guide": "/walter/capabilities/computer/manifest/GUIDE.md",
         "tools": [
           "computer_use"
-        ]
+        ],
+        "capabilities": {
+          "computer_use": {
+            "effects": [
+              "external_state"
+            ],
+            "concurrency": {
+              "resource": "computer-device"
+            },
+            "consumes": [
+              "device_session"
+            ],
+            "produces": [
+              "device_session",
+              "file"
+            ],
+            "idempotency": "none",
+            "errors": [
+              "invalid_request",
+              "permission_denied",
+              "dependency_unavailable",
+              "outcome_unknown"
+            ]
+          }
+        }
       },
       "components": [
         {
@@ -1196,8 +1273,113 @@
         "tools": [
           "walter_health",
           "module_guide",
-          "module_index"
-        ]
+          "module_index",
+          "walter_modules",
+          "beeper_read",
+          "beeper_send_message"
+        ],
+        "capabilities": {
+          "walter_health": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "module_guide": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "module_index": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "module": {
+                  "type": "string"
+                },
+                "section": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array"
+                },
+                "next_offset": {
+                  "type": "integer"
+                },
+                "cursor": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "walter_modules": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "modules": {
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "beeper_read": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "thread"
+            ],
+            "produces": [
+              "thread"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "items": {
+                  "type": "array"
+                },
+                "cursor": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "beeper_send_message": {
+            "effects": [
+              "outgoing"
+            ],
+            "concurrency": {
+              "resource": "beeper-chat",
+              "key": "chat_id"
+            },
+            "consumes": [
+              "thread"
+            ],
+            "idempotency": "none",
+            "errors": [
+              "invalid_request",
+              "permission_denied",
+              "dependency_unavailable",
+              "outcome_unknown"
+            ]
+          }
+        }
       },
       "components": [
         {
@@ -2076,7 +2258,68 @@
           "logs_search",
           "logs_timeline",
           "logs_get"
-        ]
+        ],
+        "capabilities": {
+          "logs_search": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "log"
+            ],
+            "returns": {
+              "type": "string"
+            }
+          },
+          "logs_timeline": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "log"
+            ],
+            "produces": [
+              "log"
+            ],
+            "returns": {
+              "type": "string"
+            }
+          },
+          "logs_get": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "log"
+            ],
+            "produces": [
+              "log"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "session_id": {
+                  "type": "string"
+                },
+                "seq": {
+                  "type": "integer"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "linked": {
+                  "type": "array"
+                }
+              }
+            }
+          }
+        }
       },
       "components": [
         {
@@ -2321,8 +2564,259 @@
           "memory_search",
           "memory_events",
           "person_lookup",
-          "memory_retain"
-        ]
+          "memory_retain",
+          "memory_recall",
+          "memory_reflect",
+          "memory_view",
+          "tasks_list",
+          "task_create",
+          "task_update"
+        ],
+        "capabilities": {
+          "memory_context": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "entity",
+              "view"
+            ],
+            "returns": {
+              "type": "string"
+            }
+          },
+          "memory_search": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "event",
+              "derived",
+              "object"
+            ],
+            "returns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  },
+                  "ref_id": {
+                    "type": "string"
+                  },
+                  "typed_ref": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "occurred_at": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "memory_events": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "event",
+              "thread"
+            ],
+            "produces": [
+              "event",
+              "thread",
+              "object"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "events": {
+                  "type": "array"
+                },
+                "truncated": {
+                  "type": "integer"
+                },
+                "next": {
+                  "type": "object"
+                },
+                "cursor": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "person_lookup": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "entity",
+              "thread"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "entity_id": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "memory_retain": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": "parallel",
+            "idempotency": "natural",
+            "produces": [
+              "event"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "memory_recall": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "event",
+              "derived"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "memory_reflect": {
+            "effects": [
+              "cost"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "event",
+              "derived"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "memory_view": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "derived",
+              "view",
+              "entity"
+            ],
+            "produces": [
+              "event",
+              "derived",
+              "view"
+            ],
+            "returns": {
+              "type": "string"
+            }
+          },
+          "tasks_list": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "thread"
+            ],
+            "produces": [
+              "task",
+              "entity",
+              "thread"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "tasks": {
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "task_create": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "entity"
+            ],
+            "produces": [
+              "task"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "type": "string"
+                },
+                "verified": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "task_update": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": {
+              "resource": "memory-task",
+              "key": "task_id"
+            },
+            "consumes": [
+              "task"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
       },
       "components": [
         {
@@ -2652,7 +3146,32 @@
         "order": 85,
         "summary": "/walter/ops/manifest/SUMMARY.md",
         "manifest": "/walter/ops/manifest/MANIFEST.md",
-        "tools": []
+        "tools": [
+          "devboard_correct"
+        ],
+        "capabilities": {
+          "devboard_correct": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": {
+              "resource": "devboard-card",
+              "key": "ref"
+            },
+            "consumes": [
+              "card"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
       },
       "components": [
         {
@@ -2917,7 +3436,91 @@
           "vault_search",
           "vault_get",
           "vault_put"
-        ]
+        ],
+        "capabilities": {
+          "vault_search": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "thread",
+              "event"
+            ],
+            "produces": [
+              "object"
+            ],
+            "returns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "object_id": {
+                    "type": "string"
+                  },
+                  "typed_ref": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "derived_text": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "vault_get": {
+            "effects": [
+              "local_write"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "object"
+            ],
+            "produces": [
+              "file"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "vault_put": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "file",
+              "entity",
+              "event",
+              "thread"
+            ],
+            "produces": [
+              "object"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "created": {
+                  "type": "boolean"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
       },
       "components": [
         {
@@ -3135,6 +3738,150 @@
             "tasks"
           ],
           "sections": "tasks (key, label, interface)"
+        },
+        "capabilities": {
+          "walter_route": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "walter_run": {
+            "effects": [
+              "cost"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "file",
+              "agent"
+            ],
+            "idempotency": "none",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                },
+                "answer": {
+                  "type": "string"
+                },
+                "files": {
+                  "type": "array"
+                }
+              }
+            },
+            "errors": [
+              "invalid_request",
+              "budget_exceeded",
+              "dependency_unavailable",
+              "outcome_unknown"
+            ]
+          },
+          "walter_decide": {
+            "effects": [
+              "cost"
+            ],
+            "concurrency": "parallel",
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "choice": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "walter_plans": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": {
+              "resource": "router-plans"
+            },
+            "consumes": [
+              "plan"
+            ],
+            "produces": [
+              "plan"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "plans": {
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "walter_web": {
+            "effects": [
+              "outgoing",
+              "external_state"
+            ],
+            "concurrency": {
+              "resource": "web-chat-service",
+              "key": "service",
+              "key_default": "default"
+            },
+            "consumes": [
+              "file"
+            ],
+            "produces": [
+              "file"
+            ],
+            "idempotency": "key:request_id",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "reply": {
+                  "type": "string"
+                },
+                "files": {
+                  "type": "array"
+                }
+              }
+            },
+            "errors": [
+              "invalid_request",
+              "dependency_unavailable",
+              "deadline_exceeded",
+              "outcome_unknown"
+            ]
+          },
+          "audio_transcribe": {
+            "effects": [
+              "cost"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "file"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "results": {
+                  "type": "array"
+                }
+              }
+            }
+          }
         }
       },
       "components": [
@@ -3516,7 +4263,43 @@
         "tools": [
           "secret_search",
           "secret_reference"
-        ]
+        ],
+        "capabilities": {
+          "secret_search": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "secret"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "items": {
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "secret_reference": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "secret"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "reference": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
       },
       "components": [
         {
@@ -3732,7 +4515,10 @@
         "tools": [
           "skills_search",
           "skills_index",
-          "skill_read"
+          "skill_read",
+          "skills_manifest",
+          "skill_propose",
+          "skill_patch"
         ],
         "index": {
           "command": [
@@ -3742,6 +4528,97 @@
           "section_arg": "--domain",
           "paged": true,
           "sections": "domains (without section: the list of domains)"
+        },
+        "capabilities": {
+          "skills_search": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "skill"
+            ],
+            "returns": {
+              "type": "string"
+            }
+          },
+          "skills_index": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "skill"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "items": {
+                  "type": "array"
+                },
+                "next_offset": {
+                  "type": "integer"
+                },
+                "cursor": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "skill_read": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "skill"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "skills_manifest": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "skill_propose": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": {
+              "resource": "skill",
+              "key": "name"
+            },
+            "produces": [
+              "skill"
+            ],
+            "idempotency": "none",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "skill_patch": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": {
+              "resource": "skill",
+              "key": "name"
+            },
+            "consumes": [
+              "skill"
+            ],
+            "idempotency": "none",
+            "returns": {
+              "type": "string"
+            }
+          }
         }
       },
       "components": [
@@ -3925,7 +4802,18 @@
         "guide": "/walter/core/identity/manifest/GUIDE.md",
         "tools": [
           "walter_profile"
-        ]
+        ],
+        "capabilities": {
+          "walter_profile": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "string"
+            }
+          }
+        }
       },
       "components": [
         {
