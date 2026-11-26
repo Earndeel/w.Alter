@@ -23,8 +23,9 @@
 
 ## Accès
 
-Tailnet : `http://100.91.35.121:3080` ; Internet : `https://walter.walter-ai.cloud` (tunnel Cloudflare, application
-Cloudflare Access « W.Alter web », règle « Monsieur only » = code par e-mail, puis cookie de connexion de l'interface).
+Tailnet : `http://100.91.35.121:3080` ; Internet : `https://portal.walter-ai.cloud` (tunnel Cloudflare, application
+Cloudflare Access « W.Alter web », règle « Monsieur only » = code par e-mail ; le relais `../access-gate` vérifie le jeton
+Access puis pose seul le cookie de connexion de l'interface : Access est la seule connexion, 15/11/2026).
 
 ## Adresse publique : le Worker de bord (`../edge/worker.mjs`)
 
