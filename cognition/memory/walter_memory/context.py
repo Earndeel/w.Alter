@@ -430,7 +430,12 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     # The candidate searches are local (FTS + vectors) and independent: run them at once; then ONE rerank call over
     # their union orders every section (search.rerank_pools), instead of one call per section (07/11).
     from concurrent.futures import ThreadPoolExecutor
-    pool = ThreadPoolExecutor(4)
+    import contextvars
+
+    class _Pool(ThreadPoolExecutor):   # carries the caller's context (llm.TRACE_RUN, payload plan lot 0, 2026-11-23)
+        def submit(self, fn, /, *a, **kw):
+            return super().submit(contextvars.copy_context().run, fn, *a, **kw)
+    pool = _Pool(4)
     want = {}
     if b.get("records", 0) > 0:
         want["records"] = (dict(labels=["doc_section"]), CANDIDATES["records"], 4)
