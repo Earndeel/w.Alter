@@ -1697,6 +1697,21 @@
             "help": "send the request as the prompt",
             "nargs": 0,
             "required": false
+          },
+          {
+            "choices": [
+              "kie",
+              "openrouter",
+              "codex"
+            ],
+            "default": null,
+            "dest": "provider",
+            "flags": [
+              "--provider"
+            ],
+            "help": "that provider only; codex = image tool of the Codex subscription (no cost, model not chosen)",
+            "nargs": null,
+            "required": false
           }
         ],
         "health": [
@@ -7600,6 +7615,11 @@
             "signature": "name: str"
           },
           {
+            "description": "W.Alter's own Codex subscription session (grant `codex-subscription`, renewed by the Codex CLI through",
+            "name": "codex_session",
+            "signature": ""
+          },
+          {
             "description": "A file the Router generates for the instance (state/router/<name>), e.g. the agents' brief.",
             "name": "state_file",
             "signature": "name: str"
@@ -8142,6 +8162,21 @@
             "signature": "route: dict, body: dict"
           },
           {
+            "description": "",
+            "name": "_sub_key",
+            "signature": "route: dict"
+          },
+          {
+            "description": "Why a test call leaves this subscription route to production (see TEST_BUDGET), else None.",
+            "name": "test_reserve",
+            "signature": "route: dict"
+          },
+          {
+            "description": "A test call met this subscription's real limit: tests leave it for `limit_hold_minutes`.",
+            "name": "test_hold",
+            "signature": "route: dict"
+          },
+          {
             "description": "Record the paid spend of a test call (provider cost, else estimated from its usage or size).",
             "name": "_charge",
             "signature": "route: dict, entry: dict, telemetry: dict, body: dict"
@@ -8222,6 +8257,26 @@
             "signature": ""
           },
           {
+            "description": "",
+            "name": "anthropic_protocol",
+            "signature": "route: dict"
+          },
+          {
+            "description": "",
+            "name": "_all_text_parts",
+            "signature": "content"
+          },
+          {
+            "description": "The message as an OpenAI protocol takes it: system text parts joined, no cache marker anywhere.",
+            "name": "_unmarked",
+            "signature": "message: dict"
+          },
+          {
+            "description": "The call's cache layout for its route's protocol (switch: gateway.json `cache_layout.enabled`).",
+            "name": "cache_layout",
+            "signature": "route: dict, kwargs: dict, conf: dict | None=None"
+          },
+          {
             "description": "LiteLLM arguments for one router route, or None when this gateway cannot run it (yet).",
             "name": "litellm_target",
             "signature": "route: dict"
@@ -8259,6 +8314,16 @@
           {
             "description": "LiteLLM's chatgpt provider reads W.Alter's Codex CLI session (read-only) instead of its own device login.",
             "name": "_install_codex_auth",
+            "signature": ""
+          },
+          {
+            "description": "The ChatGPT request the backend can cache. Measured 2026-11-23 (payload lot 2, same 10k-token conversation",
+            "name": "codex_cache_request",
+            "signature": "req: dict, session_id: str | None, base: str, conf: dict | None=None"
+          },
+          {
+            "description": "Applies `codex_cache_request` to every ChatGPT (Codex) request LiteLLM builds. Idempotent.",
+            "name": "_install_codex_prompt_cache",
             "signature": ""
           },
           {
@@ -8634,6 +8699,11 @@
         "description": "Transcription-only models behind the chat door (owner 2026-11-20: STT poste = MAI-Transcribe-2).",
         "file": "llm/transcription.py",
         "functions": [
+          {
+            "description": "{data, format} the endpoint takes: as given when its format is accepted, else converted to mono mp3.",
+            "name": "accepted_audio",
+            "signature": "audio: dict"
+          },
           {
             "description": "The last `input_audio` part of the request ({data, format}), or None.",
             "name": "audio_part",
@@ -10215,6 +10285,26 @@
             "description": "",
             "name": "run_openrouter",
             "signature": "or_id: str, kind: str, params: dict"
+          },
+          {
+            "description": "A test run: the engine sets WALTER_RUN_CHANNEL=test for its test principals (benches, scenarios).",
+            "name": "test_run",
+            "signature": ""
+          },
+          {
+            "description": "An input image for the Responses API: a URL as is, a local file as a data URL.",
+            "name": "_image_ref",
+            "signature": "u: str"
+          },
+          {
+            "description": "The text model that calls the image tool: the Router's own general L1 pick, on its Codex execution entry.",
+            "name": "codex_driver",
+            "signature": "conn"
+          },
+          {
+            "description": "One image through the Codex subscription's image tool. Returns {\"b64\": [...], \"cost_usd\": 0.0, ...}.",
+            "name": "run_codex_image",
+            "signature": "conn, prompt: str, image_urls: list[str] | None=None"
           },
           {
             "description": "",
@@ -17956,6 +18046,23 @@
       },
       {
         "comment": "",
+        "file": "llm/transcription.py",
+        "name": "ACCEPTED_FORMATS",
+        "value": [
+          "flac",
+          "mp3",
+          "ogg",
+          "wav"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "llm/transcription.py",
+        "name": "CONVERT_TIMEOUT_S",
+        "value": 120
+      },
+      {
+        "comment": "",
         "file": "plan/codex_account.py",
         "name": "BASE",
         "value": "https://chatgpt.com/backend-api"
@@ -18895,26 +19002,6 @@
       {
         "comment": "",
         "file": "serve/brief.py",
-        "name": "LEVELS_FR",
-        "value": {
-          "L1": "quotidien : réponse courte, résumé simple, fait rapide, petite reformulation",
-          "L2": "plus dur : analyse en plusieurs étapes, comparaison, rédaction soignée, planification",
-          "L3": "le plus dur ou à fort enjeu : recherche approfondie, raisonnement complexe, décision importante"
-        }
-      },
-      {
-        "comment": "",
-        "file": "serve/brief.py",
-        "name": "CONSTRAINTS_FR",
-        "value": {
-          "open_weights": "modèle à poids ouverts",
-          "unrestricted": "contenu que les modèles grand public refusent",
-          "video_input": "le modèle lit une vidéo (avec task=vision : analyser ou revoir une vidéo)"
-        }
-      },
-      {
-        "comment": "",
-        "file": "serve/brief.py",
         "name": "GENERATION",
         "value": [
           [
@@ -18924,7 +19011,7 @@
             ]
           ],
           [
-            "Vidéo",
+            "Video",
             [
               "video"
             ]
@@ -19261,6 +19348,18 @@
       },
       {
         "comment": "",
+        "file": "serve/media_exec.py",
+        "name": "CODEX_RESPONSES",
+        "value": "https://chatgpt.com/backend-api/codex/responses"
+      },
+      {
+        "comment": "what the executions journal records as model: the backend names none",
+        "file": "serve/media_exec.py",
+        "name": "CODEX_IMAGE_MODEL",
+        "value": "codex-image"
+      },
+      {
+        "comment": "",
         "file": "serve/named.py",
         "name": "PROVIDERS",
         "value": {
@@ -19572,6 +19671,13 @@
       },
       {
         "default_expression": "aucun",
+        "description": "test = run d'essai (posé par walter-scenario / walter-lab) : dépense payante plafonnée par walter-llm (test_budget), au-delà validation du propriétaire.",
+        "file": "serve/media_exec.py",
+        "name": "WALTER_RUN_CHANNEL",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
         "description": "Nom d'accès fournisseur ; la passerelle utilise Walter Secrets.",
         "file": "serve/media_exec.py",
         "name": "OPENROUTER_API_KEY",
@@ -19648,8 +19754,8 @@
     ]
   },
   "note": {
-    "chars": 3967,
-    "content": "## Walter Router — choisir et exécuter un modèle pour une sous-tâche\nTu définis le travail, ses contraintes et le contexte ; le routeur choisit modèle et fournisseur selon les benchmarks, les coûts, les abonnements et les préférences de l’utilisateur. Tu contrôles le résultat et l’intègres.\nUtilise-le lorsqu’une spécialité ou une sous-tâche distincte justifie le coût et la latence du transfert. Les faits et contraintes indispensables doivent accompagner chaque appel.\n- `walter_run` exécute. Donne `request`, `task`, `goal` complet pour le texte, `context` utile. L’exécuteur ne voit pas cette conversation. Appelle-le directement si le besoin est clair.\n- `walter_route` examine le choix, les routes et les prix sans exécuter ; utile pour vérifier ou planifier, pas un préalable obligatoire à `walter_run`. Sans `task`, le routeur classe la demande ; `conversation` explique un lien avec les échanges précédents.\n- `walter_decide` traite un choix court ou répété : `question`, `options` (au moins deux noms → sens), `context`. Pour une analyse longue, utilise une tâche texte.\n- `walter_plans` lit les abonnements ; une modification doit être demandée par leur propriétaire.\n- `walter_web` converse avec un service web de chat activé par l’utilisateur (`message`, `files` chemins, `model` seulement s’il le demande) ; réponse verbatim, fichiers produits en chemins. Lent ; sur sa demande.\nQuestion rapide (`weather` · `calculation` · `research`) : `walter_run` avec `request` seul ; le modèle de décision la confie au service web de chat prévu par l’utilisateur (voie habituelle et avis s’il échoue).\n`task=general` : L1 quotidien, résumé simple ; L2 analyse en plusieurs étapes ou rédaction soignée ; L3 raisonnement complexe ou fort enjeu. Les spécialités ont leur propre classement ; ne leur impose pas un niveau général.\nTexte : `3d` · `coding` · `cybersecurity` · `dataviz` · `engineering` · `finance` · `frontend` · `fullstack` · `gamedev` · `legal` · `medical` · `mobile_app` · `science` · `strategy` · `svg` · `ui_component` · `writing`\nAnalyse : `document` · `long_context` · `vision`\nImages : `graphic_design` · `image_edit` · `logo` · `text_to_image`\nVidéo : `image_to_video` · `text_to_video` · `video_edit`\nAudio : `music` · `speech_to_speech` · `tts`\nObjectif vidéo `role` : `default` · `premium` · `action` · `ugc` · `budget`\nContraintes `require` : `open_weights` poids ouverts ; `unrestricted` politique de contenu compatible ; `video_input` route capable de lire une vidéo (`task=vision`). Fournis les sources ; la sélection seule n’attache aucun média.\nSi l’utilisateur nomme un modèle, transmets `model` (éventuellement /variante) et `provider` s’il l’impose ; aucun substitut. Les favoris ne changent pas sans sa décision.\nPour le texte, limite `toolsets`, `max_turns`, `budget_seconds` au besoin. Outils natifs : terminal/code et fichiers ; autres capacités via leurs commandes si terminal autorisé. Les outils agissent sur l’hôte du routeur, avec ses droits ; les permissions d’un harness distant ne sont pas héritées automatiquement.\nNe transmets pas de secrets ou de données local_only à un modèle cloud ; le harness contrôle les classes d’accès.\nGénération média payante : uniquement sur demande de l’utilisateur ; `image_urls`, `role`, `aspect_ratio`, `duration`, `resolution` selon le média. `paid_fallback` autorise une voie payante prévue manuelle.\nTexte : fournisseur en échec → fournisseur suivant du même modèle, historique conservé. Tous échouent → échec explicite. Une restriction de fournisseur nommé reste stricte.\nLis `ok`, `routed`, `attempts`, `tools` et les erreurs. Si `user_notification_required`, transmets `user_notice` à l’utilisateur, même en cas d’échec. N’annonce jamais un succès sur la seule sélection.\nExemple texte : {\"request\":\"Corriger ce bug\",\"task\":\"coding\",\"goal\":\"…\",\"context\":\"…\"}. Transcription, embeddings, rerank et postes internes sont servis aux modules ; ne les propose pas comme tâches usuelles.",
+    "chars": 3658,
+    "content": "## Walter Router — choose and run a model for a sub-task\nYou define the work, its constraints and its context; the router picks the model and provider from benchmarks, costs, subscriptions and l’utilisateur's preferences. You check the result and integrate it.\nUse it when a speciality or a distinct sub-task is worth the cost and latency of the hand-off. Every call must carry the facts and constraints the work needs.\n- `walter_run` executes. Give `request`, `task`, a complete `goal` for text, useful `context`. The executor does not see this conversation. Call it directly when the need is clear.\n- `walter_route` examines the choice, routes and prices without executing; useful to check or plan, never a prerequisite of `walter_run`. Without `task`, the router classifies the request; `conversation` explains a link with earlier exchanges.\n- `walter_decide` settles a short or repeated choice: `question`, `options` (at least two, name → meaning), `context`. For a long analysis, use a text task.\n- `walter_plans` reads the subscriptions; changing one must be asked by their owner.\n- `walter_web` converses with a web chat service enabled by l’utilisateur (`message`, `files` as paths, `model` only if asked); verbatim answer, produced files as paths. Slow; on request.\nQuick question (`weather` · `calculation` · `research`): `walter_run` with `request` alone; the decision model hands it to the web chat service l’utilisateur chose (usual route, and a notice if it fails).\n`task=general`: L1 everyday, simple summary; L2 multi-step analysis or careful writing; L3 complex reasoning or high stakes. Specialities have their own ranking; do not impose a general level on them.\nText: `3d` · `coding` · `cybersecurity` · `dataviz` · `engineering` · `finance` · `frontend` · `fullstack` · `gamedev` · `legal` · `medical` · `mobile_app` · `science` · `strategy` · `svg` · `ui_component` · `writing`\nAnalysis: `document` · `long_context` · `vision`\nImages: `graphic_design` · `image_edit` · `logo` · `text_to_image`\nVideo: `image_to_video` · `text_to_video` · `video_edit`\nAudio: `music` · `speech_to_speech` · `tts`\nVideo objective `role`: `default` · `premium` · `action` · `ugc` · `budget`\nConstraints `require`: `open_weights` open weights; `unrestricted` compatible content policy; `video_input` a route able to read a video (`task=vision`). Provide the sources; selection alone attaches no media.\nIf the user names a model, pass `model` (optionally /variant) and `provider` if they impose one; no substitute. Favourites do not change without their decision.\nFor text, limit `toolsets`, `max_turns`, `budget_seconds` as needed. Native tools: terminal/code and files; other capabilities through their commands if the terminal is allowed. Tools act on the router's host, with its rights; a remote harness's permissions are not inherited automatically.\nNever pass secrets or local_only data to a cloud model; the harness controls access classes.\nPaid media generation: only at the user's request; `image_urls`, `role`, `aspect_ratio`, `duration`, `resolution` depending on the medium. `paid_fallback` allows a planned manual paid route.\nText: a failing provider → the next provider of the same model, history kept. All fail → explicit failure. A named provider restriction stays strict.\nRead `ok`, `routed`, `attempts`, `tools` and the errors. If `user_notification_required`, pass `user_notice` to the user, even on failure. Never announce success on selection alone.\nText example: {\"request\":\"Fix this bug\",\"task\":\"coding\",\"goal\":\"…\",\"context\":\"…\"}. Transcription, embeddings, rerank and internal tasks serve the modules; do not offer them as usual tasks.",
     "format": "text/markdown",
     "id": "walter-router.usage",
     "module": "router",
@@ -19663,7 +19769,7 @@
       "walter_plans"
     ],
     "schema_version": 1,
-    "sha256": "409316278836ea424d52adb698c1bdf6e8fd3bee5bc3e3388044a9a99a6342a0",
+    "sha256": "c05e95dd54262cfeaa29d607cb976deb6bc8ac65ba4506dfc20e8515311eb1b4",
     "source": {
       "args": [
         "brief",
@@ -19718,7 +19824,7 @@
     "bin/walter-router-control": "a21ab8d4348ede689c947427f9e4b1cabb6b4ed206d31a7e66b98432e454aa47",
     "bin/walter-router-cycle": "c974f7bbdb2df16f3be5bde0cc8efdee0bedfec0e4f846f0dec7ab3067a7ef79",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
-    "cli.py": "e077bc54f57698e3c0383ea0e74dc9c815dbde8fa1f56fd61ca0acd49f69a4f9",
+    "cli.py": "f3a48ed02ec56b61d59e8c65b549adc39d9ab8d9d1a7f85611c4b3099451057a",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
     "config/decision-needs.json": "8c912fe4a937dd9dc2ab2ab8bbe122080a67ddfcd9fd5450c4c79101e824b608",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
@@ -19730,7 +19836,7 @@
     "config/subscriptions.json": "b024fe62090d03e99ea7c06e6a76fd98228ab0d9811692ae07a65ccf4f958dac",
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "e5a30b7b5a5cc295eb05115fc25b3ca5efdc2ea64a3414b5f57c94cd9916bc33",
-    "contracts/router.json": "2c22033548faf73d7cba8f3e98e7309cccce1ffb267e0f68efa10d7cb8d3b185",
+    "contracts/router.json": "81de180aa4a0e899c22bd575f38c9dbabeb9782edb4a860682661ba832781db9",
     "documentation.py": "2c37ce0d6189e2551eb7b85ed70060fdd196ed6ef36f420bcb6b1e8e1e9e448c",
     "guardian/__init__.py": "a28ff92bf9c1254bad5416a6139b10f03a3cfedd0955894a65d042960b4ee587",
     "guardian/__main__.py": "507846e4c26dd1f427861a627daa6a4aea91e91710ed1640405f1e074d11b064",
@@ -19741,7 +19847,7 @@
     "guardian/repair.py": "50604a48872e4684ba7a8cbe031eafde5ec7cbfe1c04697927dd9447d3dd29cd",
     "guardian/run.py": "c4fb1261f8b665ebee2f8516cf5a48350e1ad9de52a17d9b90161eb6c1745c6b",
     "health.py": "aeb89568df1f3c699a749117efac4c6d7074edc441b57de32672f50dbf38eac8",
-    "instance.py": "244c85216abba400abdfbfa396139c66e68c8fbdf0991562e053cca7406947f7",
+    "instance.py": "36db02bb67646d6b98b00a34c836545866e50329c82785c49c2a367a3f04b263",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
     "interface/library.py": "813c6a027d1cd98e071dedc1f9f3200c779d1dbf90b82e8078f514b51f1971e0",
     "interface/page.py": "87621c2bb25bd00dee5a9e2c90a8ec40b97fdaa7505d8746072d9f63dc44b320",
@@ -19754,13 +19860,13 @@
     "interface/translate.py": "1d95781d0817a7590212867af01c36f0d9719d839c3dfdd67c468fe3df885daf",
     "llm/antigravity_subscription.py": "8c2527a4e38d2cc120348a63172fd35db0cd61e88198f8fcc60fae4f1eeefc40",
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
-    "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
-    "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
+    "llm/config/gateway.json": "df03d00db101e3efadd264d79a4eeaf8e935aeeb18cbabe77743743d52d9144b",
+    "llm/contracts/llm.json": "9fcfa41021312906a987d598fe8b1a728e5a952e43994e143cb766dd7e497fd0",
     "llm/decision.py": "999ffcf20c7a4598878369e9ad5439b0113b6a0d1b77bf7b0124c44557aba305",
-    "llm/gateway.py": "a9d2cf971744104624b2de597e03055d861a54d98568fe68b2c6fcf19e6007e1",
+    "llm/gateway.py": "8a052ed8eadffaca531854a3e81532acba8891d48f1558a5d91292f73b28e12d",
     "llm/resolver.py": "cd04d0c818891381f988d044cc910902ec3fc11e1d1401ad16190e601935d188",
     "llm/structured.py": "4a8e241f6033f6e61753d6090dbc920d28a4fdcf45150140d70fdf169ff742da",
-    "llm/transcription.py": "6ab3be5f2b81801248665469f8451ea630a07e53397c44e3f0357448b627b8dc",
+    "llm/transcription.py": "808239e594b6cc84ea99d4cb0ba6fa0bff0a2558c951956a13486e03f59a908e",
     "paths.py": "2feb1f504430171cc532b1bd7ce3a16a00f489eb286f820b48dc9aa4b6fcdab5",
     "plan/__init__.py": "5ba5fab620c9715c48f475098814d11ff6f272469a2adc08d5f01c7b3bd69e79",
     "plan/codex_account.py": "240d8875b0eb5bdd4fc5008cee4d8841e71641762d2ebd2df72780d8a66d4786",
@@ -19813,12 +19919,12 @@
     "serve/__init__.py": "3b3764d60a3a2bc6fb97e2d74bf82bfca45279ca8f686247c3ebcc18fc8d60ea",
     "serve/agent_view.py": "07946ccdf7f8e57d0a721b5727fb51c7d8b6a2c7c37cb24ce05481cd233f0eb1",
     "serve/api.py": "ca15f8aecd1b00dd6cc546263694a0de92b1e2b1d54f34373d60bae61621cb9e",
-    "serve/brief.py": "db7bf5b366f73e12fa9f45698a3877c9a62a4939a8d1ad971f586cb421f45f7b",
+    "serve/brief.py": "31b79c995fe65dde6fe010e451be9174cb1227336f2577e395ebeb7532857215",
     "serve/choose.py": "b1c260b7e8536a68e2b323b4dbe4e4039995eed702b1f5eebe9c50fe05d665f2",
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
     "serve/execution.py": "f73cda9d793dc7f659fc503af591eaa359d737bef15311c436179cbe43d22c8e",
     "serve/intent.py": "b5cc05dfe5a571e4f74e3a2dd379e041f961e49d8e9b2d15181c647c7b98c9ab",
-    "serve/media_exec.py": "11d4b2ffa3912518e40b348429af9a0976b6b94e4f39c0ff46e52ae87909ef2f",
+    "serve/media_exec.py": "0da2268369c27265dff24794697488cb48c0f2ac89ffdba547a12bd2e8e7cfbf",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "0d48ad5fe40335a1192a13ea736d3e2e70704045ea076b9f4fa171437673b302",
     "serve/routes.py": "7c1c4772ef597f305a8078e6ee5edd4069a594b9bbcffae0a63eba51139c91a4",

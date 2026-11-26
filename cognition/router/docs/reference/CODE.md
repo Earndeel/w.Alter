@@ -455,6 +455,7 @@ What the Router needs from the active Walter instance, asked through its public 
 - `own_file(name: str)` — Where the instance keeps its own copy of a Router file it writes (config/router/<name>).
 - `media_dir()` — Where the Router writes the media it generates (host.json `media_dir`, default
 - `secret_value(name: str)` — A key the Router component is granted under NAME (Walter Secrets: instance accounts/<id>.toml, `allow` + [env],
+- `codex_session()` — W.Alter's own Codex subscription session (grant `codex-subscription`, renewed by the Codex CLI through
 - `state_file(name: str)` — A file the Router generates for the instance (state/router/<name>), e.g. the agents' brief.
 
 ## interface/__init__.py
@@ -594,6 +595,9 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `_price_usd(route: dict, usage: dict | None, body: dict)` — Cost of one call from its usage (or, before the call, from the request size) at the route's price.
 - `_priced(route: dict, telemetry: dict, body: dict)` — A paid call the provider reports no cost for (Venice, Kie…) gets its cost at the router's price for this
 - `test_gate(route: dict, body: dict)` — None when this paid call of a test fits the budget, else the refusal (and one Telegram notice per window).
+- `_sub_key(route: dict)` — 
+- `test_reserve(route: dict)` — Why a test call leaves this subscription route to production (see TEST_BUDGET), else None.
+- `test_hold(route: dict)` — A test call met this subscription's real limit: tests leave it for `limit_hold_minutes`.
 - `_charge(route: dict, entry: dict, telemetry: dict, body: dict)` — Record the paid spend of a test call (provider cost, else estimated from its usage or size).
 - `_telegram(text: str)` — One message to the owner through Walter's Telegram door (`walter-telegram send`, lot E6; best effort).
 - `approve_tests(eur: float, note: str='')` — The owner's approval of EUR more paid spend for tests, valid for the window.
@@ -610,6 +614,10 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `warm()` — Fill the caches at start-up (background): the decision path first, then the route of every chat task.
 - `chat_tasks()` — 
 - `owner_tasks()` — Chat tasks an owner message can ask for: the internal postes (memory extraction, compression, voice…) are
+- `anthropic_protocol(route: dict)` — 
+- `_all_text_parts(content)` — 
+- `_unmarked(message: dict)` — The message as an OpenAI protocol takes it: system text parts joined, no cache marker anywhere.
+- `cache_layout(route: dict, kwargs: dict, conf: dict | None=None)` — The call's cache layout for its route's protocol (switch: gateway.json `cache_layout.enabled`).
 - `litellm_target(route: dict)` — LiteLLM arguments for one router route, or None when this gateway cannot run it (yet).
 - `provider_completion(route: dict, **kwargs)` — One provider transport; Claude's native client contributes no agent context or tools.
 - `claude_accounts(config: dict)` — subscription id -> Walter Secrets grant, first = the default account (before accounts: one grant).
@@ -618,6 +626,8 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `codex_access_token()` — W.Alter's Codex access token, from its grant (renewed through the Codex CLI by walter-secrets).
 - `_codex_account_id()` — 
 - `_install_codex_auth()` — LiteLLM's chatgpt provider reads W.Alter's Codex CLI session (read-only) instead of its own device login.
+- `codex_cache_request(req: dict, session_id: str | None, base: str, conf: dict | None=None)` — The ChatGPT request the backend can cache. Measured 2026-11-23 (payload lot 2, same 10k-token conversation
+- `_install_codex_prompt_cache()` — Applies `codex_cache_request` to every ChatGPT (Codex) request LiteLLM builds. Idempotent.
 - `_install_codex_stream_arguments()` — Parallel tool calls on the ChatGPT backend stream no argument deltas: the arguments come only in each call's
 - `codex_cache_session(agent: str, task: str, body: dict, correlation: dict)` — The ChatGPT backend keeps a prompt prefix warm on the server a session id is routed to; LiteLLM draws a new id
 - `chatgpt_ready()` — 
@@ -704,6 +714,7 @@ Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and
 
 Transcription-only models behind the chat door (owner 2026-11-20: STT poste = MAI-Transcribe-2).
 
+- `accepted_audio(audio: dict)` — {data, format} the endpoint takes: as given when its format is accepted, else converted to mono mp3.
 - `audio_part(messages: list[dict])` — The last `input_audio` part of the request ({data, format}), or None.
 - `chat_shape(model: str, text: str, cost: float | None, seconds: float | None)` — 
 - `completion(model: str, api_key: str, messages: list[dict], *, stream: bool=False, timeout: float=180, language: str | None=None, client=None)` — 
@@ -1244,6 +1255,10 @@ Direct media generation (image, video, music, voice) on the model the router pic
 - `_kie_key()` — 
 - `run_kie(path: str, params: dict, kind: str)` — 
 - `run_openrouter(or_id: str, kind: str, params: dict)` — 
+- `test_run()` — A test run: the engine sets WALTER_RUN_CHANNEL=test for its test principals (benches, scenarios).
+- `_image_ref(u: str)` — An input image for the Responses API: a URL as is, a local file as a data URL.
+- `codex_driver(conn)` — The text model that calls the image tool: the Router's own general L1 pick, on its Codex execution entry.
+- `run_codex_image(conn, prompt: str, image_urls: list[str] | None=None)` — One image through the Codex subscription's image tool. Returns {"b64": [...], "cost_usd": 0.0, ...}.
 - `_download(urls: list[str], b64: list[str], folder: Path, stem: str, auth: dict | None)` — 
 - `generate(conn, request: str, task: str | None=None, role: str | None=None, image_urls: list[str] | None=None, aspect_ratio: str | None=None, duration: int | None=None, resolution: str | None=None, paid_fallback: bool=False, craft: bool=True, _depth: int=0, model: str | None=None, _fallback: bool=True, voice: str | None=None, style: str | None=None, provider: str | None=None)` — 
 
