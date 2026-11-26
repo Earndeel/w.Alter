@@ -349,7 +349,14 @@ def tick(limit: int = 10) -> dict:
                 proposed += 1
         except Exception:
             log.exception("consolidate: %s failed", s)
-    return {"subjects": len(subjects), "built": built, "reconsolidated": proposed}
+    universal = None
+    try:                    # owner 2026-11-26: the universal consignes, at each new one (they belong to no subject)
+        if _universal_due():
+            universal = reconsolidate_universal()
+    except Exception:
+        log.exception("consolidate: universal consignes failed")
+    return {"subjects": len(subjects), "built": built, "reconsolidated": proposed,
+            **({"universal": {k: v for k, v in universal.items() if k != "proposals"}} if universal else {})}
 
 
 RECON_MIN_ITEMS = 8
@@ -462,6 +469,139 @@ def reconsolidate(subject: str, *, chat=None, apply: bool | None = None) -> dict
 
 DURABLE_RULES = ("constraint", "preference", "correction")
 
+
+
+# ───────────────────────── the universal consignes (owner 2026-11-26) ─────────────────────────
+# They belong to no subject, so the subject reconsolidation never saw them (0 ledger rows by 26/11): duplicates and
+# rewordings piled up. Same mechanism, one more kind of proposal (a portée too broad) and the contradictions, which
+# only the owner settles. [consolidation] universal: "propose" (default: every proposal recorded in the ledger,
+# nothing applied) · "active" (the safe part applied as for subjects: strict duplicates merged, the newest kept with
+# the others' provenance; a durable consigne is never closed nor narrowed by a model — those stay proposals, marked on
+# the item) · "off".
+UNIVERSAL_KEY = "g1:@consignes-universelles"
+RECON_UNIVERSAL_PROMPT = """Voici les consignes UNIVERSELLES de Monsieur à Walter EN VIGUEUR (elles valent pour tous les messages,
+toutes les conversations), de la plus ancienne à la plus récente.
+Chaque ligne : identifiant, date, texte.
+
+{items}
+
+Repère ce qui est établi par les consignes elles-mêmes :
+- "merge" : groupes d'identifiants qui disent la même chose (une reformulation, une répétition) ; le plus récent sera gardé ;
+- "supersede" : une consigne plus récente qui en remplace ou corrige une plus ancienne (le même sujet, une règle changée) ;
+- "reach" : une consigne qui n'est pas universelle : elle ne vaut que pour un outil, un projet, un domaine, une personne ou une
+  situation précise ; donne la portée juste ("project", "domain", "person", "situation") et sur quoi elle porte ("on") ;
+- "contradiction" : deux consignes qui demandent des choses incompatibles et qu'aucune date ne départage ; dis en quoi.
+Ne regroupe pas deux consignes différentes ; une consigne plus précise qu'une autre n'est pas un doublon. Réponds en JSON :
+{{"merge": [["id", "id"]], "supersede": [{{"old": "id", "new": "id", "why": "..."}}],
+  "reach": [{{"id": "id", "reach": "situation", "on": "...", "why": "..."}}],
+  "contradiction": [{{"ids": ["id", "id"], "why": "..."}}]}}"""
+
+
+def universal_mode() -> str:
+    from . import organic
+    return (organic.settings().get("consolidation") or {}).get("universal", "propose")
+
+
+def _universal_items(conn) -> list[dict]:
+    from . import working
+    ids = working._applicable_rules("", audience="cloud_model", budget=10 ** 6, exclude=set(), limit=10 ** 4)["consignes"]
+    if not ids:
+        return []
+    return conn.execute("""
+        select item_id::text as id, kind, content, stage, scope, epistemic, valid_from, created_at, privacy_class
+        from core.derived_items where item_id = any(%s::uuid[]) and status in ('derived','verified')
+          and privacy_class = 'cloud_allowed' order by coalesce(valid_from, created_at)""", (ids,)).fetchall()
+
+
+def _universal_due() -> bool:
+    """At each new universal consigne (or changed one): the last review is older than the newest of them."""
+    if universal_mode() == "off":
+        return False
+    with connection() as conn:
+        last = conn.execute("select max(at) at from views.ledger where view_key = %s and action like 'reconsolidate.%%'",
+                            (UNIVERSAL_KEY,)).fetchone()["at"]
+        if last is None:
+            return True
+        if last > _now() - timedelta(hours=1):
+            return False
+        newest = max((i["created_at"] for i in _universal_items(conn)), default=None)
+    return newest is not None and newest > last
+
+
+def reconsolidate_universal(*, chat=None, apply: bool | None = None) -> dict:
+    """One Router call over the universal consignes in force. Proposals validated (ids exist, the replacing consigne is
+    newer and stated by the owner, a known portée) and recorded in the ledger under UNIVERSAL_KEY; with apply (mode
+    "active") only the safe part is applied (_safe), the rest is marked on the items for the owner to settle."""
+    from . import llm, nature, organic, processing
+    if organic.paused("reconsolidation_universal") or universal_mode() == "off":   # its own switch ([stages])
+        return {"skipped": "off or paused"}
+    chat = chat or llm.chat
+    apply = (universal_mode() == "active") if apply is None else apply
+    with connection() as conn:
+        items = _universal_items(conn)
+    if len(items) < 2:
+        return {"skipped": "too few items"}
+    short = {i["id"][:8]: i for i in items}
+    text = "\n".join(f"{k} | {(i['valid_from'] or i['created_at']):%d/%m/%Y} | {' '.join(i['content'].split())}"
+                     for k, i in short.items())
+    poste = organic.settings().get("consolidation", {}).get("poste", "general/L3")   # a Router tier, never a model
+    prompt = RECON_UNIVERSAL_PROMPT.format(items=text)
+
+    def call():
+        # 16 000: the L3 route reasons at length before answering; at 4 000 its answer came back empty (26/11)
+        res = chat([{"role": "user", "content": prompt}], poste=poste, processor="consolidate.reconsolidate_universal",
+                   processor_version="2", privacy_class="cloud_allowed", budget="recurring",
+                   purpose="reconsolidate universal consignes", response_format={"type": "json_object"},
+                   max_tokens=16000, timeout=600)
+        c = (res["content"] or "").strip()
+        if "{" not in c:           # an empty answer is a failure, never « nothing to propose » (it would be memoised)
+            raise RuntimeError(f"reconsolidate_universal: no JSON in the answer of {res.get('model')}")
+        return (json.loads(c[c.find("{"):c.rfind("}") + 1] or "{}"), res.get("model")), res.get("model")
+
+    (data, model), _reused = processing.decide_once("consolidate.reconsolidate_universal", "2",
+                                                    {"prompt": prompt, "poste": poste}, call, privacy_class="cloud_allowed",
+                                                    refs=[i["id"] for i in items], input_key=UNIVERSAL_KEY)
+    when = lambda i: i["valid_from"] or i["created_at"]  # noqa: E731
+    ok = {"merge": [], "supersede": [], "expire": [], "reach": [], "contradiction": []}
+    for group in data.get("merge") or []:
+        g = [short[x] for x in group if isinstance(x, str) and x in short]
+        if len(g) >= 2:
+            ok["merge"].append([i["id"] for i in sorted(g, key=when)])
+    for s in data.get("supersede") or []:
+        old, new = short.get(str(s.get("old"))), short.get(str(s.get("new")))
+        if old and new and old is not new and when(new) >= when(old) and (new["epistemic"] or "stated_owner") == "stated_owner":
+            ok["supersede"].append({"old": old["id"], "new": new["id"], "why": str(s.get("why", ""))[:300]})
+    for r in data.get("reach") or []:
+        it = short.get(str(r.get("id")))
+        if it and r.get("reach") in nature.REACHES and r.get("reach") not in ("universal", "task"):
+            ok["reach"].append({"id": it["id"], "reach": r["reach"], "on": str(r.get("on") or "")[:120],
+                                "why": str(r.get("why", ""))[:300]})
+    for c in data.get("contradiction") or []:
+        ids = [short[x]["id"] for x in c.get("ids") or [] if isinstance(x, str) and x in short]
+        if len(ids) >= 2:
+            ok["contradiction"].append({"ids": ids, "why": str(c.get("why", ""))[:300]})
+    held = {"merge": [], "supersede": []}
+    if apply:
+        safe, held = _safe({"merge": ok["merge"], "supersede": ok["supersede"], "expire": []},
+                           {i["id"]: i for i in items})
+    with connection() as conn:
+        conn.execute("insert into views.ledger (view_key, action, detail) values (%s, %s, %s)",
+                     (UNIVERSAL_KEY, "reconsolidate.applied" if apply else "reconsolidate.proposed",
+                      json.dumps({**ok, "withheld": held, "items": len(items), "model": model})))
+        if apply:
+            for group in safe["merge"]:
+                for old in group[:-1]:
+                    _supersede(conn, old, group[-1], "merged")
+            for s in held["supersede"] + safe["supersede"]:   # a durable consigne is never closed by a model
+                conn.execute("""update core.derived_items set attributes = attributes || jsonb_build_object(
+                                  'replacement_proposed', jsonb_build_object('by', %s::text, 'why', %s::text, 'at', now()))
+                                where item_id = %s and status in ('derived','verified')""", (s["new"], s["why"], s["old"]))
+            for r in ok["reach"]:                              # nor narrowed: the owner confirms the portée
+                conn.execute("""update core.derived_items set attributes = attributes || jsonb_build_object(
+                                  'reach_proposed', jsonb_build_object('reach', %s::text, 'on', %s::text, 'why', %s::text,
+                                  'at', now())) where item_id = %s and status in ('derived','verified')""",
+                             (r["reach"], r["on"], r["why"], r["id"]))
+    return {"proposals": ok, "withheld": held, "applied": apply, "items": len(items), "model": model}
 
 def _safe(ok: dict, by_id: dict) -> tuple[dict, dict]:
     """What may be applied without the owner: merges of strict duplicates only (same kind and scope, close meaning,

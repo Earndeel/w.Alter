@@ -43,6 +43,10 @@ retype = "active"
 subjects = "paused"
 reconsolidation = "paused"
 episode_summaries = "paused"
+# 2026-11-26 (owner: « je valide l'intégration des consignes universelles au mécanisme de reconsolidation existant »):
+# the universal consignes only (consolidate.reconsolidate_universal, at each new one); the subjects' reconsolidation
+# above stays paused. What it may apply: [consolidation] universal. Retour arrière : "paused".
+reconsolidation_universal = "active"
 
 # [quota] removed 2026-11-20 (owner: « aucune limitation artificielle de quota »): no percentage gate. Memory's work
 # waits only on a real provider refusal of every route (walter_memory/quota.py: one hold per poste, until the reset
@@ -100,6 +104,11 @@ restitution = "applicable"
 mode = "active"
 # Router tier for reconsolidation (the memory_extraction route proposed nothing on real subjects; L3 did, 2026-11-02)
 poste = "general/L3"
+# Owner 2026-11-26: the universal consignes (no subject) go through the same reconsolidation, at each new one.
+# "propose" = proposals recorded in views.ledger (key g1:@consignes-universelles), nothing applied, until the owner
+# has seen them; "active" = the safe part applied (strict duplicates merged, provenance kept), the rest marked on the
+# items (replacement_proposed, reach_proposed) for him to settle; "off" = nothing.
+universal = "propose"
 
 [episodes]
 # P1.4-P1.5 (2026-11-03): flows (GPS visits computed on the VM, conversation bursts, appointments, work sessions) and

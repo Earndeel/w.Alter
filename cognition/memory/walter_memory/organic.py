@@ -19,7 +19,8 @@ DEFAULTS = {"generations": {"enforce": True}, "extraction": {"mode": "active"}, 
 
 # The model-driven stages of the organic chain, each with its own switch (A2, 2026-11-19). A stage absent from
 # [stages] follows [extraction] mode (the single switch of 2026-11-14), so an older config keeps its meaning.
-STAGES = ("extraction", "catchup", "reconcile_existing", "retype", "subjects", "reconsolidation", "episode_summaries")
+STAGES = ("extraction", "catchup", "reconcile_existing", "retype", "subjects", "reconsolidation", "episode_summaries",
+          "reconsolidation_universal")
 
 
 @lru_cache(maxsize=1)
