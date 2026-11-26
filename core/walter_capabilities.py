@@ -101,6 +101,10 @@ def module_layer(tools,form='full'):
 
 
 def register(mcp,client='unknown',*,local_control=True):
+    # Beeper is a native Engine channel; all writes retain the existing Engine policy gate.
+    from walter_beeper import register as register_beeper
+    register_beeper(mcp, client, local_control)
+
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
     def walter_modules(module: str='') -> str:
         """Discover Walter's installed modules, shared interfaces, dependencies and per-harness limits.
@@ -113,19 +117,19 @@ def register(mcp,client='unknown',*,local_control=True):
         except Exception as exc:return _error('registry',exc)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
-    def module_guide(module: str='',depth: str='D3') -> str:
-        """Documentation of a W.Alter module, read during the turn when the task needs it. Your instructions show
-        each module in one line (D1). depth='D2': its usage card (what it is, its tools, parameters, conventions —
-        manifest/MANIFEST.md, with its live part); depth='D3' (default): its detailed guide (components, interfaces
-        per runtime, privacy, limits — manifest/GUIDE.md). Reading a module's documentation is not an order to use
-        it. Without module: where each module's presentation lives."""
+    def module_guide(path: str='',depth: str='D2') -> str:
+        """W.Alter's documentation, at the depth the task needs. path: `walter` (the whole), a module (`memory`) or a
+        component (`memory/events`). depth: 'D1' what it is (one line), 'D2' (default) its role, organisation, tools,
+        where to check its live state and its children at D1, 'D3' its technical detail and sources. Reading
+        documentation is not an order to use what it describes. Without path: where each module's documentation lives."""
         try:
             from walter_platform import presentation
-            if not module:return json.dumps(presentation.catalog(),ensure_ascii=False)
-            if depth.upper()=='D2':return presentation.manifest(module)
-            if depth.upper()!='D3':return _error(module,ValueError("depth is 'D2' or 'D3'"))
-            return presentation.guide(module)
-        except Exception as exc:return _error(module or 'presentation',exc)
+            if not path:return json.dumps(presentation.catalog(),ensure_ascii=False)
+            return presentation.document(path,depth.upper())
+        except ValueError as exc:
+            return json.dumps({'ok':False,'path':path,'error':str(exc),
+                               'hint':'module_guide("walter", depth="D2") lists every module with its path.'},ensure_ascii=False)
+        except Exception as exc:return _error(path or 'presentation',exc)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
     def module_index(module: str,section: str='',offset: int=0,limit: int=20) -> str:
@@ -345,7 +349,7 @@ def apply_toolset(mcp,keep):
 def toolset_note(hidden):
     """One instruction line for a client with a core toolset: where the other tools are."""
     if not hidden:return ''
-    return ("## Outils W.Alter non listés\n"
-            f"{len(hidden)} outils W.Alter ne sont pas dans ta liste pour l'alléger : {', '.join(hidden)}. "
-            "Appelle-les directement avec `walter_call(tool, arguments)` quand la fiche du module donne leurs "
-            "paramètres ; sinon `walter_call(tool, describe=true)` les donne d'abord.")
+    return ("## W.Alter tools not listed\n"
+            f"{len(hidden)} W.Alter tools are left out of your list to keep it light: {', '.join(hidden)}. "
+            "Call one directly with `walter_call(tool, arguments)` when its module's documentation gives the "
+            "parameters; otherwise `walter_call(tool, describe=true)` gives them first.")

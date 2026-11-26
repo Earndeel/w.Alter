@@ -13,7 +13,7 @@ Généré depuis les manifestes propriétaires. Les scénarios décrivent les cr
 | lab | capability | Chercher, mesurer et proposer des améliorations de Walter, sans jamais les appliquer seul. | — |
 | llm | capability | Exécuter les appels modèles des consommateurs autorisés via les postes du Router. | router, secrets |
 | logs | foundation | Conserver les traces accessibles de tous les harnesses dans un journal commun. | memory |
-| memory | capability | Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées. | — |
+| memory | capability | Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées. | core |
 | ops | foundation | Installer, déployer, versionner, conserver et restaurer le logiciel Walter et ses instances (installer, deploy, git, backup, recovery, guardian), indépendamment des autres modules. | — |
 | raw-vault | capability | Conserver les octets originaux et les relier au catalogue canonique. | memory |
 | router | capability | Choisir les modèles par poste avec décisions et coûts traçables. | — |
@@ -41,10 +41,10 @@ Interfaces : shared request contract, CLI, MCP, Hermes plugin, public client (wa
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| library | active | Recherche web et lecture de pages | `/walter/capabilities/browse/walter_browse` | capabilities/browse |
-| engine | active | Moteurs Camoufox / CloakBrowser (ex ~/.hermes/camoufox-max) | `/walter/capabilities/browse/engine` | capabilities/browse/engine |
-| network | active | Sorties réseau (Freebox, Mac, défaut, NordVPN par pays à la demande) | `/walter/capabilities/browse/network` | capabilities/browse/network |
-| runtime | active | Exécution et extracteurs | `/walter/capabilities/browse/runtime` | capabilities/browse/runtime |
+| library | active | Web search and page reading (the walter_browse facade) | `/walter/capabilities/browse/walter_browse` | capabilities/browse |
+| engine | active | Browser engines: Camoufox and CloakBrowser Chromium | `/walter/capabilities/browse/engine` | capabilities/browse/engine |
+| network | active | Network exits (the owner's machine, the France exit, default exit, NordVPN per country on demand) | `/walter/capabilities/browse/network` | capabilities/browse/network |
+| runtime | active | Execution paths and extractors | `/walter/capabilities/browse/runtime` | capabilities/browse/runtime |
 
 **Limites déclarées :**
 
@@ -71,7 +71,7 @@ Interfaces : Python emit/Consumer, Postgres LISTEN/NOTIFY.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| bus | active | Bus Walter (schéma bus, LISTEN/NOTIFY, curseurs, dead) | `/walter/cognition/memory/walter_memory/bus.py` | core/bus |
+| bus | active | Walter bus: schema bus, LISTEN/NOTIFY, per-consumer cursors, dead letters | `/walter/cognition/memory/walter_memory/bus.py` | core/bus |
 
 **Limites déclarées :**
 
@@ -95,8 +95,8 @@ Interfaces : on_demand.py CLI.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| bridge | active | Pont Colab (GPU à la demande) | `/walter/capabilities/colab/bridge.py` | capabilities/colab |
-| mcp | active | Serveur MCP Colab | `/walter/capabilities/colab/mcp` | capabilities/colab |
+| bridge | active | Colab bridge: remote compute on demand | `/walter/capabilities/colab/bridge.py` | capabilities/colab |
+| mcp | active | Colab MCP server | `/walter/capabilities/colab/mcp` | capabilities/colab |
 
 **Limites déclarées :**
 
@@ -122,7 +122,7 @@ Interfaces : OperatorSessions, MCP computer_use, Hermes plugin.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| library | active | Contrôle des appareils (Mac, bureau) | `/walter/capabilities/computer/walter_computer` | capabilities/computer |
+| library | active | Device control (Mac desktop) through atomic actions | `/walter/capabilities/computer/walter_computer` | capabilities/computer |
 
 **Limites déclarées :**
 
@@ -138,7 +138,7 @@ Préparer et ordonner le contexte par message et par sous-agent, et compresser l
 Contrat 1.3.0; propriétaire : context.
 Racine actuelle : `/walter/cognition/context`. Cible : `/walter/cognition/context`.
 
-Interfaces : Python Session (walter_context.compress), Hermes ContextEngine adapter, DSH CompactionEngine adapter, CLI walter-context, CLI walter-context capability router (versioned stable note), Python walter_context.capabilities.TurnNotes, JSON bridge op=capability for trusted module notes, CLI walter-context capability all [--write] (Modules W.Alter layer from walter present notes), HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it), Python walter_context.retrieval.gather and walter_context.assembly.pack, Python walter_context.child.build; CLI walter-context-child (ChildContextSpec v1 JSON), POST /preflight?inject=1 -> plan/text/pack/degraded/error (degraded = decision failed, prudent L3 plan, SOCLE A2; pack.cuts = blocks cut to the level budget); POST /preflight?shadow=1 -> private instance record without injection, CLI walter-context-entrance (Claude Code PostToolUse event on stdin; --report) — large tool outputs on their way in, shadow, In-process walter.context.window: globalThis[Symbol.for('walter.context.window')](agent, {plan}, signal) published by the DSH port -> window decision report {applied, reason, warm, turns, tokens, measured_tokens} (SOCLE A1; the kernel isolates its compaction service, the engine's intake plugin calls this entry at each owner turn).
+Interfaces : Python Session (walter_context.compress), DSH CompactionEngine adapter, CLI walter-context, CLI walter-context capability router (versioned stable note), Python walter_context.capabilities.TurnNotes, JSON bridge op=capability for trusted module notes, CLI walter-context capability all [--write] (Modules W.Alter layer from walter present notes), HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it), Python walter_context.retrieval.gather and walter_context.assembly.pack, Python walter_context.child.build; CLI walter-context-child (ChildContextSpec v1 JSON), POST /preflight?inject=1 -> plan/text/pack/degraded/error (degraded = decision failed, prudent L3 plan, SOCLE A2; pack.cuts = blocks cut to the level budget); POST /preflight?shadow=1 -> private instance record without injection, CLI walter-context-entrance (Claude Code PostToolUse event on stdin; --report) — large tool outputs on their way in, shadow, In-process walter.context.window: globalThis[Symbol.for('walter.context.window')](agent, {plan}, signal) published by the DSH port -> window decision report {applied, reason, warm, turns, tokens, measured_tokens} (SOCLE A1; the kernel isolates its compaction service, the engine's intake plugin calls this entry at each owner turn).
 
 **Critères de validation :**
 
@@ -150,19 +150,18 @@ Interfaces : Python Session (walter_context.compress), Hermes ContextEngine adap
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| preflight | active | Décision unique par message : ContextPlan (intention, niveau, capacités, voie rapide) | `/walter/cognition/context/walter_context/preflight` | cognition/context/preflight |
-| assembly | active | Assemblage du contexte selon le plan (pack) | `/walter/cognition/context/walter_context/assembly.py` | cognition/context |
-| child | active | ChildContextSpec : dossier de départ d'un sous-agent | `/walter/cognition/context/walter_context/child.py` | cognition/context |
-| compress | active | Moteur de compaction (projection head→record→compact→live) | `/walter/cognition/context/walter_context/compress` | cognition/context/compress |
-| recover | active | Retrouver l'original d'une sortie compactée (walter_logs) | `/walter/cognition/context/walter_context/recover.py` | cognition/context |
-| dsh-port | active | Prise DSH : fenêtre du tour du propriétaire (frontière par pertinence, A1), point de contrôle sous pression, context_recover | `/walter/cognition/context/ports/dsh` | core/engine/plugins |
-| bench | active | Bancs (levels, replay, quality, acceptance) | `/walter/cognition/context/bench` | cognition/context/bench |
-| session-state | active | État de travail par fil (SessionState v1) | `/walter/cognition/context/contracts/schemas/session-state.v1.json` | cognition/context/contracts |
+| preflight | active | One decision per owner message: the ContextPlan (intent, level, capabilities, fast path) | `/walter/cognition/context/walter_context/preflight` | cognition/context/preflight |
+| assembly | active | Context assembly according to the plan (the turn's pack) | `/walter/cognition/context/walter_context/assembly.py` | cognition/context |
+| child | active | ChildContextSpec: the starting brief of a sub-agent | `/walter/cognition/context/walter_context/child.py` | cognition/context |
+| compress | active | Compaction engine (projection head → record → compact → live) | `/walter/cognition/context/walter_context/compress` | cognition/context/compress |
+| recover | active | Retrieve the original of a compacted output (walter_logs) | `/walter/cognition/context/walter_context/recover.py` | cognition/context |
+| dsh-port | obsolete | Rollback only since 2026-11-18 (DSH uninstalled): the former DSH port (owner-turn window, checkpoint under pressure, context_recover) | `/walter/cognition/context/ports/dsh` | core/engine/plugins |
+| bench | active | Benches (levels, replay, quality, acceptance) | `/walter/cognition/context/bench` | cognition/context/bench |
+| session-state | active | Working state per thread (SessionState v1) | `/walter/cognition/context/contracts/schemas/session-state.v1.json` | cognition/context/contracts |
 
 **Limites déclarées :**
 
 - DSH uses public compaction transactions; checkpoints retain all visible user and assistant dialogue or refuse.
-- Hermes runs its native compressor (walter-compress retired 2026-10-21); the walter-context Hermes port is not activated.
 - Structural and known-answer tests do not certify semantic model quality.
 - Capability-note preparation does not activate the lot-4 composer or inject into an unconnected host.
 - Memory, Skills, Core, Router, Logs and Soul are optional at module startup; their dependent operations degrade or fail when unavailable.
@@ -179,7 +178,7 @@ Exposer les capacités et installer les raccordements des harnesses.
 Contrat 1.1.0; propriétaire : core.
 Racine actuelle : `/walter/core`. Cible : `/walter/core`.
 
-Interfaces : MCP stdio, walter CLI, CLI contracts, matrix, doctor, Declarative harness compositions, Offline source release and staged installation, walter standby, walter matrix: qualified evidence requires matching source/scenario/version/configuration attestation (bench protocol 2), walter-guardians: strict Incident v1 validation, explicit check failures and bounded notification retry/backoff.
+Interfaces : MCP stdio, walter CLI, CLI contracts, matrix, doctor, Declarative harness compositions, Offline source release and staged installation, walter standby, walter matrix: qualified evidence requires matching source/scenario/version/configuration attestation (bench protocol 2), walter-guardians: strict Incident v1 validation, explicit check failures and bounded notification retry/backoff, Python walter_beeper.BeeperClient: native Beeper REST/WS; named Secrets grants, MCP beeper_read; beeper_send_message only through local Walter Engine with policy enforce.
 
 **Critères de validation :**
 
@@ -190,31 +189,34 @@ Interfaces : MCP stdio, walter CLI, CLI contracts, matrix, doctor, Declarative h
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| engine | implemented | Runtime agentique unique de Walter : noyau DSH/Cordis approprié (base adaptable) + greffons et portes Walter ; en service dans /opt/dsh (dsh-web) | `/walter/core/engine` | core/engine |
-| engine-contracts | implemented | Schémas Engine API, accueil, délégation, politique, événements, stratégies (brouillons testés) | `/walter/core/engine/contracts` | core/engine/contracts |
-| engine-kernel | implemented | Gel du noyau DSH/Cordis (lot E1) : version exacte, verrou, empreintes de l'installation, installation hors ligne reproductible, vérification ; l'installation en service reste /opt/dsh | `/walter/core/engine/kernel` | core/engine/kernel |
-| engine-compositions | active | Source de la face du profil web DSH (nom, accueil, durée de connexion), rendue par walter-core dans le bloc géré dsh-face ; valeurs dans la configuration de l'instance (lot E1) | `/walter/core/engine/compositions` | core/engine/compositions |
-| engine-plugins | implemented | Stratégies du moteur : intake et events (lot E2 : accueil d'un tour — run, ContextPlan, pack, skills — et fin du run, turn.ended, session.ended) ; policy et budget (lot E3 : politique unique avant chaque outil de chaque agent, plafonds du tour) ; interrupteurs [dsh.engine] intake hook\|shadow\|native et policy off\|enforce | `/walter/core/engine/plugins` | core/engine/plugins |
-| security | implemented | Politique d'exécution unique de Walter (lot E3) : policy.json (jamais, classes d'outils, presets par porte, enfant ≤ parent) lue par le greffon policy du moteur (policy.mjs) et par le filet du serveur MCP pour tout client (walter_security) ; mêmes vecteurs d'essai des deux côtés | `/walter/core/security` | core/security |
-| engine-api | active | Engine API (lot E4) : porte canonique du moteur pour Telegram, le web, les modules et les tests — ouvrir ou retrouver une conversation (<porte>/<compte>/<conversation> → session du noyau), soumettre (idempotent), suivre (SSE), résultat d'un tour, interrompre, répondre aux approbations ; greffon hôte du profil web, interrupteur [dsh.engine] api off\|on | `/walter/core/interfaces/api` | core/interfaces/api |
-| interface-telegram | active | Porte Telegram du moteur (lot E7) : bot propre à Walter, client de l'Engine API uniquement — conversations telegram/<compte>/chat-<id> persistantes, messages idempotents (id Telegram), suivi SSE (écrit…, outils, réponse), /stop, /nouveau, /etat, boutons d'approbation, propriétaire seul ; service walter-telegram | `/walter/core/interfaces/telegram` | core/interfaces/telegram |
-| mcp-server | active | Serveur MCP walter : expose les capacités aux agents (Claude Code, Codex, DSH, Hermes) | `/walter/core/server.py` | core/interfaces/mcp |
-| capabilities-adapter | active | Adaptateur des outils MCP vers les commandes déclarées des modules | `/walter/core/walter_capabilities.py` | core/interfaces/mcp |
-| mcp-toolsets | active | Jeux d'outils MCP par client (WALTER_CLIENT_TAG) | `/walter/core/config/toolsets.toml` | core/interfaces/mcp |
-| runtime-hook | active | Adaptateur de cycle de vie des runtimes (preflight, contexte, runs, bus) appelé à chaque message | `/walter/core/hooks/walter_hook.py` | core/interfaces/hooks |
-| dsh-hooks | active | Greffon DSH owner-turn (texte du propriétaire pour walter_hook.py) ; remplacé par engine/plugins/intake en mode native | `/walter/core/hooks/dsh` | core/engine/plugins |
-| platform | active | Registre, contrats, chemins, instances, raccordements, contrôles (walter …) | `/walter/core/walter_platform` | core/contracts |
-| module-catalog | active | Table unique des modules : emplacement actuel, ancien, cible de la vision | `/walter/core/modules/catalog.json` | core/contracts |
-| module-registry | active | Registre compilé depuis les contrats (généré, jamais édité à la main) | `/walter/core/modules/registry.json` | core/contracts |
-| computer-policy | active | Périmètres Computer Use par interface | `/walter/core/modules/computer-policy.json` | core/security |
-| compositions | active | Compositions de harnesses générées par walter-core (sections gérées) | `/walter/core/compositions` | core/engine/compositions |
-| dsh-web-ui | active | Personnalisation de l'interface web DSH (couleurs, porte web du propriétaire) | `/walter/core/ports/dsh-web-ui` | core/interfaces/web |
-| tool-gateway | active | Passerelle d'outils de walter_run (un processus par run) ; remplacée par le moteur au lot E5 | `/walter/core/bin/walter-tools` | — |
-| guardians | active | Lanceur des gardiens de modules (diagnostic, réparation, alerte) | `/walter/core/bin/walter-guardians` | ops/guardians |
-| scenarios | active | Scénarios de bout en bout (walter-scenario) | `/walter/core/scenarios` | lab/scenarios |
-| browser-session | active | Session navigateur du propriétaire côté serveur (MCP browser_session) — responsabilité de Browse mal placée | `/walter/core/browser_auth.py` | capabilities/browse |
-| standby | active | Mise en veille des services à la demande | `/walter/core/walter_platform/standby.py` | ops |
-| deploy-check | active | Fraîcheur du déploiement : chaque service long compare son démarrage au code qu'il charge (imports statiques + racines déclarées `service_code`) ; réparation gardée du gardien core (redémarrage, interrupteur config/deploy.toml) | `/walter/core/walter_platform/deploy.py` | ops |
+| engine | implemented | Walter Engine, W.Alter's single agent runtime: native walter_engine (walter-engine.service since 2026-11-17: loop, sessions, tools, Python kernel, sub-agents, tasks, Engine API); the former DSH/Cordis kernel is uninstalled (rollback archive only) | `/walter/core/engine` | core/engine |
+| engine-contracts | implemented | Engine API, intake, delegation, policy, events and strategy schemas (tested drafts) | `/walter/core/engine/contracts` | core/engine/contracts |
+| engine-kernel | obsolete | Freeze of the DSH/Cordis kernel (lot E1); DSH uninstalled on 2026-11-18: rollback kit only, `walter engine kernel` says installed=false | `/walter/core/engine/kernel` | core/engine/kernel |
+| engine-compositions | obsolete | Rollback only since 2026-11-18 (DSH uninstalled): source of the former DSH web profile face | `/walter/core/engine/compositions` | core/engine/compositions |
+| engine-plugins | obsolete | Rollback only since 2026-11-18 (DSH uninstalled): DSH Node plugins (intake, events, policy, budget); only engine/plugins/python/runtime still serves the native engine (component engine-python) | `/walter/core/engine/plugins` | core/engine/plugins |
+| engine-python | implemented | The engine's python tool: a persistent Python kernel per conversation in an unprivileged systemd bubble (only its folder writable, local network refused); W.Alter tools from Python under the policy, background tasks, sub-agents | `/walter/core/engine/plugins/python` | core/engine/plugins |
+| security | implemented | W.Alter's single execution policy (lot E3): policy.json (never-list, tool classes, presets per door, child ≤ parent), applied by the engine and by the MCP server's guard for every client | `/walter/core/security` | core/security |
+| engine-api | obsolete | Rollback only since 2026-11-18 (DSH uninstalled): the former Node implementation of the Engine API; the native engine serves the same contract (engine/walter_engine/api.py) | `/walter/core/interfaces/api` | core/interfaces/api |
+| interface-telegram | active | Telegram door of the engine (lot E7): W.Alter's own bot, an Engine API client only — persistent conversations, idempotent messages, live progress, /stop, /nouveau, /etat, owner only; service walter-telegram | `/walter/core/interfaces/telegram` | core/interfaces/telegram |
+| mcp-server | active | The walter MCP server: exposes W.Alter's capabilities to agents (Walter Engine, Claude Code, Codex) | `/walter/core/server.py` | core/interfaces/mcp |
+| capabilities-adapter | active | Adapter from MCP tools to the modules' declared commands | `/walter/core/walter_capabilities.py` | core/interfaces/mcp |
+| mcp-toolsets | active | MCP toolsets per client (WALTER_CLIENT_TAG); tools not listed stay reachable through walter_call | `/walter/core/config/toolsets.toml` | core/interfaces/mcp |
+| runtime-hook | active | Runtime lifecycle adapter for external agents (preflight, context, runs, bus), called at each message | `/walter/core/hooks/walter_hook.py` | core/interfaces/hooks |
+| dsh-hooks | obsolete | Rollback only since 2026-11-18 (DSH uninstalled): the DSH owner-turn plugin | `/walter/core/hooks/dsh` | core/engine/plugins |
+| platform | active | Registry, contracts, paths, instances, harness connections, checks (the walter CLI), and module presentation (module_guide) | `/walter/core/walter_platform` | core/contracts |
+| module-catalog | active | Single table of modules: current location, former location, vision target | `/walter/core/modules/catalog.json` | core/contracts |
+| module-registry | active | Registry compiled from the contracts (generated, never edited by hand) | `/walter/core/modules/registry.json` | core/contracts |
+| computer-policy | active | Computer Use scopes per interface | `/walter/core/modules/computer-policy.json` | core/security |
+| compositions | active | Harness compositions generated by walter-core (managed sections) | `/walter/core/compositions` | core/engine/compositions |
+| dsh-web-ui | obsolete | Rollback only since 2026-11-18 (DSH uninstalled): the former DSH web interface customisation | `/walter/core/ports/dsh-web-ui` | core/interfaces/web |
+| web-panels | active | Web interface panels: pages of other W.Alter modules (development board…) relayed read-only behind the interface's sign-in | `/walter/core/interfaces/web/panels` | core/interfaces/web |
+| tool-gateway | active | Tool gateway of walter_run (one process per run) | `/walter/core/bin/walter-tools` | — |
+| guardians | active | Launcher of the module guardians (diagnosis, repair, alert) | `/walter/core/bin/walter-guardians` | ops/guardians |
+| scenarios | active | End-to-end scenarios (walter-scenario) | `/walter/core/scenarios` | lab/scenarios |
+| browser-session | active | The owner's server-side browser session (MCP browser_session); belongs to Browse, misplaced here | `/walter/core/browser_auth.py` | capabilities/browse |
+| standby | active | On-demand standby of services | `/walter/core/walter_platform/standby.py` | ops |
+| deploy-check | active | Deployment freshness: each long-running service compares its start time with the code it loads; guarded repair by the core guardian (restart) | `/walter/core/walter_platform/deploy.py` | ops |
+| beeper | implemented | Native Beeper channel (REST/WebSocket); reads and sends go through Walter Engine's policy | `/walter/core/walter_beeper.py` | core/interfaces/beeper |
 
 **Limites déclarées :**
 
@@ -241,9 +243,9 @@ Interfaces : CLI walter-lab status|run|history|list, Experiment v1 (experiments/
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| library | active | Lab : bancs, comparaisons, propositions (jamais de déploiement) | `/walter/lab/walter_lab` | lab |
-| experiments | active | Expériences et résultats | `/walter/lab/experiments` | lab/experiments |
-| computer-use-v2 | experimental | Étude Computer Use V2 (Adaptive Universal Operator) : architecture, prototype en observation, banc ; à l'arrêt | `/walter/lab/computer-use-v2` | lab/computer-use-v2 |
+| library | active | Lab: benches, comparisons, proposals (never a deployment) | `/walter/lab/walter_lab` | lab |
+| experiments | active | Experiments and results | `/walter/lab/experiments` | lab/experiments |
+| computer-use-v2 | experimental | Computer Use V2 study (Adaptive Universal Operator): architecture, observed prototype, bench; stopped | `/walter/lab/computer-use-v2` | lab/computer-use-v2 |
 
 **Limites déclarées :**
 
@@ -277,8 +279,8 @@ Interfaces : OpenAI-compatible :8894, POST /v1/decisions {state, questions, samp
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| gateway | active | Passerelle de modèles OpenAI-compatible (:8894), clés depuis Bitwarden, model=auto suit le plan du run | `/walter/cognition/router/llm/gateway.py` | cognition/router/llm |
-| subscriptions | active | Transports par abonnement (Claude, Antigravity, ChatGPT) | `/walter/cognition/router/llm/claude_subscription.py` | cognition/router/llm |
+| gateway | active | OpenAI-compatible model gateway (:8894): keys from the vault, model = a Router poste | `/walter/cognition/router/llm/gateway.py` | cognition/router/llm |
+| subscriptions | active | Subscription transports (Claude, Antigravity, ChatGPT/Codex) | `/walter/cognition/router/llm/claude_subscription.py` | cognition/router/llm |
 
 **Limites déclarées :**
 
@@ -303,8 +305,8 @@ Interfaces : Writer, CLI, MCP.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| logs-store | active | Journal canonique d'exécution walter_logs (masquage à l'écriture) | `/walter/cognition/memory/walter_memory/logs.py` | core/observability |
-| logs-watch | active | Synchronisation des journaux de tous les runtimes (inotify) | `/walter/cognition/memory/connectors/walter_logs.py` | core/observability |
+| logs-store | active | Canonical execution journal walter_logs (secrets masked at write) | `/walter/cognition/memory/walter_memory/logs.py` | core/observability |
+| logs-watch | active | Synchronisation of every runtime's logs (inotify) | `/walter/cognition/memory/connectors/walter_logs.py` | core/observability |
 
 **Limites déclarées :**
 
@@ -317,7 +319,7 @@ Posséder les événements et objets canoniques, leur provenance et les connaiss
 Contrat 1.2.0; propriétaire : memory.
 Racine actuelle : `/walter/cognition/memory`. Cible : `/walter/cognition/memory`.
 
-Interfaces : Python library, HTTP :8890, CLI, MCP, Overland authenticated HTTP :3010, CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer, HTTP :8890 socle A3/A4: POST /v1/tasks/list {thread_id?, session_id?, status?, limit} -> {tasks: [{task_id, goal, status, thread_id, updated_at, progress, attempts, last_outcome}]}; POST /v1/tasks/update {task_id, status?, progress?, result?, note?}; POST /v1/experience {thread_id?, query?, limit} -> {items: [{at, run_id, status, summary, errors, lessons, solutions, pending}]}; /v1/runs/end accepts outcome; /v1/runs/start origin accepts interface, engine_session, request_id; /v1/context accepts thread_id (layers tasks, experience), CLI tasks list|show|update|sweep|triage-redecide [--execute]; CLI experience [--thread] [--query].
+Interfaces : Python library, HTTP :8890, CLI, MCP, Overland authenticated HTTP :3010, CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer, HTTP :8890 socle A3/A4: POST /v1/tasks/list {thread_id?, session_id?, status?, limit} -> {tasks: [{task_id, goal, status, thread_id, updated_at, progress, attempts, last_outcome}]}; POST /v1/tasks/update {task_id, status?, progress?, result?, note?}; POST /v1/experience {thread_id?, query?, limit} -> {items: [{at, run_id, status, summary, errors, lessons, solutions, pending}]}; /v1/runs/end accepts outcome; /v1/runs/start origin accepts interface, engine_session, request_id; /v1/context accepts thread_id (layers tasks, experience), CLI tasks list|show|update|sweep|triage-redecide [--execute] [--channels owner|all|a,b]; CLI experience [--thread] [--query], Beeper connector: WS -> ingestion.jobs beeper_events -> canonical core.events/media/bus; profile-scoped cursors in existing checkpoints.
 
 **Critères de validation :**
 
@@ -329,21 +331,21 @@ Interfaces : Python library, HTTP :8890, CLI, MCP, Overland authenticated HTTP :
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| events | active | Journal canonique core.events (append-only, idempotent) | `/walter/cognition/memory/walter_memory/events.py` | cognition/memory |
-| media | active | Dérivation des médias du Raw Vault (A5) : audio → transcription (poste stt), document → extraction locale, image → OCR/légende (poste vision, désactivé) ; pilotée par le bus (memory.object), texte sur core.objects.derived_* | `/walter/cognition/memory/walter_memory/media.py` | cognition/memory |
-| gateway | active | Seule porte d'écriture (127.0.0.1:8890) | `/walter/cognition/memory/walter_memory/gateway.py` | cognition/memory |
-| connectors | active | Connecteurs (hermes, beeper, gmail, calendar, agent_sessions, triage…) | `/walter/cognition/memory/connectors` | cognition/memory/connectors |
-| organic | active | Mémoire organique V1 (vues, épisodes, périodes, flux) | `/walter/cognition/memory/walter_memory/organic.py` | cognition/memory |
-| assimilation | active | Assimilation pilotée par le bus (memory.organic) | `/walter/cognition/memory/walter_memory/assimilation.py` | cognition/memory |
-| runs | active | Run Plane (runs, tâches déléguées et objectifs durables du propriétaire A3, épisodes de run et expérience A4) | `/walter/cognition/memory/walter_memory/runs.py` | core/orchestration |
-| kardex | active | Couche sociale Kardex (schéma kardex) | `/walter/cognition/memory/walter_memory/social.py` | cognition/memory/kardex |
-| search | active | Index de recherche (search.chunks) | `/walter/cognition/memory/walter_memory/search.py` | cognition/memory |
-| privacy | active | Classes de confidentialité et règle de lecture | `/walter/cognition/memory/walter_memory/privacy.py` | cognition/memory |
-| disclosure | active | Contrôle de divulgation des messages sortants | `/walter/cognition/memory/walter_memory/disclosure.py` | core/security |
-| llm-client | active | Appels de modèles de Memory (refuse local_only, budgets) ; clés par autorisation Walter Secrets (allow memory), sans repli fichier | `/walter/cognition/memory/walter_memory/llm.py` | cognition/memory |
-| migrations | active | Migrations Postgres | `/walter/cognition/memory/migrations` | cognition/memory/migrations |
-| hermes-plugin | active | Fournisseur mémoire walter-memory pour Hermes — à retirer avec Hermes (E7) | `/walter/cognition/memory/hermes-plugins` | — |
-| overland | active | Réception GPS (Overland, :3010) | `/walter/cognition/memory/walter_memory/overland.py` | cognition/memory/connectors |
+| events | active | Canonical journal core.events (append-only, idempotent) | `/walter/cognition/memory/walter_memory/events.py` | cognition/memory |
+| media | active | Derivation of Raw Vault media: audio → transcript (stt poste), document → local extraction, image → OCR/caption (vision poste, disabled); driven by the bus (memory.object) | `/walter/cognition/memory/walter_memory/media.py` | cognition/memory |
+| gateway | active | The only write door (127.0.0.1:8890) | `/walter/cognition/memory/walter_memory/gateway.py` | cognition/memory |
+| connectors | active | Connectors (beeper, gmail, calendar, agent_sessions, triage…) | `/walter/cognition/memory/connectors` | cognition/memory/connectors |
+| organic | active | Organic memory V1 (views, episodes, periods, flows) | `/walter/cognition/memory/walter_memory/organic.py` | cognition/memory |
+| assimilation | active | Bus-driven assimilation (memory.organic) | `/walter/cognition/memory/walter_memory/assimilation.py` | cognition/memory |
+| runs | active | Run plane: runs, delegated tasks and the owner's durable tasks, run episodes and experience | `/walter/cognition/memory/walter_memory/runs.py` | core/orchestration |
+| kardex | active | Kardex social layer (schema kardex) | `/walter/cognition/memory/walter_memory/social.py` | cognition/memory/kardex |
+| search | active | Search index (search.chunks) | `/walter/cognition/memory/walter_memory/search.py` | cognition/memory |
+| privacy | active | Privacy classes and reading rule | `/walter/cognition/memory/walter_memory/privacy.py` | cognition/memory |
+| disclosure | active | Disclosure check of outgoing messages | `/walter/cognition/memory/walter_memory/disclosure.py` | core/security |
+| llm-client | active | Memory's model calls (refuses local_only, budgets); keys through Walter Secrets grants, no file fallback | `/walter/cognition/memory/walter_memory/llm.py` | cognition/memory |
+| migrations | active | PostgreSQL migrations | `/walter/cognition/memory/migrations` | cognition/memory/migrations |
+| overland | active | GPS reception (Overland, :3010) | `/walter/cognition/memory/walter_memory/overland.py` | cognition/memory/connectors |
+| beeper-native | implemented | Event-driven Beeper ingestion; HTTP catch-up and canonical deduplication | `/walter/cognition/memory/connectors/beeper_watch.py` | cognition/memory/connectors |
 
 **Limites déclarées :**
 
@@ -370,18 +372,18 @@ Interfaces : CLI walter-ops backup|git|check|recovery|deploy|status (install, on
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| backup | active | Sauvegardes (pg, state.db, restic, publication git) | `/walter/ops/backup` | ops/backup |
-| ops | active | Installation, déploiement, récupération | `/walter/ops/walter_ops` | ops |
-| services | active | Dépendances opérationnelles de Walter (bases, bureaux distants, environnements Python partagés, passerelles) : installations, définitions de déploiement et données techniques ; jamais de code de Walter | `/services` | — |
-| postgres | active | PostgreSQL de Walter en service depuis le 2026-11-10 (E9.2b) : données dans /services/postgres/data, configuration dans config/, compose verrouillé par empreinte ; conteneur hindsight-pg, 127.0.0.1:5433 inchangés. Déplacement et retour arrière : walter-pg-relocate (ops/backup/scripts) | `/services/postgres` | — |
-| kernel-npm-cache | active | Cache npm hors ligne du noyau figé du moteur (lot E1), utilisé par core/engine/kernel/install.sh | `/services/dsh` | — |
-| python | active | Environnements Python installés des modules (runtime de walter-python, core, router, llm, raw-vault), déplacés le 2026-11-10 (E9.2a) ; chaque module garde un lien venv ; exclus de restic, reconstruits depuis les verrous des modules | `/services/python` | — |
-| webtop | active | Bureau XFCE en conteneur (Browse, Computer), rangé le 2026-11-11 (ancien dossier = lien de compatibilité) ; compose verrouillé par empreinte ; config/.cache exclu de restic | `/services/webtop` | — |
-| browse-display | active | Écran Selkies (X :101) du navigateur de Walter, rangé le 2026-11-11 ; compose + config/, démarré par walter-browse-display.service | `/services/browse-display` | — |
-| flaresolverr | active | FlareSolverr (127.0.0.1:8191) pour la recherche web, rangé le 2026-11-11 ; sans données | `/services/flaresolverr` | — |
-| nordvpn-proxy | active | Proxy NordVPN de Browse, rangé le 2026-11-11 ; CASSÉ (sleep infinity, rien ne sert :1080) : à réparer ou retirer | `/services/nordvpn-proxy` | — |
-| raw-vault-s3 | active | Raw Vault en S3 (127.0.0.1:8899, rclone) ; source de l'unité, clés lues dans @instance/bootstrap/raw-vault | `/services/raw-vault-s3` | — |
-| cloudflared | active | Tunnel Cloudflare (entrée publique de l'instance) ; réglages et identifiants (0600) dans config/, rangés le 2026-11-11 depuis le dossier d'intégrations de Hermes | `/services/cloudflared` | — |
+| backup | active | Backups (PostgreSQL, restic offsite, git publication) | `/walter/ops/backup` | ops/backup |
+| ops | active | Installation, deployment, recovery | `/walter/ops/walter_ops` | ops |
+| services | active | W.Alter's operational dependencies (databases, remote desktops, shared Python environments, gateways): installations, deployment definitions and technical data; never W.Alter code | `/services` | — |
+| postgres | active | W.Alter's PostgreSQL: container walter-pg (127.0.0.1:5433), data in /services/postgres/data, settings in config/, compose locked by fingerprint | `/services/postgres` | — |
+| python | active | Installed Python environments of the modules (walter-python runtime, core, router, llm, raw-vault); excluded from restic, rebuilt from the modules' locks | `/services/python` | — |
+| webtop | active | XFCE desktop in a container (Browse, Computer); compose locked by fingerprint | `/services/webtop` | — |
+| browse-display | active | Selkies display (X :101) of W.Alter's browser, started by walter-browse-display.service | `/services/browse-display` | — |
+| flaresolverr | active | FlareSolverr (127.0.0.1:8191) for web search; no data | `/services/flaresolverr` | — |
+| nordvpn-proxy | active | Settings of Browse's NordVPN per-country exits, opened on demand by walter-wg-exit | `/services/nordvpn-proxy` | — |
+| raw-vault-s3 | active | Raw Vault as S3 (127.0.0.1:8899, rclone); keys read from the instance's bootstrap | `/services/raw-vault-s3` | — |
+| cloudflared | active | Cloudflare tunnel (the instance's public ingress); settings and credentials (0600) in config/ | `/services/cloudflared` | — |
+| devboard | experimental | W.Alter's development board: projects, pending agreements, replaced decisions, documents, agents' live activity (tailnet page, read-only) | `/walter/ops/devboard` | ops/devboard |
 
 **Limites déclarées :**
 
@@ -414,7 +416,7 @@ Interfaces : memory objects library, S3, MCP.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| rawvault-shim | obsolete | Ancienne entrée du Raw Vault ; renvoie vers walter_memory.objects | `/walter/cognition/memory/vault/rawvault.py` | — |
+| rawvault-shim | obsolete | Former Raw Vault entry point; forwards to walter_memory.objects | `/walter/cognition/memory/vault/rawvault.py` | — |
 
 **Limites déclarées :**
 
@@ -438,21 +440,19 @@ Interfaces : CLI, walter-llm task routes, MCP walter_route / walter_run / walter
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| research | active | Collecte des classements et prix (AA, Arena, OpenRouter…) | `/walter/cognition/router/research` | cognition/router/research |
-| analysis | active | Analyse, propositions Telegram, alertes (alertes = rôle Hermes à retirer, E6) | `/walter/cognition/router/analysis` | cognition/router/analysis |
-| plan | active | Forfaits du propriétaire et quotas | `/walter/cognition/router/plan` | cognition/router/plan |
-| serve | active | Choix du modèle par tâche, exécution texte et médias | `/walter/cognition/router/serve` | cognition/router/serve |
-| oneshot | obsolete | Appels ponctuels via hermes chat --oneshot — rôle Hermes à retirer (E6) | `/walter/cognition/router/serve/oneshot.py` | — |
-| interface | active | Page publique de la bibliothèque des modèles | `/walter/cognition/router/interface` | cognition/router/interface |
-| store | active | Schéma Postgres models (lecture/écriture) | `/walter/cognition/router/store` | cognition/router/store |
-| hermes-plugin | active | Greffon Hermes walter-router — à retirer avec Hermes (E7) | `/walter/cognition/router/hermes-plugins` | — |
-| guardian | active | Gardien du Router | `/walter/cognition/router/guardian` | cognition/router/guardian |
-| documentation | active | Référence générée (CODE, CONFIGURATION, DATABASE…) contrôlée par les tests | `/walter/cognition/router/documentation.py` | cognition/router/docs |
+| research | active | Collection of leaderboards and prices (Artificial Analysis, Arena, OpenRouter…) | `/walter/cognition/router/research` | cognition/router/research |
+| analysis | active | Analysis, Telegram proposals, alerts | `/walter/cognition/router/analysis` | cognition/router/analysis |
+| plan | active | The owner's plans and quotas | `/walter/cognition/router/plan` | cognition/router/plan |
+| serve | active | Model choice per task, text and media execution | `/walter/cognition/router/serve` | cognition/router/serve |
+| oneshot | active | The Router's one-shot answers: direct walter-llm (economical poste) or delegation to Walter Engine | `/walter/cognition/router/serve/oneshot.py` | — |
+| interface | active | Public model library page | `/walter/cognition/router/interface` | cognition/router/interface |
+| store | active | PostgreSQL schema models (read/write) | `/walter/cognition/router/store` | cognition/router/store |
+| guardian | active | The Router's guardian | `/walter/cognition/router/guardian` | cognition/router/guardian |
+| documentation | active | Generated reference (code, configuration, database…) checked by the tests | `/walter/cognition/router/documentation.py` | cognition/router/docs |
 
 **Limites déclarées :**
 
 - New model choices remain subject to the owner's approval; no automatic switching introduced.
-- Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.
 - Text runs execute natively with bounded terminal/file tools; only providers of the selected model are tried, and callers must forward user_notice on failover.
 - The guardian lands repairs only in research/, analysis/parse.py, analysis/identity.py, analysis/aliases.json, interface/ and tests/, through deterministic gates; owner choices, execution policy, schema and units are never changed by it.
 
@@ -474,7 +474,7 @@ Interfaces : command walter-python.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| python | active | Interpréteur Python partagé des modules | `/walter/ops/runtime/bin/walter-python` | ops/runtime |
+| python | active | Shared Python interpreter of the modules | `/walter/ops/runtime/bin/walter-python` | ops/runtime |
 
 **Limites déclarées :**
 
@@ -498,9 +498,9 @@ Interfaces : safe MCP metadata/reference, local CLI exec/get, Hermes hooks, walt
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| library | active | Accès au coffre Bitwarden sans valeur exposée, autorisations (grants) | `/walter/core/security/secrets/walter_secrets` | core/security/secrets |
-| walter-cloudflare | active | Injection ciblée des identifiants Cloudflare (autorisations cloudflare-api, cloudflare-workers-ai) dans une commande tierce ; échoue fermé | `/walter/core/security/secrets/bin/walter-cloudflare` | core/security/secrets |
-| compat | obsolete | Anciennes entrées de compatibilité | `/walter/core/security/secrets/compat` | — |
+| library | active | Access to the Bitwarden vault without exposing values; grants | `/walter/core/security/secrets/walter_secrets` | core/security/secrets |
+| walter-cloudflare | active | Targeted injection of Cloudflare credentials (grants cloudflare-api, cloudflare-workers-ai) into a third-party command; fails closed | `/walter/core/security/secrets/bin/walter-cloudflare` | core/security/secrets |
+| compat | obsolete | Former compatibility entry points | `/walter/core/security/secrets/compat` | — |
 
 **Limites déclarées :**
 
@@ -514,7 +514,7 @@ Gérer le contenu, la recherche, les propositions et la curation des procédures
 Contrat 1.1.0; propriétaire : skills.
 Racine actuelle : `/walter/capabilities/skills`. Cible : `/walter/capabilities/skills`.
 
-Interfaces : HTTP :8891, stdlib client, MCP, Hermes plugin.
+Interfaces : HTTP :8891, stdlib client, MCP.
 
 **Critères de validation :**
 
@@ -526,11 +526,11 @@ Interfaces : HTTP :8891, stdlib client, MCP, Hermes plugin.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| core | active | Noyau des skills (store git, cartes Postgres, politique d'exposition, apprentissage) | `/walter/capabilities/skills/walter_skills` | capabilities/skills |
+| core | active | Skills core (git store, PostgreSQL cards, exposure policy, learning) | `/walter/capabilities/skills/walter_skills` | capabilities/skills |
 | service | active | Service :8891 | `/walter/capabilities/skills/walter_skills/api.py` | capabilities/skills |
-| consumer | active | Consommateur du bus walter-skills-bus | `/walter/capabilities/skills/walter_skills/consumer.py` | capabilities/skills |
-| library | active | Bibliothèque de procédures (SKILL.md) | `/walter/capabilities/skills/skills` | capabilities/skills/library |
-| archive | obsolete | Skills retirés (réserve) | `/walter/capabilities/skills/archive` | capabilities/skills/archive |
+| consumer | active | Bus consumer walter-skills-bus | `/walter/capabilities/skills/walter_skills/consumer.py` | capabilities/skills |
+| library | active | Library of procedures (SKILL.md) | `/walter/capabilities/skills/skills` | capabilities/skills/library |
+| archive | obsolete | Retired skills (reserve) | `/walter/capabilities/skills/archive` | capabilities/skills/archive |
 
 **Limites déclarées :**
 
@@ -554,8 +554,8 @@ Interfaces : renderer, walter-soul render/path/sync/check/init, walter_profile M
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| renderer | active | Rendu de l'identité vers chaque runtime (SOUL.md, profils) | `/walter/core/identity/bin/walter-soul` | core/identity |
-| runtimes | active | Adaptateurs neutres par runtime | `/walter/core/identity/runtimes` | core/identity/runtimes |
+| renderer | active | Renders the identity for each runtime (Soul, conduct, profiles) | `/walter/core/identity/bin/walter-soul` | core/identity |
+| runtimes | active | Neutral adapters per runtime | `/walter/core/identity/runtimes` | core/identity/runtimes |
 
 **Limites déclarées :**
 

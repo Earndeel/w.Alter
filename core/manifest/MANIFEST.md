@@ -1,8 +1,17 @@
-# walter-core — le harnais
+# walter-core
 
-Branche les modules de W.Alter dans chaque runtime sous les mêmes noms d'outils, sans remplacer le runtime ni ses permissions.
+**Role.** Connects W.Alter's modules to each runtime under the same tool names without replacing the runtime or its
+permissions: the `walter` MCP server, the platform library (registry, paths, instance, presentation), runtime hooks,
+and the core components (engine, identity, security, interfaces).
 
-**Utilisation**
-- Chaque module se présente en une ligne (D1). À la demande : `module_guide(module, depth="D2")` sa fiche d'utilisation (outils, paramètres, conventions), `depth="D3"` son guide détaillé ; `module_index(module, section)` ce qu'il contient.
-- `walter_health` : état de la pile ; `walter_modules` : déclarations techniques des modules.
-- `walter_run(request, goal)` : déléguer un travail à Walter Engine (session déléguée, sous sa politique). Prévenir le propriétaire : `walter-telegram send`.
+**Tools**
+- `module_guide(path, depth="D1"|"D2"|"D3")`: documentation of W.Alter (`walter`), a module (`memory`) or a component
+  (`memory/events`); each D2 lists its children's paths. `module_index(module, section)`: a module's live contents.
+- `walter_health`: state of the stack; `walter_modules(module)`: technical declarations (contracts, dependencies,
+  per-runtime limits, observed files).
+- `walter_run(request, goal)`: delegate work to Walter Engine (delegated session under its policy).
+- `walter_call(tool, arguments)`: call a W.Alter tool that is not in your list (`describe=true` gives its
+  parameters).
+- Native messaging: `beeper_read(operation="chats"|"messages"|"search"|"accounts"|"status", …)` reads the local
+  Beeper server; on the engine, `beeper_send_message(chat_id, text, reply_to)` sends under its policy and disclosure
+  check.

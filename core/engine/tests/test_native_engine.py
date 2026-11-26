@@ -398,3 +398,258 @@ def test_a_turn_cut_by_the_engine_stopping_is_resumed_as_its_continuation(engine
     finally:
         asyncio.run(again.doors.close())
         asyncio.run(again.llm.close())
+
+
+# ── payload trace (lot 0, 2026-11-23) ──
+def test_payload_trace_parts_and_blobs(tmp_path):
+    from walter_engine.payload import Trace
+    t = Trace(tmp_path / "payload")
+    sys_parts = [("soul", "Tu es Walter."), ("environment", "## Environnement\n- Date"),
+                 ("mcp_instructions", "W.Alter preface.\n\n## Modules W.Alter\n- memory")]
+    system = "\n\n".join(x for _, x in sys_parts)
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": "salut"},
+                {"role": "user", "content": "<walter-context>\nmémoire\n</walter-context>"},
+                {"role": "assistant", "content": "", "tool_calls": [{"id": "1", "function": {"name": "bash"}}]},
+                {"role": "tool", "content": "ok"}]
+    tools = [{"type": "function", "function": {"name": "bash", "parameters": {}}}]
+    row = t.row(sys_parts=sys_parts, messages=messages, tools=tools,
+                usage={"prompt_tokens": 100, "prompt_tokens_details": {"cached_tokens": 40}, "completion_tokens": 5})
+    assert set(row["parts"]) == {"soul", "environment", "mcp_preface", "mcp_modules", "tools"}
+    assert "sha" not in row["parts"]["environment"] and row["parts"]["tools"]["n"] == 1
+    assert row["messages"]["chars"]["pack"] > 0 and row["messages"]["chars"]["owner"] == len("salut")
+    assert row["messages"]["last_owner_chars"] == len("salut")
+    assert row["usage"] == {"prompt": 100, "cached": 40, "completion": 5}
+    blobs = sorted(p.name for p in (tmp_path / "payload" / "blobs").iterdir())
+    assert len(blobs) == 4                     # soul, preface, modules, tools: kept once
+    t.row(sys_parts=sys_parts, messages=messages, tools=tools, usage={})
+    assert sorted(p.name for p in (tmp_path / "payload" / "blobs").iterdir()) == blobs
+    t.record({"session": "s"}, sys_parts=sys_parts, messages=messages, tools=tools, usage={})
+    assert len(list((tmp_path / "payload").glob("trace-*.jsonl"))) == 1
+
+
+def test_bench_test_account_judged_autonomous():
+    """2026-11-23: a `bench-` test account is judged under `maintenance` (no interactive approval); others stay `test`."""
+    from walter_engine.policy import Policy
+    p = {"interfaces": {"test": "api", "maintenance": "dev"}, "test_interfaces": {"_doc": "x", "bench-": "maintenance"}}
+    assert Policy.test_interface(p, "test", {"kind": "test", "id": "bench-payload"}) == "maintenance"
+    assert Policy.test_interface(p, "test", {"kind": "test", "id": "e2e"}) is None
+    assert Policy.test_interface(p, "web", {"kind": "owner", "id": "bench-x"}) is None
+    assert Policy.test_interface(p, "test", {"kind": "machine", "id": "bench-x"}) is None
+
+
+# ── system order (payload lot 2, 2026-11-23) ──
+def test_the_system_text_puts_the_shared_socle_first_and_the_session_lines_last(engine, tmp_path):
+    soul = tmp_path / "soul.md"
+    soul.write_text("Tu es Walter.")
+    engine.s.instructions = str(soul)
+    engine.mcp.instructions = "## Modules W.Alter\n- memory"
+    a = engine.create(cwd="/w", door="telegram", principal={"kind": "owner", "id": "monsieur"})
+    a._skills0 = "## Skills\n- walter-skills"
+    text = engine._system(a)
+    assert [k for k, _ in a._sys_parts] == ["soul", "skills_map", "mcp_instructions", "environment", "journal_line"]
+    assert text.startswith("Tu es Walter.\n\n## Skills") and text.rstrip().endswith(f"thread_id={a.sid}).")
+    b = engine.create(cwd="/w", door="web", principal={"kind": "owner", "id": "monsieur"})
+    b._skills0 = a._skills0
+    shared = text.split("## Environnement")[0]
+    assert engine._system(b).startswith(shared)                       # another session shares the whole socle
+    engine.s.system_order = "legacy"                                  # rollback: the order before 23/11
+    a._sys = None
+    engine._system(a)
+    assert [k for k, _ in a._sys_parts] == ["soul", "environment", "journal_line", "skills_map", "mcp_instructions"]
+
+
+# ── prompt layout v2 (lot 3a, 2026-11-24) ──
+def _v2_files(engine, tmp_path):
+    (tmp_path / "SOUL.md").write_text("<!-- GÉNÉRÉ par walter-soul (engine) -->\nYou are W.Alter.\n")
+    (tmp_path / "OPERATING.md").write_text("## Operating rules\n- rule")
+    (tmp_path / "CONDUCT.md").write_text("<!-- GÉNÉRÉ par walter-soul (engine-conduct) -->\n## How to work\n- conduct\n")
+    (tmp_path / "AGENTS.md").write_text("Tu es Walter (v1).")
+    engine.s.instructions, engine.s.soul = str(tmp_path / "AGENTS.md"), str(tmp_path / "SOUL.md")
+    engine.s.operating, engine.s.conduct = str(tmp_path / "OPERATING.md"), str(tmp_path / "CONDUCT.md")
+    engine.mcp.instructions = "## Modules W.Alter\n- memory"
+
+
+def test_layout_v2_composes_soul_operating_rules_and_conduct_in_the_shared_socle(engine, tmp_path):
+    _v2_files(engine, tmp_path)
+    engine.s.prompt_layout = "v2"
+    a = engine.create(cwd="/w", door="web", principal={"kind": "owner", "id": "monsieur"})
+    a._skills0 = "## Skills\n- walter-skills"
+    text = engine._system(a)
+    assert [k for k, _ in a._sys_parts] == ["soul", "engine_rules", "conduct", "skills_map", "mcp_instructions",
+                                           "environment", "journal_line"]
+    assert text.startswith("You are W.Alter.\n\n## Operating rules") and "<!--" not in text   # human note stripped
+    assert "## Environment\n- Date: " in text and "Monsieur" not in text and "Tu es Walter" not in text
+    blocks = engine._messages(a)[0]["content"]
+    assert blocks[0]["text"].endswith("- memory") and blocks[1]["text"].startswith("## Environment")
+    sub = engine.create(cwd="/w", door="web", principal={"kind": "owner", "id": "monsieur"}, depth=1)
+    assert "not to the owner" in engine._system(sub)
+
+
+def test_layout_v2_for_test_accounts_only_and_v1_when_the_soul_is_missing(engine, tmp_path):
+    _v2_files(engine, tmp_path)
+    engine.s.prompt_layout, engine.s.prompt_layout_test = "v1", "v2"
+    owner = engine.create(cwd="/w", door="web", principal={"kind": "owner", "id": "monsieur"})
+    test = engine.create(cwd="/w", door="api", principal={"kind": "test", "id": "bench-payload"})
+    assert engine._system(owner).startswith("Tu es Walter (v1).")
+    assert engine._system(test).startswith("You are W.Alter.")
+    engine.s.prompt_layout_accounts = {"bench-v1": "v1"}             # a bench arm keeps its own layout
+    arm = engine.create(cwd="/w", door="api", principal={"kind": "test", "id": "bench-v1"})
+    assert engine._system(arm).startswith("Tu es Walter (v1).")
+    (tmp_path / "SOUL.md").unlink()                                   # no Soul file: the v1 profile, never no identity
+    test._sys = None
+    assert engine._system(test).startswith("Tu es Walter (v1).")
+
+
+def test_an_edited_soul_reaches_an_open_session_at_its_next_turn_only(engine, tmp_path):
+    import os
+    _v2_files(engine, tmp_path)
+    engine.s.prompt_layout = "v2"
+    a = engine.create(cwd="/w", door="web", principal={"kind": "owner", "id": "monsieur"})
+    a._sys_sig = engine._sys_sources_sig(a)                          # turn start
+    first = engine._system(a)
+    soul = tmp_path / "SOUL.md"
+    soul.write_text("You are W.Alter, edited.\n")
+    st = soul.stat()
+    os.utime(soul, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000))
+    assert engine._system(a) == first                                 # same turn: stable (cache)
+    a._sys_sig = engine._sys_sources_sig(a)                          # next turn start
+    assert engine._system(a).startswith("You are W.Alter, edited.")
+
+
+# ── documentation layer (lot 3c, 2026-11-24) ──
+def test_doc_layer_replaces_the_module_layer_keeps_the_walter_call_note_and_follows_the_manifests(engine, tmp_path,
+                                                                                                    monkeypatch):
+    from walter_engine import engine as eng
+    _v2_files(engine, tmp_path)
+    engine.mcp.instructions = ("W.Alter base line.\n\n## Modules W.Alter\n- memory\n\n## W.Alter tools not listed\n"
+                               "Call them with `walter_call(tool, arguments)`.")
+    docs = {"text": "## W.Alter\nW.Alter is a persistent personal intelligence."}
+    monkeypatch.setattr(eng, "_doc_layer", lambda form: docs["text"] + f" ({form})")
+    engine.s.prompt_layout = "v2"                                     # doc_layer "mcp" by default: unchanged
+    a = engine.create(cwd="/w", door="web", principal={"kind": "owner", "id": "monsieur"})
+    a._skills0 = "## Skills\n- walter-skills"
+    a._sys_sig = engine._sys_sources_sig(a)
+    assert "## Modules W.Alter" in engine._system(a) and "walter_doc" not in dict(a._sys_parts)
+    engine.s.prompt_layout_accounts = {"bench-s2": "v2+s2", "bench-s2n": "v2+s2-skills", "bench-v1": "v1+s2"}
+    b = engine.create(cwd="/w", door="api", principal={"kind": "test", "id": "bench-s2"})
+    b._skills0 = "## Skills\n- walter-skills"
+    b._sys_sig = engine._sys_sources_sig(b)
+    text = engine._system(b)
+    assert [k for k, _ in b._sys_parts] == ["soul", "engine_rules", "conduct", "walter_doc", "skills_map",
+                                           "mcp_instructions", "environment", "journal_line"]
+    assert "(s2)" in text and "## Modules W.Alter" not in text and "base line" not in text
+    assert dict(b._sys_parts)["mcp_instructions"].startswith("## W.Alter tools not listed")
+    assert "(s2)" in engine._messages(b)[0]["content"][0]["text"]     # in the shared, cached socle
+    c = engine.create(cwd="/w", door="api", principal={"kind": "test", "id": "bench-s2n"})
+    c._skills0 = "## Skills\n- walter-skills"
+    c._sys_sig = engine._sys_sources_sig(c)
+    engine._system(c)
+    assert "skills_map" not in dict(c._sys_parts)
+    v1 = engine.create(cwd="/w", door="api", principal={"kind": "test", "id": "bench-v1"})
+    v1._sys_sig = engine._sys_sources_sig(v1)
+    assert engine._system(v1).startswith("Tu es Walter (v1).") and not v1._doc   # a v2 feature only
+    first = engine._system(b)
+    docs["text"] = "## W.Alter\nEdited D1."                           # an edited manifest: next turn, not this one
+    assert engine._system(b) == first
+    b._sys_sig = engine._sys_sources_sig(b)
+    assert "Edited D1." in engine._system(b)
+    monkeypatch.setattr(eng, "_doc_layer", lambda form: "")           # documentation unavailable: module layer kept
+    b._sys_sig = engine._sys_sources_sig(b)
+    assert "## Modules W.Alter" in engine._system(b)
+
+
+def test_doc_layer_from_the_real_presentation_names_walter_and_its_modules():
+    from walter_engine import engine as eng
+    s1, s2 = eng._doc_layer("s1"), eng._doc_layer("s2")
+    if not s2:                                                        # presentation without socle(): before the swap
+        return
+    assert s1.startswith("## W.Alter") and 'module_guide("walter", depth="D2")' in s1
+    assert "### Modules (D1)" in s2 and "`memory`" in s2 and len(s2) > len(s1)
+
+
+# ── communication profile per recipient (lot 3b, 2026-11-24) ──
+def test_the_recipient_is_decided_by_the_session_not_by_the_technical_channel(engine):
+    owner = {"kind": "owner", "id": "monsieur"}
+    assert engine.recipient(engine.create(cwd="/w", door="web", principal=owner)) == "web"
+    assert engine.recipient(engine.create(cwd="/w", door="telegram", principal=owner)) == "telegram"
+    assert engine.recipient(engine.create(cwd="/w", door="api", principal=owner)) == "default"   # a person via API
+    assert engine.recipient(engine.create(cwd="/w", door="mcp", principal=owner)) == "default"
+    assert engine.recipient(engine.create(cwd="/w", door="mcp", principal={"kind": "machine", "id": "guardian"})) == "agent"
+    assert engine.recipient(engine.create(cwd="/w", door="telegram", principal=owner, depth=1)) == "agent"   # sub-agent
+    assert engine.recipient(engine.create(cwd="/w", door="web", principal={"kind": "test", "id": "e2e"})) == "web"
+
+
+def test_communication_profile_is_off_by_default_then_its_own_cache_block(engine, tmp_path, monkeypatch):
+    import os
+    from walter_engine import config as cfg, engine as eng
+    _v2_files(engine, tmp_path)
+    ifaces = tmp_path / "interfaces"
+    for name, text in (("web", "## Communication — Portal\n- tables ok"), ("telegram", "## Communication — Telegram\n- no tables"),
+                       ("agent", "## Communication — agent"), ("default", "## Communication — client not known")):
+        (ifaces / name).mkdir(parents=True)
+        (ifaces / name / "COMMUNICATION.md").write_text(text)
+    monkeypatch.setattr(eng, "INTERFACES", ifaces)
+    inst = tmp_path / "instance"
+    (inst / "config" / "interfaces").mkdir(parents=True)
+    monkeypatch.setattr(cfg, "instance_root", lambda: inst)
+    engine.s.prompt_layout = "v2"
+    web = engine.create(cwd="/w", door="web", principal={"kind": "owner", "id": "monsieur"})
+    web._sys_sig = engine._sys_sources_sig(web)
+    assert "Communication" not in engine._system(web)                 # off by default: unchanged
+    engine.s.communication = True
+    web._sys_sig = engine._sys_sources_sig(web)
+    text = engine._system(web)
+    assert [k for k, _ in web._sys_parts][-3:] == ["communication", "environment", "journal_line"]
+    assert "tables ok" in text and "no tables" not in text
+    blocks = engine._messages(web)[0]["content"]
+    assert [("cache_control" in b) for b in blocks] == [True, True, False] and blocks[1]["text"].startswith("## Communication — Portal")
+    tg = engine.create(cwd="/w", door="telegram", principal={"kind": "owner", "id": "monsieur"})
+    tg._sys_sig = engine._sys_sources_sig(tg)
+    tg_blocks = engine._messages(tg)[0]["content"]
+    assert tg_blocks[0]["text"] == blocks[0]["text"] and "no tables" in tg_blocks[1]["text"]   # socle shared
+    (inst / "config" / "interfaces" / "telegram.md").write_text("- The owner's addition.")   # next turn, this session
+    assert "addition" not in engine._system(tg)
+    tg._sys_sig = engine._sys_sources_sig(tg)
+    assert "- no tables\n\n- The owner's addition." in engine._system(tg)
+    engine.s.communication, engine.s.prompt_layout = False, "v1"
+    engine.s.prompt_layout_accounts = {"bench-3b": "v2+comm"}         # a bench arm turns it on for itself only
+    arm = engine.create(cwd="/w", door="telegram", principal={"kind": "test", "id": "bench-3b"})
+    arm._sys_sig = engine._sys_sources_sig(arm)
+    assert "no tables" in engine._system(arm)
+    v1 = engine.create(cwd="/w", door="telegram", principal={"kind": "owner", "id": "monsieur"})
+    v1._sys_sig = engine._sys_sources_sig(v1)
+    assert "Communication" not in engine._system(v1)
+
+
+def test_shipped_profiles_exist_and_inactive_ones_are_never_selected():
+    from walter_engine import engine as eng
+    for name in ("web", "telegram", "agent", "default"):
+        text = (eng.INTERFACES / name / "COMMUNICATION.md").read_text()
+        assert text.startswith("## Communication") and "Monsieur" not in text
+    for name in ("voice", "desktop"):
+        assert (eng.INTERFACES / name / "COMMUNICATION.md").read_text().startswith("<!-- INACTIVE")
+        assert name not in eng.DOOR_PROFILE.values()
+
+
+def test_the_system_message_marks_the_shared_socle_as_its_own_cache_block(engine, tmp_path):
+    soul = tmp_path / "soul.md"
+    soul.write_text("Tu es Walter.")
+    engine.s.instructions = str(soul)
+    engine.mcp.instructions = "## Modules W.Alter\n- memory"
+    a = engine.create(cwd="/w", door="telegram", principal={"kind": "owner", "id": "monsieur"})
+    a._skills0 = "## Skills\n- walter-skills"
+    text = engine._system(a)
+    blocks = engine._messages(a)[0]["content"]
+    assert [b["type"] for b in blocks] == ["text", "text"]
+    assert "\n\n".join(b["text"] for b in blocks) == text             # the very text of one string, cut in two
+    assert blocks[0]["cache_control"] == {"type": "ephemeral"} and "cache_control" not in blocks[1]
+    assert blocks[0]["text"].endswith("- memory") and blocks[1]["text"].startswith("## Environnement")
+    b = engine.create(cwd="/w", door="web", principal={"kind": "owner", "id": "monsieur"})
+    b._skills0 = a._skills0
+    assert engine._messages(b)[0]["content"][0] == blocks[0]          # another session: the same marked socle
+    engine.s.system_blocks = False                                    # rollback: one string
+    assert engine._messages(a)[0]["content"] == text
+    engine.s.system_blocks = True
+    engine.s.system_order = "legacy"                                  # the legacy order has no shared prefix to mark
+    a._sys = None
+    assert isinstance(engine._messages(a)[0]["content"], str)

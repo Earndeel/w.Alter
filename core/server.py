@@ -50,9 +50,19 @@ BUDGETS = {"low", "mid", "high"}
 
 from walter_capabilities import router_brief  # noqa: E402 — the router's own brief joins the server instructions
 
+def _owner_line() -> str:
+    """How the instance's owner is addressed, from the instance (lot 3a, 2026-11-24: never hardcoded in software)."""
+    try:
+        from walter_platform import instance
+        o = instance.owner()
+        return f"The user is addressed as '{o['address']}' and works in {o['language_name']}. "
+    except Exception:  # noqa: BLE001 — no instance: neutral text
+        return ""
+
+
 BASE_INSTRUCTIONS = (
     "W.Alter is the user's modular capability stack on this VM. Use its connected modules across harnesses; keep the host runtime and permissions. These tools share its long-term "
-    "memory and skills. The user is addressed as 'Monsieur' and works in French. Recalled memories are dated "
+    "memory and skills. " + _owner_line() + "Recalled memories are dated "
     "snapshots, not live state: verify current config/services before asserting them. Retain only durable "
     "facts about the user, their projects and decisions — never secrets, credentials or transient logs.")
 mcp = FastMCP("walter-core", instructions=BASE_INSTRUCTIONS)  # + module layer, set once the tools are registered

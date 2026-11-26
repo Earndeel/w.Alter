@@ -92,7 +92,13 @@ def owner(base=None):
     o = dict(manifest(base)['owner'])
     o.setdefault('language', 'fr')
     o.setdefault('timezone', 'UTC')
+    # English name of the language, for instructions written in English (Soul, 2026-11-24): {{owner.language_name}}
+    o.setdefault('language_name', LANGUAGE_NAMES.get(str(o['language']).lower().split('-')[0], str(o['language'])))
     return o
+
+
+LANGUAGE_NAMES = {'fr': 'French', 'en': 'English', 'es': 'Spanish', 'de': 'German', 'it': 'Italian',
+                  'pt': 'Portuguese', 'nl': 'Dutch', 'th': 'Thai', 'ja': 'Japanese', 'zh': 'Chinese'}
 
 
 def render(text, base=None):

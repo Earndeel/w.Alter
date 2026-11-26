@@ -67,6 +67,15 @@ def _merge(base: dict, over: dict) -> dict:
     return out
 
 
+def _module_path(value: str) -> str:
+    """A path shipped with the engine, relative to core/engine (absolute and @instance/ paths kept as they are)."""
+    if not isinstance(value, str) or not value:
+        return ""
+    if value.startswith("@instance/"):
+        return _resolve(value)
+    return value if value.startswith("/") else str(ENGINE_ROOT / value)
+
+
 def _resolve(value: str) -> str:
     return str(instance_root() / value.removeprefix("@instance/")) if isinstance(value, str) and value.startswith("@instance/") else value
 
@@ -89,6 +98,23 @@ class Settings:
     tool_result_head: int = 4096
     tool_result_tail: int = 1024
     context_window: int = 200_000
+    system_order: str = "socle_first"             # payload lot 2: "socle_first" | "legacy" (rollback)
+    system_blocks: bool = True                    # payload cache layout (24/11): socle block marked for Anthropic
+    # lot 3a (2026-11-24): "v1" = one walter-soul profile (`instructions`); "v2" = Soul + the engine's operating rules
+    # + the owner's conduct, composed here. `prompt_layout_test` = the layout of test accounts only ("" = the same)
+    prompt_layout: str = "v1"
+    prompt_layout_test: str = ""
+    prompt_layout_accounts: dict = field(default_factory=dict)   # test account id → layout (A/B arms of the bench)
+    # lot 3c: documentation layer of the v2 layout ("mcp" | "s1" | "s2"; a layout "v2+s2" overrides it) and the skills
+    # map (a layout suffix "-skills" drops it)
+    doc_layer: str = "mcp"
+    skills_map: bool = True
+    # lot 3b: the recipient's communication profile (core/interfaces/<name>/COMMUNICATION.md); a layout "…+comm" turns
+    # it on for one test account
+    communication: bool = False
+    soul: str = ""
+    conduct: str = ""
+    operating: str = str(ENGINE_ROOT / "instructions" / "OPERATING.md")
     resume_interrupted: bool = True
     python: str = "full"
     python_idle_s: float = 1800.0
@@ -147,6 +173,14 @@ def load(state: Path | None = None) -> Settings:
         approval_timeout_s=float(n.get("approval_timeout_min", 10)) * 60,
         tool_result_chars=int(n.get("tool_result_chars", 8192)), tool_result_head=int(n.get("tool_result_head", 4096)),
         tool_result_tail=int(n.get("tool_result_tail", 1024)), context_window=int(n.get("context_window", 200_000)),
+        system_order=str(n.get("system_order", "socle_first")),
+        system_blocks=bool(n.get("system_blocks", True)),
+        prompt_layout=str(n.get("prompt_layout", "v1")), prompt_layout_test=str(n.get("prompt_layout_test", "")),
+        prompt_layout_accounts={str(k): str(v) for k, v in dict(n.get("prompt_layout_accounts", {})).items()},
+        doc_layer=str(n.get("doc_layer", "mcp")), skills_map=bool(n.get("skills_map", True)),
+        communication=bool(n.get("communication", False)),
+        soul=_resolve(n.get("soul", "")), conduct=_resolve(n.get("conduct", "")),
+        operating=_module_path(n.get("operating", "instructions/OPERATING.md")),
         resume_interrupted=bool(n.get("resume_interrupted", True)), python=n.get("python", "full"),
         python_idle_s=float(n.get("python_idle_min", 30)) * 60,
         python_interpreter=n.get("python_interpreter", "/services/python/engine-python/bin/python"),

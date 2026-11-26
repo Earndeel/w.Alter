@@ -8,13 +8,18 @@
     "modules/registry.json",
     "systemd/walter-standby.service",
     "systemd/walter-standby.timer",
-    "config/standby.toml"
+    "config/standby.toml",
+    "walter_beeper.py",
+    "interfaces/beeper/README.md"
   ],
   "requires": [],
-  "external": [],
+  "external": [
+    "Official Beeper Server stable ARM64, loopback API :23374, systemd beeper-server"
+  ],
   "data": [],
   "core_paths": [
-    "walter_platform"
+    "walter_platform",
+    "walter_beeper.py"
   ],
   "backup_paths": [
     ".",
@@ -35,7 +40,9 @@
     "Offline source release and staged installation",
     "walter standby",
     "walter matrix: qualified evidence requires matching source/scenario/version/configuration attestation (bench protocol 2)",
-    "walter-guardians: strict Incident v1 validation, explicit check failures and bounded notification retry/backoff"
+    "walter-guardians: strict Incident v1 validation, explicit check failures and bounded notification retry/backoff",
+    "Python walter_beeper.BeeperClient: native Beeper REST/WS; named Secrets grants",
+    "MCP beeper_read; beeper_send_message only through local Walter Engine with policy enforce"
   ],
   "bindings": {
     "hermes": "native adapters + lifecycle hook (no duplicate MCP attachment)",
@@ -50,7 +57,8 @@
   "services": [
     "walter-standby.timer",
     "walter-telegram.service",
-    "walter-engine.service"
+    "walter-engine.service",
+    "beeper-server.service"
   ],
   "service_code": {
     "walter-engine": {
@@ -72,7 +80,10 @@
       "code_files": [
         "/opt/dsh/home/cordis.patch.yml",
         "/opt/dsh/home/walter-hooks.json",
-        "/opt/dsh/home/profiles/web/cordis.patch.yml"
+        "/opt/dsh/home/profiles/web/cordis.patch.yml",
+        "security/policy.json",
+        "walter_beeper.py",
+        "walter_capabilities.py"
       ]
     }
   },
@@ -85,7 +96,8 @@
     "purpose": "Exposer les capacités et installer les raccordements des harnesses.",
     "target_root": "core",
     "config_paths": [
-      "modules/computer-policy.json"
+      "modules/computer-policy.json",
+      "config/beeper.toml"
     ],
     "permissions": [
       "configurations clients",
@@ -123,6 +135,22 @@
         "access": "write",
         "timeout_seconds": 60,
         "timeout_status": "target"
+      },
+      {
+        "id": "beeper-read",
+        "transport": "mcp",
+        "interface": "beeper_read",
+        "access": "read",
+        "timeout_seconds": 300,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "beeper-send",
+        "transport": "mcp",
+        "interface": "beeper_send_message (Engine policy/disclosure)",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "implemented"
       }
     ],
     "resources": [
@@ -182,7 +210,7 @@
     {
       "id": "engine",
       "path": "engine",
-      "role": "Runtime agentique unique de Walter : moteur natif walter_engine (walter-engine.service, depuis le 17/11/2026 ; boucle, sessions, outils, Python, sous-agents, tâches, Engine API) ; ancien noyau DSH/Cordis gelé dans /opt/dsh, arrêté (retour arrière seulement)",
+      "role": "Walter Engine, W.Alter's single agent runtime: native walter_engine (walter-engine.service since 2026-11-17: loop, sessions, tools, Python kernel, sub-agents, tasks, Engine API); the former DSH/Cordis kernel is uninstalled (rollback archive only)",
       "status": "implemented",
       "readme": "engine/README.md",
       "vision_target": "core/engine"
@@ -190,7 +218,7 @@
     {
       "id": "engine-contracts",
       "path": "engine/contracts",
-      "role": "Schémas Engine API, accueil, délégation, politique, événements, stratégies (brouillons testés)",
+      "role": "Engine API, intake, delegation, policy, events and strategy schemas (tested drafts)",
       "status": "implemented",
       "readme": "engine/README.md",
       "contracts": [
@@ -201,7 +229,7 @@
     {
       "id": "engine-kernel",
       "path": "engine/kernel",
-      "role": "Gel du noyau DSH/Cordis (lot E1) : version exacte, verrou, empreintes de l'installation, installation hors ligne reproductible, vérification ; DSH désinstallé le 2026-11-18 : kit de retour arrière (avec l'archive de l'instance), `walter engine kernel` dit installed=false",
+      "role": "Freeze of the DSH/Cordis kernel (lot E1); DSH uninstalled on 2026-11-18: rollback kit only, `walter engine kernel` says installed=false",
       "status": "obsolete",
       "readme": "engine/kernel/README.md",
       "interfaces": [
@@ -215,7 +243,7 @@
     {
       "id": "engine-compositions",
       "path": "engine/compositions",
-      "role": "Retour arrière seulement depuis le 2026-11-18 (DSH désinstallé, archive dans les sauvegardes de l'instance ; le moteur natif ne le charge pas) : source de la face du profil web DSH (nom, accueil, durée de connexion), rendue par walter-core dans le bloc géré dsh-face ; valeurs dans la configuration de l'instance (lot E1)",
+      "role": "Rollback only since 2026-11-18 (DSH uninstalled): source of the former DSH web profile face",
       "status": "obsolete",
       "readme": "engine/compositions/README.md",
       "interfaces": [
@@ -229,7 +257,7 @@
     {
       "id": "engine-plugins",
       "path": "engine/plugins",
-      "role": "Retour arrière seulement depuis le 2026-11-18 (DSH désinstallé, archive dans les sauvegardes de l'instance ; le moteur natif ne le charge pas) : greffons Node de DSH (seul engine/plugins/python/runtime sert au moteur natif, composant engine-python). Stratégies du moteur : intake et events (lot E2 : accueil d'un tour — run, ContextPlan, pack, skills — et fin du run, turn.ended, session.ended) ; policy et budget (lot E3 : politique unique avant chaque outil de chaque agent, plafonds du tour) ; interrupteurs [dsh.engine] intake hook|shadow|native et policy off|enforce",
+      "role": "Rollback only since 2026-11-18 (DSH uninstalled): DSH Node plugins (intake, events, policy, budget); only engine/plugins/python/runtime still serves the native engine (component engine-python)",
       "status": "obsolete",
       "readme": "engine/plugins/README.md",
       "contracts": [
@@ -248,7 +276,7 @@
     {
       "id": "engine-python",
       "path": "engine/plugins/python",
-      "role": "Outil python du moteur (16/11, convergence Unharnessed) : noyau Python persistant par conversation, en bulle systemd non privilégiée (walter-sandbox, seul son dossier inscriptible, réseau local refusé) ; outils Walter depuis Python sous la politique, tâches de fond = tâches du moteur avec tour de réveil, sous-agents ; interrupteur [dsh.engine] python off|on",
+      "role": "The engine's python tool: a persistent Python kernel per conversation in an unprivileged systemd bubble (only its folder writable, local network refused); W.Alter tools from Python under the policy, background tasks, sub-agents",
       "status": "implemented",
       "readme": "engine/plugins/python/README.md",
       "interfaces": [
@@ -262,7 +290,7 @@
     {
       "id": "security",
       "path": "security",
-      "role": "Politique d'exécution unique de Walter (lot E3) : policy.json (jamais, classes d'outils, presets par porte, enfant ≤ parent) lue par le greffon policy du moteur (policy.mjs) et par le filet du serveur MCP pour tout client (walter_security) ; mêmes vecteurs d'essai des deux côtés",
+      "role": "W.Alter's single execution policy (lot E3): policy.json (never-list, tool classes, presets per door, child ≤ parent), applied by the engine and by the MCP server's guard for every client",
       "status": "implemented",
       "readme": "security/README.md",
       "contracts": [
@@ -279,7 +307,7 @@
     {
       "id": "engine-api",
       "path": "interfaces/api",
-      "role": "Retour arrière seulement depuis le 2026-11-18 (DSH désinstallé, archive dans les sauvegardes de l'instance ; le moteur natif ne le charge pas) : implémentation Node de l'Engine API hébergée par DSH ; le moteur natif sert le même contrat (engine/walter_engine/api.py). Engine API (lot E4) : porte canonique du moteur pour Telegram, le web, les modules et les tests — ouvrir ou retrouver une conversation (<porte>/<compte>/<conversation> → session du noyau), soumettre (idempotent), suivre (SSE), résultat d'un tour, interrompre, répondre aux approbations ; greffon hôte du profil web, interrupteur [dsh.engine] api off|on",
+      "role": "Rollback only since 2026-11-18 (DSH uninstalled): the former Node implementation of the Engine API; the native engine serves the same contract (engine/walter_engine/api.py)",
       "status": "obsolete",
       "readme": "interfaces/api/README.md",
       "contracts": [
@@ -296,7 +324,7 @@
     {
       "id": "interface-telegram",
       "path": "interfaces/telegram",
-      "role": "Porte Telegram du moteur (lot E7) : bot propre à Walter, client de l'Engine API uniquement — conversations telegram/<compte>/chat-<id> persistantes, messages idempotents (id Telegram), suivi SSE (écrit…, outils, réponse), /stop, /nouveau, /etat, boutons d'approbation, propriétaire seul ; service walter-telegram",
+      "role": "Telegram door of the engine (lot E7): W.Alter's own bot, an Engine API client only — persistent conversations, idempotent messages, live progress, /stop, /nouveau, /etat, owner only; service walter-telegram",
       "status": "active",
       "readme": "interfaces/telegram/README.md",
       "interfaces": [
@@ -314,7 +342,7 @@
     {
       "id": "mcp-server",
       "path": "server.py",
-      "role": "Serveur MCP walter : expose les capacités aux agents (Claude Code, Codex, DSH, Hermes)",
+      "role": "The walter MCP server: exposes W.Alter's capabilities to agents (Walter Engine, Claude Code, Codex)",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -328,7 +356,7 @@
     {
       "id": "capabilities-adapter",
       "path": "walter_capabilities.py",
-      "role": "Adaptateur des outils MCP vers les commandes déclarées des modules",
+      "role": "Adapter from MCP tools to the modules' declared commands",
       "status": "active",
       "readme": "README.md",
       "vision_target": "core/interfaces/mcp"
@@ -336,7 +364,7 @@
     {
       "id": "mcp-toolsets",
       "path": "config/toolsets.toml",
-      "role": "Jeux d'outils MCP par client (WALTER_CLIENT_TAG)",
+      "role": "MCP toolsets per client (WALTER_CLIENT_TAG); tools not listed stay reachable through walter_call",
       "status": "active",
       "readme": "README.md",
       "vision_target": "core/interfaces/mcp"
@@ -344,7 +372,7 @@
     {
       "id": "runtime-hook",
       "path": "hooks/walter_hook.py",
-      "role": "Adaptateur de cycle de vie des runtimes (preflight, contexte, runs, bus) appelé à chaque message",
+      "role": "Runtime lifecycle adapter for external agents (preflight, context, runs, bus), called at each message",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -358,7 +386,7 @@
     {
       "id": "dsh-hooks",
       "path": "hooks/dsh",
-      "role": "Retour arrière seulement depuis le 2026-11-18 (DSH désinstallé, archive dans les sauvegardes de l'instance ; le moteur natif ne le charge pas) : greffon DSH owner-turn (texte du propriétaire pour walter_hook.py) ; remplacé par engine/plugins/intake en mode native",
+      "role": "Rollback only since 2026-11-18 (DSH uninstalled): the DSH owner-turn plugin",
       "status": "obsolete",
       "readme": "README.md",
       "vision_target": "core/engine/plugins"
@@ -366,7 +394,7 @@
     {
       "id": "platform",
       "path": "walter_platform",
-      "role": "Registre, contrats, chemins, instances, raccordements, contrôles (walter …)",
+      "role": "Registry, contracts, paths, instances, harness connections, checks (the walter CLI), and module presentation (module_guide)",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -380,7 +408,7 @@
     {
       "id": "module-catalog",
       "path": "modules/catalog.json",
-      "role": "Table unique des modules : emplacement actuel, ancien, cible de la vision",
+      "role": "Single table of modules: current location, former location, vision target",
       "status": "active",
       "readme": "README.md",
       "vision_target": "core/contracts"
@@ -388,7 +416,7 @@
     {
       "id": "module-registry",
       "path": "modules/registry.json",
-      "role": "Registre compilé depuis les contrats (généré, jamais édité à la main)",
+      "role": "Registry compiled from the contracts (generated, never edited by hand)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "core/contracts"
@@ -396,7 +424,7 @@
     {
       "id": "computer-policy",
       "path": "modules/computer-policy.json",
-      "role": "Périmètres Computer Use par interface",
+      "role": "Computer Use scopes per interface",
       "status": "active",
       "readme": "README.md",
       "vision_target": "core/security"
@@ -404,7 +432,7 @@
     {
       "id": "compositions",
       "path": "compositions",
-      "role": "Compositions de harnesses générées par walter-core (sections gérées)",
+      "role": "Harness compositions generated by walter-core (managed sections)",
       "status": "active",
       "readme": "docs/HARNESS-COMPOSITION.md",
       "vision_target": "core/engine/compositions"
@@ -412,7 +440,7 @@
     {
       "id": "dsh-web-ui",
       "path": "ports/dsh-web-ui",
-      "role": "Retour arrière seulement depuis le 2026-11-18 (DSH désinstallé, archive dans les sauvegardes de l'instance ; le moteur natif ne le charge pas) : personnalisation de l'interface web DSH (couleurs, porte web du propriétaire)",
+      "role": "Rollback only since 2026-11-18 (DSH uninstalled): the former DSH web interface customisation",
       "status": "obsolete",
       "readme": "README.md",
       "vision_target": "core/interfaces/web"
@@ -420,7 +448,7 @@
     {
       "id": "web-panels",
       "path": "interfaces/web/panels",
-      "role": "Panneaux de l'interface web : pages d'autres modules Walter (tableau de développement…) dans la barre latérale et la zone principale, relayées en lecture seule derrière la connexion de l'interface ; liste dans engine.toml [[dsh.web.panels]]",
+      "role": "Web interface panels: pages of other W.Alter modules (development board…) relayed read-only behind the interface's sign-in",
       "status": "active",
       "readme": "interfaces/web/panels/README.md",
       "interfaces": [
@@ -438,7 +466,7 @@
     {
       "id": "tool-gateway",
       "path": "bin/walter-tools",
-      "role": "Passerelle d'outils de walter_run (un processus par run) ; remplacée par le moteur au lot E5",
+      "role": "Tool gateway of walter_run (one process per run)",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -451,7 +479,7 @@
     {
       "id": "guardians",
       "path": "bin/walter-guardians",
-      "role": "Lanceur des gardiens de modules (diagnostic, réparation, alerte)",
+      "role": "Launcher of the module guardians (diagnosis, repair, alert)",
       "status": "active",
       "readme": "GUARDIANS.md",
       "interfaces": [
@@ -465,7 +493,7 @@
     {
       "id": "scenarios",
       "path": "scenarios",
-      "role": "Scénarios de bout en bout (walter-scenario)",
+      "role": "End-to-end scenarios (walter-scenario)",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -479,7 +507,7 @@
     {
       "id": "browser-session",
       "path": "browser_auth.py",
-      "role": "Session navigateur du propriétaire côté serveur (MCP browser_session) — responsabilité de Browse mal placée",
+      "role": "The owner's server-side browser session (MCP browser_session); belongs to Browse, misplaced here",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -493,7 +521,7 @@
     {
       "id": "standby",
       "path": "walter_platform/standby.py",
-      "role": "Mise en veille des services à la demande",
+      "role": "On-demand standby of services",
       "status": "active",
       "readme": "README.md",
       "vision_target": "ops"
@@ -501,7 +529,7 @@
     {
       "id": "deploy-check",
       "path": "walter_platform/deploy.py",
-      "role": "Fraîcheur du déploiement : chaque service long compare son démarrage au code qu'il charge (imports statiques + racines déclarées `service_code`) ; réparation gardée du gardien core (redémarrage, interrupteur config/deploy.toml)",
+      "role": "Deployment freshness: each long-running service compares its start time with the code it loads; guarded repair by the core guardian (restart)",
       "status": "active",
       "readme": "README.md",
       "contracts": [
@@ -514,6 +542,24 @@
         }
       ],
       "vision_target": "ops"
+    },
+    {
+      "id": "beeper",
+      "path": "walter_beeper.py",
+      "role": "Native Beeper channel (REST/WebSocket); reads and sends go through Walter Engine's policy",
+      "status": "implemented",
+      "readme": "interfaces/beeper/README.md",
+      "vision_target": "core/interfaces/beeper",
+      "interfaces": [
+        {
+          "transport": "library",
+          "interface": "walter_beeper.BeeperClient"
+        },
+        {
+          "transport": "mcp",
+          "interface": "beeper_read / beeper_send_message (Engine only)"
+        }
+      ]
     }
   ]
 }

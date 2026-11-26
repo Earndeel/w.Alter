@@ -14,7 +14,7 @@ def main(argv=None):
     q=sub.add_parser('layout');q.add_argument('layout_action',nargs='?',choices=('show','move','verify','rollback','env'),default='show');q.add_argument('target',nargs='?',help='module (move) or backup folder (verify, rollback)');q.add_argument('--to');q.add_argument('--apply',action='store_true');q.add_argument('--backup');q.add_argument('--allow-dirty',action='store_true');q.add_argument('--no-systemd',action='store_true')
     q=sub.add_parser('standby');q.add_argument('standby_action',nargs='?',choices=('status','start','stop','ensure','sweep'),default='status');q.add_argument('group',nargs='?');q.add_argument('--by',default='agent')
     q=sub.add_parser('instance');q.add_argument('instance_action',nargs='?',choices=('show','check','path','render','config','harness'),default='show');q.add_argument('parts',nargs='*')
-    q=sub.add_parser('present');q.add_argument('level',choices=('notes','note','catalog','summary','manifest','guide','index'));q.add_argument('module',nargs='?');q.add_argument('--form',choices=('full','m0'),default='full');q.add_argument('--m1',action='append',default=[]);q.add_argument('--level',choices=('M0','M1'),default='M1');q.add_argument('--section',default='');q.add_argument('--offset',type=int,default=0);q.add_argument('--limit',type=int,default=20)
+    q=sub.add_parser('present');q.add_argument('level',choices=('notes','note','catalog','summary','manifest','guide','index','doc','socle'));q.add_argument('module',nargs='?');q.add_argument('--form',choices=('full','m0'),default='full');q.add_argument('--m1',action='append',default=[]);q.add_argument('--level',choices=('M0','M1'),default='M1');q.add_argument('--section',default='');q.add_argument('--offset',type=int,default=0);q.add_argument('--limit',type=int,default=20);q.add_argument('--depth',choices=('D1','D2','D3'),default='D2');q.add_argument('--socle-form',choices=('s1','s2'),default='s2')
     q=sub.add_parser('decisions',help='decision signals the modules declare (Walter Decision)');q.add_argument('--occasion');q.add_argument('--catalog');q.add_argument('--root',default='/')
     sub.add_parser('matrix')
     q=sub.add_parser('engine');q.add_argument('engine_action',choices=('kernel',));q.add_argument('--install');q.add_argument('--home')
@@ -103,6 +103,10 @@ def main(argv=None):
             if a.level in ('note','summary','manifest','guide','index') and not a.module:raise ValueError('usage: walter present '+a.level+' <module>')
             if a.level in ('summary','manifest','guide'):
                 print(getattr(presentation,a.level)(a.module));return 0
+            if a.level=='doc':  # D1/D2/D3 of walter, a module or a component (lot 3c, 2026-11-24)
+                print(presentation.document(a.module or presentation.ENTITY,a.depth));return 0
+            if a.level=='socle':
+                print(presentation.socle(a.socle_form));return 0
             m1=[x for v in a.m1 for x in v.split(',') if x]
             out=(presentation.notes(a.form,m1) if a.level=='notes' else presentation.catalog() if a.level=='catalog' else
                  presentation.note(a.module,a.level) if a.level=='note' else

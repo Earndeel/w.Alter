@@ -1,1 +1,1 @@
-Le harnais : `walter_health` (état), `module_guide(module, depth="D2"|"D3")` / `module_index` (documentation d'un module à la demande), `walter_run` (sous-tâche au moteur).
+walter-core is the harness that connects W.Alter's modules to every runtime under the same tool names (MCP server, platform library, runtime hooks), and the home of the engine.

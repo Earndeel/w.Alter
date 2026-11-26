@@ -48,6 +48,14 @@ approval_timeout_min = 10
 tool_result_chars = 8192          # a longer tool result is cut for the model (head + tail), the original stays
 tool_result_head = 4096
 tool_result_tail = 1024
+system_order = "socle_first"      # system text: shared parts first, this session's lines last (cache); "legacy" = before 23/11
+system_blocks = true              # system text in two blocks, the shared socle marked as a cache point for Claude (24/11); false = one text
+prompt_layout = "v1"              # lot 3a (24/11): "v1" = the one `instructions` profile; "v2" = soul + operating + conduct
+prompt_layout_test = ""           # the layout of test accounts only ("" = prompt_layout): measure before switching everyone
+prompt_layout_accounts = {}       # test account id → layout (the bench's A/B arms)
+soul = "@instance/profiles/engine/SOUL.md"         # walter-soul target `engine`: the Soul alone
+conduct = "@instance/profiles/engine/CONDUCT.md"   # walter-soul target `engine-conduct`: the owner's conduct
+operating = "instructions/OPERATING.md"           # the engine's own operating rules (relative to core/engine)
 context_window = 200000           # tokens the main model accepts (walter-context decides the window inside it)
 resume_interrupted = true         # a turn cut by a restart resumes from its journal (never re-running a done action)
 python = "full"                   # full = the engine's own rights; sandbox = the old walter-sandbox bubble

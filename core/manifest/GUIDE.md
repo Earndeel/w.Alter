@@ -1,51 +1,40 @@
-# walter-core — guide détaillé
+# walter-core — detailed guide
 
-## Objectif
+## Purpose
+The common harness of W.Alter: it presents the modules to agents, exposes their capabilities under the same names in
+every runtime (Walter Engine, Claude Code, Codex) and installs the connections. It replaces neither the runtime nor
+its permissions. It also hosts the core components: the engine, identity (Soul), security (policy, secrets),
+interfaces (web Portal, Telegram, API).
 
-Le harnais commun de W.Alter : il présente les modules aux agents, expose leurs capacités sous les mêmes noms
-dans chaque runtime (Claude Code, Codex, DSH, Hermes par ses plugins) et installe les raccordements. Il ne
-remplace ni le runtime ni ses permissions.
+## Documentation of W.Alter (D1 / D2 / D3)
+Every entity has three depths, read with `module_guide(path, depth)`:
 
-## Comment l'utiliser
+| Depth | Content | Source |
+|---|---|---|
+| D1 | What it is (a definition) and how to open D2 | W.Alter: `/walter/docs/manifest/SUMMARY.md`; module: `manifest/SUMMARY.md`; component: its `role` in the module contract |
+| D2 | Role and scope, organisation, tools and interfaces, where to check the live state, and its children (generated from the registry) | W.Alter: `/walter/docs/manifest/MANIFEST.md` + the modules; module: `manifest/MANIFEST.md` (+ a live part the module generates) + its components; component: its contract entry and README header |
+| D3 | Technical detail: components, interfaces per runtime, data, privacy, limits, source paths | W.Alter: `/walter/docs/manifest/GUIDE.md`; module: `manifest/GUIDE.md` (or its README); component: its README |
 
-- **Découvrir un module** : sa ligne (D1) est dans la couche « Modules W.Alter » des instructions ; sa fiche
-  d'utilisation (D2) arrive avec un message quand elle est utile, ou se lit avec `module_guide(module, depth="D2")` ;
-  `module_guide(module)` (D3) donne son guide détaillé ; `module_index(module, section)` liste ce qu'il contient quand
-  il publie un index. Sans argument, `module_guide()` dit où vit la présentation de chaque module. D1/D2/D3 = les
-  fichiers SUMMARY / MANIFEST / GUIDE du dossier `manifest/` de chaque module (aucune copie ailleurs).
-- **État** : `walter_health` (services, moteur, score mémoire, routeur, disque).
-- **Déclarations techniques** : `walter_modules(module)` (contrats, dépendances, limites par harness).
-- **Déléguer à Walter Engine** : `walter_run(request, goal)` (session déléguée du moteur, lectures permises, rien de ce
-  qui demande le propriétaire). Prévenir le propriétaire : `walter-telegram send`. Hermes est arrêté (10/11/2026).
-
-## Présentation des modules
-
-Chaque module se présente depuis son propre dossier `manifest/` ; son contrat (`presentation`) ne fait qu'y pointer.
-
-| Niveau | Contenu | Fichier / source | Accès |
-|---|---|---|---|
-| 1 — manifeste | Ce qu'est le module, son organisation, comment s'en servir | `manifest/MANIFEST.md` (+ partie vivante `manifest_command`) | Injecté dans chaque harness branché, couche composée par walter-context |
-| 2 — index | Ce que le module contient (skills par domaine, tâches du routeur…) | `presentation.index.command`, tenu à jour par le module | `module_index` |
-| Guide | Composants, interfaces par runtime, confidentialité, limites | `manifest/GUIDE.md` | `module_guide` |
-| 3 — élément | Un skill, un souvenir, une entrée du coffre… | Outils propres du module | `skill_read`, `memory_search`, … |
-
-Un module qui partage le dossier d'un autre range sa présentation dessous (`walter-memory/manifest/logs/`).
+Paths: `walter`, a module id, or `module/component`. Any depth can be read directly. `module_index(module, section)`
+gives a module's live contents (skills per domain, router tasks). A module that shares another's folder keeps its
+presentation below it (`/walter/cognition/memory/manifest/logs/`). Nothing is copied elsewhere: the registry
+(`/walter/core/modules/registry.json`, compiled from the contracts by `walter contracts render`) points to these files.
 
 ## Organisation
-
-| Partie | Rôle |
+| Part | Role |
 |---|---|
-| `server.py`, `walter_capabilities.py` | Serveur MCP `walter` : ports minces vers les modules |
-| `walter_platform/` | Contrats, registre, chemins, instance, présentation, release, raccordement des harnesses |
-| `hooks/walter_hook.py` | Adaptateur de runtime : contexte mémoire par message, journalisation des sessions, bus |
-| `modules/catalog.json` → `registry.json` | Catalogue des contrats et registre compilé (`walter contracts render`) |
+| `server.py`, `walter_capabilities.py` | MCP server `walter`: thin ports to the modules; toolsets per client (`config/toolsets.toml`) |
+| `walter_platform/` | Contracts, registry, paths, instance, presentation, release, harness connections |
+| `hooks/walter_hook.py` | Runtime adapter for external agents: memory context per message, session logging, bus events |
+| `engine/` | Walter Engine, the single production runtime (sessions, agent loop, tools, sub-agents, Engine API) |
+| `identity/` | walter-soul: renders the Soul for each runtime |
+| `security/` | Execution policy (`walter_security`), Walter Secrets |
+| `interfaces/` | Doors to the engine: web Portal, Telegram |
+| `modules/catalog.json` → `registry.json` | Contract catalogue and compiled registry |
 
 ## Interfaces
+CLI `walter`: `modules`, `status`, `check`, `doctor`, `path`, `instance`, `layout`, `present notes|note|catalog|manifest|index|doc`.
 
-CLI `walter` : `modules`, `status`, `check`, `doctor`, `path`, `instance`, `present notes|note|catalog|manifest|index`.
-
-## Limites
-
-- Les instructions du serveur MCP sont fixées au démarrage du serveur : un module ajouté ou modifié apparaît à la
-  session suivante.
-- Un module indisponible désactive ses propres outils, pas les autres.
+## Limits
+- MCP server instructions are fixed when the server starts: a module added or changed appears in the next session.
+- An unavailable module disables its own tools, not the others.

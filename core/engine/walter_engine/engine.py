@@ -32,6 +32,38 @@ import uuid
 from pathlib import Path
 
 from . import config, identity, journal
+from .payload import Trace
+
+# the system text's parts, shared ones first (`[native] system_order = "socle_first"`; "legacy" = the order of 17/11)
+# lot 3a (2026-11-24): layout v2 adds the engine's operating rules and the owner's conduct after the Soul; layout v1
+# (one walter-soul profile in `soul`) keeps the same relative order
+SOCLE_FIRST = ("soul", "engine_rules", "conduct", "walter_doc", "skills_map", "mcp_instructions", "communication",
+               "environment", "journal_line")
+SOCLE_SHARED = frozenset(SOCLE_FIRST[:6])     # the same for every session: the cached socle (`_system_content`)
+# lot 3b: the recipient's communication profile, the same for every session of that recipient — its own cache block
+INTERFACES = config.ENGINE_ROOT.parent / "interfaces"
+DOOR_PROFILE = {"web": "web", "telegram": "telegram"}   # voice / desktop: no door renders them yet (inactive)
+
+DOC_FORMS = ("s1", "s2")
+
+
+def _doc_layer(form: str) -> str:
+    """W.Alter's documentation part, from walter_platform's presentation (the files `module_guide` reads)."""
+    try:
+        from walter_platform import presentation
+        return presentation.socle(form).strip()
+    except Exception as exc:  # noqa: BLE001 - no documentation part: the MCP module layer is kept
+        log.warning("documentation layer %s unavailable (%s): MCP module layer kept", form, exc)
+        return ""
+
+
+def _walter_call_note(instructions: str) -> str:
+    """The MCP instructions' section on tools reachable through `walter_call` (its heading may be in any language)."""
+    for part in re.split(r"\n(?=## )", instructions):
+        if part.startswith("## ") and "walter_call(" in part:
+            return part.strip()
+    return ""     # the same for every session: the cached socle (`_system_content`)
+COMMENT_LINE = re.compile(r"\A\s*<!--.*?-->\s*", re.S)
 from .jobs import Job, Jobs
 from .llm import Answer, Client, LLMError
 from .policy import Policy
@@ -135,8 +167,11 @@ class Agent:
         self.conclude_ms: float | None = None    # a delegation's own budget: told to conclude before the API cancels it
         self.images: list[dict] = []
         self.live: set = set()                   # callables(event) for events that are not journaled (deltas, notices)
-        self._sys: tuple[str, str] | None = None  # (day, system prompt)
+        self._sys: tuple[tuple, str] | None = None  # ((day, sources signature), system prompt)
+        self._sys_sig: tuple | None = None        # signature of the instruction files, taken at each turn start
+        self._sys_parts: list[tuple[str, str]] = []   # the same, part by part (payload trace)
         self._skills0: str | None = None
+        self._doc: str = ""                       # lot 3c: W.Alter's documentation part (D1), read at each turn start
         self.turn_no: int | None = None
         self.step_no: int | None = None
         self.title_asked = bool(session.title())
@@ -230,6 +265,7 @@ class Engine:
         self.active_file = settings.state / "active.json"
         self.runs_file = settings.state / "open-runs.json"
         self.obs_dir = settings.state / "intake"
+        self.trace = Trace(settings.state / "payload")   # lot 0 (2026-11-23): what each model call sent, part by part
         self.started_at = time.time()
         self._mcp_task: asyncio.Task | None = None
         self.stopping = False
@@ -419,6 +455,9 @@ class Engine:
         a.cancel = asyncio.Event()
         a.turn_no, a.step_no = turn, 0
         a.fails, a.joined = {}, []
+        # lot 3a: an edited Soul, conduct or operating rule reaches an open session at its next turn (one cache write),
+        # never in the middle of a turn
+        a._sys_sig = self._sys_sources_sig(a)
         kinds = sorted({(i["source"] or {}).get("kind") for i in items})
         a.pending_trigger = None if requests else (
             {"kind": "interrupted", "reason": "engine_restart"} if "engine-restart" in kinds else
@@ -588,6 +627,14 @@ class Engine:
                                            "tool_calls": ans.tool_calls, "model": ans.model, "route": ans.route,
                                            "usage": ans.usage, "finish": ans.finish, "ms": ans.total_ms,
                                            "first_token_ms": ans.first_token_ms})
+            try:
+                self.trace.record({"session": a.key, "run_id": a.run_id or a.root().run_id, "turn": turn, "step": step,
+                                   "depth": a.depth, "door": a.door, "channel": a.channel(), "model": ans.model,
+                                   "route": ans.route, "ms": ans.total_ms, "first_token_ms": ans.first_token_ms,
+                                   "tools_offered": tools is not None},
+                                  sys_parts=a._sys_parts, messages=messages, tools=tools, usage=ans.usage)
+            except Exception as e:  # noqa: BLE001 — observability never touches the turn
+                log.debug("payload trace: %s", e)
             if ans.usage.get("prompt_tokens") and messages:
                 chars = sum(len(json.dumps(m, ensure_ascii=False)) for m in messages)
                 if chars:
@@ -1053,31 +1100,160 @@ class Engine:
                 "thread_id": thread}
 
     # ── what the model sees ──
+    def _layout(self, a: Agent) -> str:
+        p = a.principal or {}
+        if p.get("kind") == "test":   # a test account may carry its own layout (bench arms), then the test layout
+            lay = self.s.prompt_layout_accounts.get(str(p.get("id"))) or self.s.prompt_layout_test
+            if lay:
+                return lay
+        return self.s.prompt_layout
+
+    def _layout_spec(self, a: Agent) -> tuple[str, str, bool, bool]:
+        """(base layout, documentation layer, skills map, communication profile) from a layout such as "v2",
+        "v2+s2", "v2+s2-skills" or "v2+s2+comm" (the bench's arms; the settings give the defaults).
+        Documentation layer (lot 3c): "mcp" = the MCP server's module layer (until 3c), "s1" = W.Alter's D1 and how
+        to read any depth, "s2" = the same plus every module at its D1. Communication (lot 3b): the recipient's
+        profile. Both are v2 features only."""
+        base, *tokens = self._layout(a).split("+")
+        doc, skills, comm = self.s.doc_layer, self.s.skills_map, self.s.communication
+        for t in tokens:
+            if t.endswith("-skills"):
+                t, skills = t[:-len("-skills")], False
+            if t in DOC_FORMS or t == "mcp":
+                doc = t
+            elif t == "comm":
+                comm = True
+        v2 = base == "v2"
+        return base, (doc if v2 and doc in DOC_FORMS else "mcp"), skills, comm and v2
+
+    def recipient(self, a: Agent) -> str:
+        """Who reads the answer, decided from the session alone (lot 3b, no model call): an agent for a sub-agent or a
+        machine caller (inter-agent exchanges, whatever the door), else the person's interface — Portal, Telegram, or
+        `default` when the client is not known (API, MCP, command used by a person)."""
+        if a.depth:
+            return "agent"
+        root = a.root()
+        if (root.principal or {}).get("kind") == "machine":
+            return "agent"
+        return DOOR_PROFILE.get(root.door, "default")
+
+    def _communication_files(self, a: Agent) -> list[str]:
+        name = self.recipient(a)
+        return [str(INTERFACES / name / "COMMUNICATION.md"),
+                str(config.instance_root() / "config" / "interfaces" / f"{name}.md")]   # the instance's additions
+
+    def _sys_sources(self, a: Agent) -> list[str]:
+        base, _, _, comm = self._layout_spec(a)
+        if base == "v2":
+            return [p for p in (self.s.soul, self.s.operating, self.s.conduct) if p] + (
+                self._communication_files(a) if comm else [])
+        return [self.s.instructions] if self.s.instructions else []
+
+    def _sys_sources_sig(self, a: Agent) -> tuple:
+        out = []
+        for p in self._sys_sources(a):
+            try:
+                st = os.stat(p)
+                out.append((p, st.st_mtime_ns, st.st_size))
+            except OSError:
+                out.append((p, None, None))
+        doc = self._layout_spec(a)[1]
+        # the documentation part is rebuilt at each turn start (a few small files) and enters the signature by its
+        # content: an edited manifest reaches an open session at its next turn, an unchanged one keeps the cache
+        a._doc = _doc_layer(doc) if doc in DOC_FORMS else ""
+        if a._doc:
+            out.append(("walter_doc", hashlib.sha256(a._doc.encode()).hexdigest()[:16], doc))
+        return tuple(out)
+
+    @staticmethod
+    def _read_part(path: str) -> str:
+        """An instruction file, without walter-soul's leading « generated » comment (a note for humans)."""
+        try:
+            return COMMENT_LINE.sub("", Path(path).read_text(), count=1).strip()
+        except OSError:
+            return ""
+
     def _system(self, a: Agent) -> str:
         day = _today()
-        if a._sys and a._sys[0] == day:
+        key = (day, a._sys_sig)
+        if a._sys and a._sys[0] == key:
             return a._sys[1]
-        parts = []
-        if self.s.instructions:
+        named: list[tuple[str, str]] = []
+        base, doc, skills, comm = self._layout_spec(a)
+        v2 = base == "v2"
+        if v2:
+            named = [(k, t) for k, t in (("soul", self._read_part(self.s.soul)),
+                                         ("engine_rules", self._read_part(self.s.operating)),
+                                         ("conduct", self._read_part(self.s.conduct))) if t]
+            if not any(k == "soul" for k, _ in named):   # no Soul file: the v1 profile rather than no identity
+                log.warning("prompt layout v2: Soul unreadable (%s), v1 profile used", self.s.soul)
+                named, v2 = [], False
+        if not v2 and self.s.instructions:
             try:
-                parts.append(Path(self.s.instructions).read_text().strip())
+                named.append(("soul", Path(self.s.instructions).read_text().strip()))
             except OSError:
                 pass
-        env = [f"- Date : {day} (UTC)", f"- Dossier de travail : {a.cwd}", f"- Session Walter : {a.key}",
-               f"- Porte : {a.door}"]
-        if a.depth:
-            env.append(f"- Tu es un sous-agent (profondeur {a.depth}) : ta réponse finale est rendue à l'agent qui t'a "
-                       "délégué la tâche, pas à Monsieur.")
-        parts.append("## Environnement\n" + "\n".join(env))
-        parts.append(f"Cette session est journalisée dans la mémoire W.Alter (core.events, source {config.RUNTIME}, "
-                     f"thread_id={a.sid}).")
-        if a._skills0:
-            parts.append(a._skills0)
-        if self.mcp.instructions:
-            parts.append(self.mcp.instructions.strip())
-        text = "\n\n".join(p for p in parts if p)
-        a._sys = (day, text)
+        if v2:
+            env = [f"- Date: {day} (UTC)", f"- Working directory: {a.cwd}", f"- Walter session: {a.key}",
+                   f"- Door: {a.door}"]
+            if a.depth:
+                env.append(f"- You are a sub-agent (depth {a.depth}): your final answer goes back to the agent that "
+                           "delegated the task, not to the owner.")
+            named.append(("environment", "## Environment\n" + "\n".join(env)))
+            named.append(("journal_line", f"This session is logged in W.Alter memory (core.events, source "
+                                          f"{config.RUNTIME}, thread_id={a.sid})."))
+        else:
+            env = [f"- Date : {day} (UTC)", f"- Dossier de travail : {a.cwd}", f"- Session Walter : {a.key}",
+                   f"- Porte : {a.door}"]
+            if a.depth:
+                env.append(f"- Tu es un sous-agent (profondeur {a.depth}) : ta réponse finale est rendue à l'agent qui t'a "
+                           "délégué la tâche, pas à Monsieur.")
+            named.append(("environment", "## Environnement\n" + "\n".join(env)))
+            named.append(("journal_line", f"Cette session est journalisée dans la mémoire W.Alter (core.events, source "
+                                          f"{config.RUNTIME}, thread_id={a.sid})."))
+        if a._skills0 and skills:
+            named.append(("skills_map", a._skills0))
+        if v2 and a._doc:
+            # lot 3c: W.Alter's own documentation replaces the MCP server's module layer; only the server's note on
+            # tools reachable through walter_call is kept (it depends on this client's toolset)
+            named.append(("walter_doc", a._doc))
+            note = _walter_call_note(self.mcp.instructions or "")
+            if note:
+                named.append(("mcp_instructions", note))
+        elif self.mcp.instructions:
+            named.append(("mcp_instructions", self.mcp.instructions.strip()))
+        if v2 and comm:
+            profile = "\n\n".join(t for t in (self._read_part(p) for p in self._communication_files(a)) if t)
+            if profile:
+                named.append(("communication", profile))
+        if self.s.system_order == "socle_first":
+            # payload lot 2 (2026-11-23): the parts every session shares first, then this session's own lines, so a
+            # new conversation's first call reuses the cached socle (measured: 0 → 84 % of a 9.4k-token prompt)
+            rank = {k: i for i, k in enumerate(SOCLE_FIRST)}
+            named.sort(key=lambda kt: rank.get(kt[0], len(rank)))
+        a._sys_parts = [(k, t) for k, t in named if t]
+        text = "\n\n".join(t for _, t in a._sys_parts)
+        a._sys = (key, text)
         return text
+
+    def _system_content(self, a: Agent) -> str | list[dict]:
+        """The system message's content. Payload cache layout (2026-11-24, `[native] system_blocks`): two text blocks,
+        the socle every session shares (Soul, skills map, MCP modules) marked as a cache point, then this session's own
+        lines. Anthropic caches only up to a marker: the first call of a new conversation reads the socle another one
+        wrote. walter-llm keeps the marker for Claude routes and joins the blocks back into this very text for the
+        OpenAI protocols, which cache any repeated prefix by themselves."""
+        text = self._system(a)
+        if not (self.s.system_blocks and self.s.system_order == "socle_first"):
+            return text
+        socle = [t for k, t in a._sys_parts if k in SOCLE_SHARED]
+        profile = [t for k, t in a._sys_parts if k == "communication"]
+        rest = [t for k, t in a._sys_parts if k not in SOCLE_SHARED and k != "communication"]
+        if not socle or not rest:
+            return text
+        mark = {"cache_control": {"type": "ephemeral"}}
+        return ([{"type": "text", "text": "\n\n".join(socle), **mark}]
+                + ([{"type": "text", "text": "\n\n".join(profile), **mark}] if profile else [])   # lot 3b: per recipient
+                + [{"type": "text", "text": "\n\n".join(rest)}])
 
     async def _skills_tier0(self, a: Agent) -> None:
         if a._skills0 is not None:
@@ -1110,7 +1286,7 @@ class Engine:
             return (f"{c[:head]}\n… [résultat réduit : {len(c)} caractères ; context_recover(ref=\"{ev['data'].get('callId')}\") "
                     f"rend l'original] …\n{c[-tail:]}")
 
-        out = [{"role": "system", "content": self._system(a)}]
+        out = [{"role": "system", "content": self._system_content(a)}]
         for seq, m in journal.surface(a.session, prune=prune):
             imgs = m.pop("_images", None)
             if imgs and seq >= live_from:
