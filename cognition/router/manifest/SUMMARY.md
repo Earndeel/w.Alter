@@ -1,1 +1,1 @@
-Le bon modèle par tâche (texte, code, image, vidéo, voix…) : `walter_route(task)` le choisit ; `walter_run` exécute une sous-tâche ou une génération média ; `walter_plans`, `audio_transcribe`.
+Walter Router chooses the model and provider for each task — text levels, code, images, video, voice, specialised domains — from benchmarks, prices and {{owner.address}}'s subscriptions, and runs sub-tasks on them.

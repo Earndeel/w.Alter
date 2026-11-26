@@ -20,13 +20,7 @@ from walter_router.serve.choose import REQUIREMENTS
 
 MAX_CHARS = 4000
 ANALYSIS = ("vision", "document", "long_context")   # chat tasks that read what they are given
-LEVELS_FR = {"L1": "quotidien : réponse courte, résumé simple, fait rapide, petite reformulation",
-             "L2": "plus dur : analyse en plusieurs étapes, comparaison, rédaction soignée, planification",
-             "L3": "le plus dur ou à fort enjeu : recherche approfondie, raisonnement complexe, décision importante"}
-CONSTRAINTS_FR = {"unrestricted": "contenu que les modèles grand public refusent",
-                  "open_weights": "modèle à poids ouverts",
-                  "video_input": "le modèle lit une vidéo (avec task=vision : analyser ou revoir une vidéo)"}
-GENERATION = (("Images", ("image",)), ("Vidéo", ("video",)), ("Audio", ("audio", "music")))
+GENERATION = (("Images", ("image",)), ("Video", ("video",)), ("Audio", ("audio", "music")))
 
 
 def _short(text: str | None) -> str:
@@ -65,51 +59,51 @@ def text(conn, owner: str | None = None) -> str:
         f"`{r['task']}`" for r in rows if r["interface"] in interfaces
         and (not only or r["task"] in only) and r["task"] not in skip)
     out = [
-        "## Walter Router — choisir et exécuter un modèle pour une sous-tâche",
-        "Tu définis le travail, ses contraintes et le contexte ; le routeur choisit modèle et fournisseur selon les "
-        "benchmarks, les coûts, les abonnements et les préférences de " + owner + ". Tu contrôles le résultat et l’intègres.",
-        "Utilise-le lorsqu’une spécialité ou une sous-tâche distincte justifie le coût et la latence du transfert. "
-        "Les faits et contraintes indispensables doivent accompagner chaque appel.",
-        "- `walter_run` exécute. Donne `request`, `task`, `goal` complet pour le texte, `context` utile. "
-        "L’exécuteur ne voit pas cette conversation. Appelle-le directement si le besoin est clair.",
-        "- `walter_route` examine le choix, les routes et les prix sans exécuter ; utile pour vérifier ou planifier, "
-        "pas un préalable obligatoire à `walter_run`. Sans `task`, le routeur classe la demande ; "
-        "`conversation` explique un lien avec les échanges précédents.",
-        "- `walter_decide` traite un choix court ou répété : `question`, `options` (au moins deux noms → sens), "
-        "`context`. Pour une analyse longue, utilise une tâche texte.",
-        "- `walter_plans` lit les abonnements ; une modification doit être demandée par leur propriétaire.",
-        "- `walter_web` converse avec un service web de chat activé par " + owner + " (`message`, `files` chemins, "
-        "`model` seulement s’il le demande) ; réponse verbatim, fichiers produits en chemins. Lent ; sur sa demande.",
-        *(["Question rapide (" + quick + ") : `walter_run` avec `request` seul ; le modèle de décision la confie au "
-           "service web de chat prévu par " + owner + " (voie habituelle et avis s’il échoue)."] if quick else []),
-        "`task=general` : L1 quotidien, résumé simple ; L2 analyse en plusieurs étapes ou rédaction soignée ; "
-        "L3 raisonnement complexe ou fort enjeu. Les spécialités ont leur propre classement ; ne leur impose pas un niveau général.",
-        "Texte : " + keys(("chat",), skip=ANALYSIS + ("general",)),
-        "Analyse : " + keys(("chat",), only=ANALYSIS),
+        "## Walter Router — choose and run a model for a sub-task",
+        "You define the work, its constraints and its context; the router picks the model and provider from "
+        "benchmarks, costs, subscriptions and " + owner + "'s preferences. You check the result and integrate it.",
+        "Use it when a speciality or a distinct sub-task is worth the cost and latency of the hand-off. "
+        "Every call must carry the facts and constraints the work needs.",
+        "- `walter_run` executes. Give `request`, `task`, a complete `goal` for text, useful `context`. "
+        "The executor does not see this conversation. Call it directly when the need is clear.",
+        "- `walter_route` examines the choice, routes and prices without executing; useful to check or plan, "
+        "never a prerequisite of `walter_run`. Without `task`, the router classifies the request; "
+        "`conversation` explains a link with earlier exchanges.",
+        "- `walter_decide` settles a short or repeated choice: `question`, `options` (at least two, name → meaning), "
+        "`context`. For a long analysis, use a text task.",
+        "- `walter_plans` reads the subscriptions; changing one must be asked by their owner.",
+        "- `walter_web` converses with a web chat service enabled by " + owner + " (`message`, `files` as paths, "
+        "`model` only if asked); verbatim answer, produced files as paths. Slow; on request.",
+        *(["Quick question (" + quick + "): `walter_run` with `request` alone; the decision model hands it to the "
+           "web chat service " + owner + " chose (usual route, and a notice if it fails)."] if quick else []),
+        "`task=general`: L1 everyday, simple summary; L2 multi-step analysis or careful writing; "
+        "L3 complex reasoning or high stakes. Specialities have their own ranking; do not impose a general level on them.",
+        "Text: " + keys(("chat",), skip=ANALYSIS + ("general",)),
+        "Analysis: " + keys(("chat",), only=ANALYSIS),
     ]
     for title, interfaces in GENERATION:
         line = keys(interfaces)
         if line:
-            out.append(title + " : " + line)
+            out.append(title + ": " + line)
     if roles:
-        out.append("Objectif vidéo `role` : " + " · ".join(f"`{r['role']}`" for r in roles))
+        out.append("Video objective `role`: " + " · ".join(f"`{r['role']}`" for r in roles))
     out += [
-        "Contraintes `require` : `open_weights` poids ouverts ; `unrestricted` politique de contenu compatible ; "
-        "`video_input` route capable de lire une vidéo (`task=vision`). Fournis les sources ; la sélection seule n’attache aucun média.",
-        "Si l’utilisateur nomme un modèle, transmets `model` (éventuellement /variante) et `provider` s’il l’impose ; "
-        "aucun substitut. Les favoris ne changent pas sans sa décision.",
-        "Pour le texte, limite `toolsets`, `max_turns`, `budget_seconds` au besoin. Outils natifs : terminal/code et fichiers ; "
-        "autres capacités via leurs commandes si terminal autorisé. Les outils agissent sur l’hôte du routeur, "
-        "avec ses droits ; les permissions d’un harness distant ne sont pas héritées automatiquement.",
-        "Ne transmets pas de secrets ou de données local_only à un modèle cloud ; le harness contrôle les classes d’accès.",
-        "Génération média payante : uniquement sur demande de l’utilisateur ; `image_urls`, `role`, "
-        "`aspect_ratio`, `duration`, `resolution` selon le média. `paid_fallback` autorise une voie payante prévue manuelle.",
-        "Texte : fournisseur en échec → fournisseur suivant du même modèle, historique conservé. "
-        "Tous échouent → échec explicite. Une restriction de fournisseur nommé reste stricte.",
-        "Lis `ok`, `routed`, `attempts`, `tools` et les erreurs. Si `user_notification_required`, "
-        "transmets `user_notice` à l’utilisateur, même en cas d’échec. N’annonce jamais un succès sur la seule sélection.",
-        "Exemple texte : {\"request\":\"Corriger ce bug\",\"task\":\"coding\",\"goal\":\"…\",\"context\":\"…\"}. "
-        "Transcription, embeddings, rerank et postes internes sont servis aux modules ; ne les propose pas comme tâches usuelles.",
+        "Constraints `require`: `open_weights` open weights; `unrestricted` compatible content policy; "
+        "`video_input` a route able to read a video (`task=vision`). Provide the sources; selection alone attaches no media.",
+        "If the user names a model, pass `model` (optionally /variant) and `provider` if they impose one; "
+        "no substitute. Favourites do not change without their decision.",
+        "For text, limit `toolsets`, `max_turns`, `budget_seconds` as needed. Native tools: terminal/code and files; "
+        "other capabilities through their commands if the terminal is allowed. Tools act on the router's host, "
+        "with its rights; a remote harness's permissions are not inherited automatically.",
+        "Never pass secrets or local_only data to a cloud model; the harness controls access classes.",
+        "Paid media generation: only at the user's request; `image_urls`, `role`, "
+        "`aspect_ratio`, `duration`, `resolution` depending on the medium. `paid_fallback` allows a planned manual paid route.",
+        "Text: a failing provider → the next provider of the same model, history kept. "
+        "All fail → explicit failure. A named provider restriction stays strict.",
+        "Read `ok`, `routed`, `attempts`, `tools` and the errors. If `user_notification_required`, "
+        "pass `user_notice` to the user, even on failure. Never announce success on selection alone.",
+        "Text example: {\"request\":\"Fix this bug\",\"task\":\"coding\",\"goal\":\"…\",\"context\":\"…\"}. "
+        "Transcription, embeddings, rerank and internal tasks serve the modules; do not offer them as usual tasks.",
     ]
     body = "\n".join(out)
     if len(body) > MAX_CHARS:

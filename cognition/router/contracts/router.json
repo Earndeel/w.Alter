@@ -202,14 +202,14 @@
         "walter-router",
         "tasks"
       ],
-      "sections": "tâches (clé, libellé, interface)"
+      "sections": "tasks (key, label, interface)"
     }
   },
   "components": [
     {
       "id": "research",
       "path": "research",
-      "role": "Collecte des classements et prix (AA, Arena, OpenRouter…)",
+      "role": "Collection of leaderboards and prices (Artificial Analysis, Arena, OpenRouter…)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/router/research"
@@ -217,7 +217,7 @@
     {
       "id": "analysis",
       "path": "analysis",
-      "role": "Analyse, propositions Telegram, alertes",
+      "role": "Analysis, Telegram proposals, alerts",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/router/analysis"
@@ -225,7 +225,7 @@
     {
       "id": "plan",
       "path": "plan",
-      "role": "Forfaits du propriétaire et quotas",
+      "role": "The owner's plans and quotas",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/router/plan"
@@ -233,7 +233,7 @@
     {
       "id": "serve",
       "path": "serve",
-      "role": "Choix du modèle par tâche, exécution texte et médias",
+      "role": "Model choice per task, text and media execution",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -247,14 +247,14 @@
     {
       "id": "oneshot",
       "path": "serve/oneshot.py",
-      "role": "Réponses ponctuelles du Router : walter-llm direct (poste économique) ou délégation à Walter Engine",
+      "role": "The Router's one-shot answers: direct walter-llm (economical poste) or delegation to Walter Engine",
       "status": "active",
       "readme": "README.md"
     },
     {
       "id": "interface",
       "path": "interface",
-      "role": "Page publique de la bibliothèque des modèles",
+      "role": "Public model library page",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/router/interface"
@@ -262,7 +262,7 @@
     {
       "id": "store",
       "path": "store",
-      "role": "Schéma Postgres models (lecture/écriture)",
+      "role": "PostgreSQL schema models (read/write)",
       "status": "active",
       "readme": "README.md",
       "data": [
@@ -273,7 +273,7 @@
     {
       "id": "guardian",
       "path": "guardian",
-      "role": "Gardien du Router",
+      "role": "The Router's guardian",
       "status": "active",
       "readme": "guardian/README.md",
       "vision_target": "cognition/router/guardian"
@@ -281,7 +281,7 @@
     {
       "id": "documentation",
       "path": "documentation.py",
-      "role": "Référence générée (CODE, CONFIGURATION, DATABASE…) contrôlée par les tests",
+      "role": "Generated reference (code, configuration, database…) checked by the tests",
       "status": "active",
       "readme": "docs/README.md",
       "vision_target": "cognition/router/docs"

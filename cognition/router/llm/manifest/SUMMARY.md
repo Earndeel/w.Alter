@@ -1,0 +1,1 @@
+walter-llm is the model gateway of W.Alter's runtime and modules: one OpenAI-compatible endpoint where `model` names a Router poste, with provider keys read from the vault and subscription transports.

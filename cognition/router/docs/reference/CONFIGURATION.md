@@ -185,6 +185,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/structured.py | `ASIDE_ERROR_S` | 60.0 | a native route whose every call failed (5xx, timeout): asked again after this |
 | llm/transcription.py | `OPENROUTER_TRANSCRIPTIONS` | https://openrouter.ai/api/v1/audio/transcriptions |  |
 | llm/transcription.py | `RETRY_WAITS` | [1.5, 3.0, 4.0] |  |
+| llm/transcription.py | `ACCEPTED_FORMATS` | ["flac", "mp3", "ogg", "wav"] |  |
+| llm/transcription.py | `CONVERT_TIMEOUT_S` | 120 |  |
 | plan/codex_account.py | `BASE` | https://chatgpt.com/backend-api |  |
 | plan/codex_account.py | `GRANT` | codex-subscription |  |
 | plan/codex_account.py | `CLIENT_VERSIONS` | ["99.0.0", "0.0.0"] |  |
@@ -288,9 +290,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/agent_view.py | `KEEP` | ["task", "mode", "role", "role_label", "matched_signals", "model_id", "variant", "display_name", "provider", "level", "objective", "quality", "quality_unit", "real_cost", "cost_unit", "why", "warning", "require", "score_from_base", "unrestricted_signals", "role_source"] |  |
 | serve/brief.py | `MAX_CHARS` | 4000 |  |
 | serve/brief.py | `ANALYSIS` | ["vision", "document", "long_context"] | chat tasks that read what they are given |
-| serve/brief.py | `LEVELS_FR` | {"L1": "quotidien : réponse courte, résumé simple, fait rapide, petite reformulation", "L2": "plus dur : analyse en plusieurs étapes, comparaison, rédaction soignée, planification", "L3": "le plus dur ou à fort enjeu : recherche approfondie, raisonnement complexe, décision importante"} |  |
-| serve/brief.py | `CONSTRAINTS_FR` | {"open_weights": "modèle à poids ouverts", "unrestricted": "contenu que les modèles grand public refusent", "video_input": "le modèle lit une vidéo (avec task=vision : analyser ou revoir une vidéo)"} |  |
-| serve/brief.py | `GENERATION` | [["Images", ["image"]], ["Vidéo", ["video"]], ["Audio", ["audio", "music"]]] |  |
+| serve/brief.py | `GENERATION` | [["Images", ["image"]], ["Video", ["video"]], ["Audio", ["audio", "music"]]] |  |
 | serve/choose.py | `LEVELS` | ["L1", "L2", "L3"] |  |
 | serve/choose.py | `POLICY` | coalesce(pr.content_policy, c.content_policy) |  |
 | serve/choose.py | `INPUTS` | {"video_input": ["video"]} | requirement -> inputs every route of the choice must read |
@@ -330,6 +330,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/media_exec.py | `TIMEOUTS` | {"audio": 300, "image": 360, "music": 600, "video": 1200} |  |
 | serve/media_exec.py | `OPENROUTER_MODES` | {"image": ["t2i"], "video": ["t2v", "i2v", "r2v"]} | what run_openrouter sends (no input image) |
 | serve/media_exec.py | `FALLBACK_COST_X` | 2.0 |  |
+| serve/media_exec.py | `CODEX_RESPONSES` | https://chatgpt.com/backend-api/codex/responses |  |
+| serve/media_exec.py | `CODEX_IMAGE_MODEL` | codex-image | what the executions journal records as model: the backend names none |
 | serve/named.py | `PROVIDERS` | {"arnict": "arnict", "chatgpt": "codex", "codex": "codex", "flow": "google-flow", "google-flow": "google-flow", "kie": "kie", "kie-codex": "kie", "kie.ai": "kie", "openai-codex": "codex", "openrouter": "openrouter", "venice": "venice"} |  |
 | serve/named.py | `DEFAULT_TASK` | {"audio": "tts", "chat": "general", "image": "text_to_image", "music": "music", "video": "text_to_video"} |  |
 | serve/oneshot.py | `TOKEN_FILE` | @instance/bootstrap/llm/walter-router.env |  |
@@ -372,6 +374,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `CLOUDFLARE_EMAIL` | serve/intent.py | secret_value | aucun | Identité de compte pour l'adaptateur Cloudflare ; donnée d'instance. |
 | `CLOUDFLARE_API_KEY` | serve/intent.py | secret_value | aucun | Nom d'un accès secret utilisé par un adaptateur ; ne pas afficher sa valeur. |
 | `KIE_API_KEY` | serve/media_exec.py | secret_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets, pas une clé transmise au modèle. |
+| `WALTER_RUN_CHANNEL` | serve/media_exec.py | get | aucun | test = run d'essai (posé par walter-scenario / walter-lab) : dépense payante plafonnée par walter-llm (test_budget), au-delà validation du propriétaire. |
 | `OPENROUTER_API_KEY` | serve/media_exec.py | secret_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
 | `OPENROUTER_API_KEY` | serve/media_exec.py | secret_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
 | `WALTER_LLM_URL` | serve/oneshot.py | get | 'http://127.0.0.1:8894' | URL loopback de la passerelle walter-llm pour les commandes Telegram des services web conversationnels (défaut http://127.0.0.1:8894). |
