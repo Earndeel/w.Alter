@@ -35,6 +35,28 @@ PORT = int(os.environ.get("WALTER_CONTEXT_PREFLIGHT_PORT") or 8897)
 MAX_BODY = 256 * 1024
 
 
+
+class _trace_run:
+    """The run this message opened, as the trace label of Memory's calls made for it (payload plan lot 0,
+    2026-11-23); without a run or without Memory's client, nothing."""
+
+    def __init__(self, run_id):
+        self.run_id, self.token, self.var = run_id, None, None
+
+    def __enter__(self):
+        if self.run_id:
+            try:
+                from walter_memory.llm import TRACE_RUN
+                self.var, self.token = TRACE_RUN, TRACE_RUN.set(str(self.run_id))
+            except Exception:  # noqa: BLE001 — a label, never a reason to fail the plan
+                self.var = None
+        return self
+
+    def __exit__(self, *exc):
+        if self.var is not None:
+            self.var.reset(self.token)
+        return False
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "walter-context-preflight"
 
@@ -107,7 +129,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         shadow = parse_qs(url.query).get("shadow") == ["1"]
         inject = parse_qs(url.query).get("inject") == ["1"]      # real injection trials (owner, 2026-10-27/28)
-        plan, row = handle(d, shadow, want_pack=inject)
+        with _trace_run(d.get("run_id")):
+            plan, row = handle(d, shadow, want_pack=inject)
         if shadow:
             return self._send(204, None)
         if inject:
