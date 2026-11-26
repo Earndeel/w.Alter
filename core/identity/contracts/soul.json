@@ -129,7 +129,18 @@
     "guide": "manifest/GUIDE.md",
     "tools": [
       "walter_profile"
-    ]
+    ],
+    "capabilities": {
+      "walter_profile": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "returns": {
+          "type": "string"
+        }
+      }
+    }
   },
   "components": [
     {
