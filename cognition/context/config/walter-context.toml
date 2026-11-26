@@ -189,7 +189,10 @@ roots = ["@instance/state/core/telegram", "@instance/state/context/bench"]
 # Per-message pack (walter_context.assembly / retrieval). Budgets in tokens (chars / 4), header included.
 # Measured 07-11/11 (741 packs): median L0 115, L1 1588, L2 2983, L3 2889, L4 4666; max 7257.
 [pack]
-budget = { L0 = 800, L1 = 1200, L2 = 2000, L3 = 3000, L4 = 4500 }
+# Owner 2026-11-26: the rules layer goes 350 → 2 500 tokens (below); every level but L0 is raised by the same 2 150 so
+# memory and the other blocks are never cut to make room (report 2026-11-26-activation-et-etudes § 3).
+# Rollback: { L0 = 800, L1 = 1200, L2 = 2000, L3 = 3000, L4 = 4500 }, restart walter-context-preflight.
+budget = { L0 = 800, L1 = 3350, L2 = 4150, L3 = 5150, L4 = 6650 }
 # Over budget, blocks are shrunk (whole lines kept) then dropped in this order, least relevant first; a block id not
 # listed is cut last; `now` and the degraded-plan line are never cut. Every cut is recorded in the pack's `cuts`.
 cut_order = ["subjects_board", "records", "tool_cards", "recent_exchanges", "memory", "people", "experience", "subject",
