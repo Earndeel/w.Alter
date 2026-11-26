@@ -241,7 +241,7 @@ def test_context_titles_the_consignes_as_the_only_instructions(monkeypatch, stor
     tag, s = stored
     _mode(monkeypatch, "applicable")
     out = context.get_context(f"refais les tableaux {tag} du rapport", include_profile=False)
-    assert "## Consignes de Monsieur à Walter applicables à ce message" in out["text"]
+    assert "## Consignes de Monsieur à Walter en vigueur (chacune s'applique quand sa condition se présente" in out["text"]
     assert "sauf la section « Consignes »" in out["text"].split("\n", 1)[0]
     assert "## Préférences et énoncés durables de Monsieur liés à ce message" in out["text"]
     _mode(monkeypatch, "rules")
