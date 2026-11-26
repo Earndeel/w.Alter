@@ -32,7 +32,8 @@ anyone acts on them (cognition/router/llm/resolver.py applies them; no model, no
         "prefer": "if" | "then" | "none",       # who wins a real conflict (none: reported, nothing changed)
         "strict": false,            # true: `prefer` wins even when it is the less sure side (a bench-validated rule)
         "use": "why the relation holds", "since": "YYYY-MM-DD"}}
-    <condition> = {"signal": "<id>", "is" | "in" | "has" | "above" | "below": …} | {"fact": "name" | "!name"}
+    <condition> = {"signal": "<id>", "is" | "in" | "has" | "has_any" | "above" | "below": …} | {"fact": "name" | "!name"}
+    (`has_any` [options], 18/11: a several-options answer holds at least one of them)
 
 The global id of a signal is `<module>.<name>`. `collect()` compiles the contracts afresh (never the registry file,
 which may lag behind them) and keeps every valid module's signals: one invalid file is reported in `problems` and
@@ -59,7 +60,7 @@ MAX_RELATIONS = 32
 REL_KEYS = {"type", "if", "then", "signal", "on", "prefer", "strict", "use", "since"}
 REL_TYPES = ("implies", "excludes", "depends")
 GLOBAL_ID = re.compile(r"[a-z][a-z0-9-]{0,63}\.[a-z][a-z0-9_]{0,40}\Z")
-TESTS = {"is": str, "in": list, "has": str, "above": (int, float), "below": (int, float)}
+TESTS = {"is": str, "in": list, "has": str, "has_any": list, "above": (int, float), "below": (int, float)}
 
 
 def _require(ok, message):
@@ -106,8 +107,8 @@ def check_condition(where: str, c) -> dict:
     t = tests.pop()
     v = c[t]
     _require(isinstance(v, TESTS[t]) and not isinstance(v, bool), f"{where}: {t} has the wrong type")
-    if t == "in":
-        _require(v and all(isinstance(x, str) for x in v), f"{where}: in = a non-empty list of options")
+    if t in ("in", "has_any"):
+        _require(v and all(isinstance(x, str) for x in v), f"{where}: {t} = a non-empty list of options")
     if t in ("above", "below"):
         _require(0 <= float(v) <= 1, f"{where}: {t} is a probability")
     return c

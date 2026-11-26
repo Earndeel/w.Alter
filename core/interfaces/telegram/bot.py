@@ -618,7 +618,9 @@ class Bot:
         log.info("WALTER_VOICE %s", json.dumps({"seconds": f.get("duration"), "chars": len(heard),
                                                   "ms": int((time.time() - t0) * 1000)}))
         self.send(chat, f"🎤 « {heard} »", disable_notification=True)
-        return f"[note vocale de Telegram, transcrite] {heard}"
+        # the file's path rides in the marker (18/11): the preflight's decision model reads the voice note itself
+        # beside its transcript (walter_context.media, [media] audio); the main model reads the transcript
+        return f"[note vocale de Telegram, transcrite ; audio : {path}] {heard}"
 
     def save_attachment(self, chat: int, m: dict) -> tuple[str | None, Path | None, str | None]:
         """(kind, saved path, note when it could not be kept) of the message's photo or document."""

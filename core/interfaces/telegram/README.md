@@ -5,7 +5,7 @@
 | **Rôle** | Le bot Telegram propre à Walter (lot E7) : recevoir et répondre, sur le moteur Walter, avec l'identité (Soul), la mémoire, le contexte, Router, les outils et les sous-agents du moteur ; interruption, erreurs, approbations, suivi de la tâche. |
 | **Propriétaire** | walter-core (interfaces). |
 | **État** | En service depuis le 10/11/2026 (`walter-telegram.service`), bot du grant `telegram-walter-bot` ; scénario `../../scenarios/v1/telegram_door.py`. Le bot historique tenu par Hermes reste à Hermes jusqu'à sa sortie (E6). |
-| **Ne fait pas** | Aucune boucle, session, choix de modèle ni permission à lui : tout passe par l'Engine API (`../api`). Ne sert que les comptes Telegram du propriétaire (`owner_ids`), en conversation privée ; tout autre message est ignoré et journalisé. Pas encore de notes vocales (réponse explicite). |
+| **Ne fait pas** | Aucune boucle, session, choix de modèle ni permission à lui : tout passe par l'Engine API (`../api`). Ne sert que les comptes Telegram du propriétaire (`owner_ids`), en conversation privée ; tout autre message est ignoré et journalisé. Les notes vocales sont transcrites par le poste `stt` du Router ; depuis le 18/11 le message transmis dit aussi où est l'audio (« [note vocale de Telegram, transcrite ; audio : <chemin>] »), pour que le préflight de Context le lise lui-même. |
 | **Contrats** | Engine API v1 (`../../engine/contracts/engine-api.v1.json`) ; Bot API Telegram (long polling). |
 
 ## Fonctionnement
