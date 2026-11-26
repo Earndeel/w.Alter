@@ -82,3 +82,7 @@ du processus enfant, le banc retrouve uniquement le run de sa session et appelle
 `runs end RUN_ID` avec le statut failed. Il ne synthétise aucun succès ni Stop normal. Le port est idempotent
 et ne réécrit pas un run déjà fermé. Le fonctionnement DSH en dehors du banc garde son adaptateur natif ;
 un run sans événement de fin reste soumis au mécanisme d’abandon existant.
+
+## Canal Beeper natif
+
+Beeper Server officiel sans affichage : transport commun `walter_beeper.py`, lectures MCP `beeper_read`, envois `beeper_send_message` limités au moteur sous sa politique existante. Ingestion, files et historique restent dans Memory. Voir [interfaces/beeper/README.md](interfaces/beeper/README.md).

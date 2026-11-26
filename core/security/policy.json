@@ -68,7 +68,8 @@
       "mcp__walter__walter_browse",
       "mcp__walter__walter_plans",
       "mcp__walter__audio_transcribe",
-      "mcp__walter__tasks_list"
+      "mcp__walter__tasks_list",
+      "mcp__walter__beeper_read"
     ],
     "record": [
       "mcp__walter__task_create"
@@ -97,7 +98,8 @@
       "mcp__*__send_message",
       "mcp__*__reply",
       "mcp__*__forward",
-      "mcp__walter__walter_web"
+      "mcp__walter__walter_web",
+      "mcp__walter__beeper_send_message"
     ],
     "act_as_owner": [
       "mcp__walter__browser_session",

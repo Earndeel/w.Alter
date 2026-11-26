@@ -1,0 +1,5 @@
+api_url = "http://127.0.0.1:23374"
+grant = "beeper-server"
+# Stable profile identity, independent of app version and port. Old Mac cursors stay preserved separately.
+checkpoint_scope = "server"
+reconcile_days = 1
