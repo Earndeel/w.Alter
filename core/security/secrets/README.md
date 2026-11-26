@@ -19,7 +19,7 @@ Hermes, DSH, Codex and Claude Code are **not** Python dependencies of the core.
 - `walter_secrets/unlock.py`: bootstrap from the existing age-encrypted local vault;
   passes the master password to `bw unlock` in an environment variable, never argv.
 - `walter_secrets/otp.py`: received-code sources. Gmail uses Walter Memory's Google connector;
-  Beeper uses its local client API. These are optional operational dependencies.
+  Beeper uses the native local Server API (default 127.0.0.1:23374) and the named beeper-server grant as consumer secrets, without a Mac dependency. These are optional operational dependencies.
 - `walter_secrets/secrets_sync.py`, `vault_react.py`: watcher, target application, encrypted
   backup and folder classification. They consume Walter Memory's bus/decision interfaces.
 - `walter_secrets/ports/hermes/`: tool/hook registration and native browser integration.

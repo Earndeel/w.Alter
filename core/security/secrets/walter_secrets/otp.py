@@ -6,7 +6,7 @@ app, W.Alter fetches it and fills it, like the iPhone does. Read-only, narrow by
   - only messages that mention the expected site (`hint`: its name or domain) in sender, subject or text;
   - the code is returned to the caller (filled into the page / printed for a terminal placeholder) and registered for
     masking; the audit log keeps channel + sender + time, never the code or the message text.
-Sources: Gmail (gmail.readonly token of Walter Memory, connectors/google_api.py) and the Beeper Client API on the Mac
+Sources: Gmail (gmail.readonly token of Walter Memory, connectors/google_api.py) and the native Beeper Server API
 (WhatsApp, Telegram, LINE, Messenger, Instagram… — Beeper has no SMS account on 2026-10-17, so real SMS are not seen).
 """
 from __future__ import annotations
@@ -24,7 +24,8 @@ from datetime import datetime, timedelta, timezone
 from .vault import SecretError
 
 from . import settings
-BEEPER_API = settings.setting("otp", "beeper_api", "http://127.0.0.1:23373")
+BEEPER_API = settings.setting("otp", "beeper_api", "http://127.0.0.1:23374")
+BEEPER_GRANT = settings.setting("otp", "beeper_grant", "beeper-server")
 KEYWORDS = re.compile(r"code|otp|pin|passcode|password|mot de passe|v[ée]rification|verify|confirm|s[ée]curit[ée]|"
                       r"security|login|connexion|sign[- ]?in|authenticat|รหัส|ยืนยัน|验证码|コード", re.I)
 CANDIDATE = re.compile(r"(?<![\w/.-])(?:[A-Z]{1,3}-)?(\d{3}[ -]?\d{3}|\d{4,8})(?![\w/-]|[.,]\d)")
@@ -123,7 +124,7 @@ def _beeper_get(path: str, token: str, **params) -> dict:
 def from_messages(terms: list[str], since: datetime, token: str | None = None) -> list[dict]:
     if not token:
         from . import grants
-        token = grants.access("beeper")   # the owner's Beeper, through Walter's grant
+        token = grants.access(BEEPER_GRANT, consumer="secrets")   # the owner's Beeper, through Walter's grant
     found = []
     d = _beeper_get("/v1/chats", token, limit=40)
     for chat in d.get("items") or []:
