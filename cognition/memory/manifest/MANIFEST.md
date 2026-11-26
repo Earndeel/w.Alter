@@ -1,14 +1,27 @@
-# Walter Memory — la mémoire de {{owner.address}}
+# Walter Memory
 
-Vérité durable de sa vie : ce qui s'est passé (messages Beeper, e-mails, agenda, conversations avec W.Alter, fichiers), ce qui en a été appris, et qui sont les personnes.
+**Role.** The durable truth of {{owner.address}}'s life, usable by every agent: events from every source, knowledge
+derived from them (always linked to its evidence), the social layer (Kardex: people, identities, relationships) and
+durable tasks. It answers who / when / what with sources and dates, and records durable facts.
 
-**Organisation** : historique canonique append-only (`core.events`) ; connaissances dérivées toujours reliées à leurs preuves ; Kardex = couche sociale (identités, relations, mesures) ; index de recherche plein texte + sémantique ; connecteurs qui alimentent le tout. Classes de confidentialité : `cloud_allowed`, `redacted_cloud`, `local_only`.
+**Organisation.** Append-only canonical history (`core.events`); derived knowledge with provenance; Kardex (schema
+`kardex`); full-text + semantic search index; connectors that feed it (Beeper, Google, agent sessions…); a single
+write door (library or gateway). Privacy classes: `cloud_allowed`, `redacted_cloud`, `local_only`.
 
-**Utilisation**
-- `memory_context(query)` d'abord pour tout sujet personnel ou de projet (personnes citées, connaissances, sources).
-- `memory_search` : qui/quand/quoi, avec source et date ; `memory_events(text, source, since, until, order="newest"|"oldest", event_id, limit)` : le texte exact d'un événement — liste compacte, `order="oldest", limit=1` donne le tout premier en entier ; sinon `event_id` pour un événement en entier. Un message avec fichiers porte `attachments` (transcription d'une note vocale, texte d'un document…).
-- `person_lookup(name)` : fiche d'une personne ; `memory_recall` / `memory_reflect` : faits synthétisés, synthèse sourcée.
-- `memory_retain(content)` : enregistrer un fait durable, jamais un secret ni un journal transitoire.
-- `tasks_list(status, thread_id)` : les tâches durables du propriétaire (ouvertes, suspendues…), avec progrès et dernier résultat ; `task_update(task_id, status, progress, result, note)` : noter l'avancement ou clore. `task_create(goal, entity_id | person, due_at, remind_at, draft, source)` : créer une tâche durable liée à une personne, datée, avec un rappel à date et un brouillon conservé (jamais envoyé) ; la réponse est la tâche relue. Une tâche suit son fil, pas la session : elle se reprend depuis une autre conversation ou une autre interface.
+**Tools**
+- `memory_context(query)`: a ready context block (people named, knowledge, original sources). The turn's
+  `<walter-context>` block usually holds it already.
+- `memory_search(query)`: knowledge + original evidence with source and date.
+- `memory_events(text, source, thread_id, since, until, order="newest"|"oldest", event_id, limit)`: the exact text of
+  canonical events; a conversation in order with `thread_id` (about a hundred messages per read, continue with
+  `next`); `event_id` for one event in full. Messages with files carry `attachments` (voice-note transcript,
+  document text…).
+- `person_lookup(name)`: a person's card (identities, relationship, `thread_id` of their conversations).
+- `memory_recall` / `memory_reflect`: synthesised facts / a sourced synthesis.
+- `memory_retain(content)`: record a durable fact, never a secret or a transient log.
+- `tasks_list(status, thread_id)`, `task_create(goal, entity_id | person, due_at, remind_at, draft, source)`,
+  `task_update(task_id, status, progress, result, note)`: the owner's durable tasks; a task follows its thread, not
+  the session, and can be resumed from another conversation or door. A draft is kept, never sent.
 
-Souvenirs datés : vérifier l'état réel avant de l'affirmer ; recouper une réponse importante avec les sources.
+Recalled memories are dated snapshots: check the live state before asserting it, and cross-check an important
+answer with the sources. Live state of the module: `walter_health` (memory score, connectors).

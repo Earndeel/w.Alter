@@ -9,11 +9,14 @@
     "walter_memory/read_policy.py",
     "walter_memory/overland.py"
   ],
-  "requires": [],
+  "requires": [
+    "core"
+  ],
   "external": [
     "PostgreSQL walter-pg:5433",
     "pgvector",
-    "walter-llm for derived extraction"
+    "walter-llm for derived extraction",
+    "Beeper Server through core public BeeperClient (no Mac dependency)"
   ],
   "data": [
     "core.*",
@@ -42,7 +45,8 @@
     "Overland authenticated HTTP :3010",
     "CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer",
     "HTTP :8890 socle A3/A4: POST /v1/tasks/list {thread_id?, session_id?, status?, limit} -> {tasks: [{task_id, goal, status, thread_id, updated_at, progress, attempts, last_outcome}]}; POST /v1/tasks/update {task_id, status?, progress?, result?, note?}; POST /v1/experience {thread_id?, query?, limit} -> {items: [{at, run_id, status, summary, errors, lessons, solutions, pending}]}; /v1/runs/end accepts outcome; /v1/runs/start origin accepts interface, engine_session, request_id; /v1/context accepts thread_id (layers tasks, experience)",
-    "CLI tasks list|show|update|sweep|triage-redecide [--execute] [--channels owner|all|a,b]; CLI experience [--thread] [--query]"
+    "CLI tasks list|show|update|sweep|triage-redecide [--execute] [--channels owner|all|a,b]; CLI experience [--thread] [--query]",
+    "Beeper connector: WS -> ingestion.jobs beeper_events -> canonical core.events/media/bus; profile-scoped cursors in existing checkpoints"
   ],
   "bindings": {
     "dsh": "common MCP",
@@ -58,7 +62,9 @@
   "services": [
     "walter-memory-gateway",
     "walter-memory-overland",
-    "walter-memory-pipeline"
+    "walter-memory-pipeline",
+    "walter-memory-beeper-watch.service",
+    "walter-memory-beeper.timer"
   ],
   "optional": [
     "llm"
@@ -219,7 +225,7 @@
     {
       "id": "events",
       "path": "walter_memory/events.py",
-      "role": "Journal canonique core.events (append-only, idempotent)",
+      "role": "Canonical journal core.events (append-only, idempotent)",
       "status": "active",
       "readme": "README.md",
       "data": [
@@ -230,7 +236,7 @@
     {
       "id": "media",
       "path": "walter_memory/media.py",
-      "role": "Dérivation des médias du Raw Vault (A5) : audio → transcription (poste stt), document → extraction locale, image → OCR/légende (poste vision, désactivé) ; pilotée par le bus (memory.object), texte sur core.objects.derived_*",
+      "role": "Derivation of Raw Vault media: audio → transcript (stt poste), document → local extraction, image → OCR/caption (vision poste, disabled); driven by the bus (memory.object)",
       "status": "active",
       "readme": "README.md",
       "data": [
@@ -242,7 +248,7 @@
     {
       "id": "gateway",
       "path": "walter_memory/gateway.py",
-      "role": "Seule porte d'écriture (127.0.0.1:8890)",
+      "role": "The only write door (127.0.0.1:8890)",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -256,7 +262,7 @@
     {
       "id": "connectors",
       "path": "connectors",
-      "role": "Connecteurs (beeper, gmail, calendar, agent_sessions, triage…)",
+      "role": "Connectors (beeper, gmail, calendar, agent_sessions, triage…)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/memory/connectors"
@@ -264,7 +270,7 @@
     {
       "id": "organic",
       "path": "walter_memory/organic.py",
-      "role": "Mémoire organique V1 (vues, épisodes, périodes, flux)",
+      "role": "Organic memory V1 (views, episodes, periods, flows)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/memory"
@@ -272,7 +278,7 @@
     {
       "id": "assimilation",
       "path": "walter_memory/assimilation.py",
-      "role": "Assimilation pilotée par le bus (memory.organic)",
+      "role": "Bus-driven assimilation (memory.organic)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/memory"
@@ -280,7 +286,7 @@
     {
       "id": "runs",
       "path": "walter_memory/runs.py",
-      "role": "Run Plane (runs, tâches déléguées et objectifs durables du propriétaire A3, épisodes de run et expérience A4)",
+      "role": "Run plane: runs, delegated tasks and the owner's durable tasks, run episodes and experience",
       "status": "active",
       "readme": "README.md",
       "data": [
@@ -291,7 +297,7 @@
     {
       "id": "kardex",
       "path": "walter_memory/social.py",
-      "role": "Couche sociale Kardex (schéma kardex)",
+      "role": "Kardex social layer (schema kardex)",
       "status": "active",
       "readme": "README.md",
       "data": [
@@ -302,7 +308,7 @@
     {
       "id": "search",
       "path": "walter_memory/search.py",
-      "role": "Index de recherche (search.chunks)",
+      "role": "Search index (search.chunks)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/memory"
@@ -310,7 +316,7 @@
     {
       "id": "privacy",
       "path": "walter_memory/privacy.py",
-      "role": "Classes de confidentialité et règle de lecture",
+      "role": "Privacy classes and reading rule",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/memory"
@@ -318,7 +324,7 @@
     {
       "id": "disclosure",
       "path": "walter_memory/disclosure.py",
-      "role": "Contrôle de divulgation des messages sortants",
+      "role": "Disclosure check of outgoing messages",
       "status": "active",
       "readme": "README.md",
       "vision_target": "core/security"
@@ -326,7 +332,7 @@
     {
       "id": "llm-client",
       "path": "walter_memory/llm.py",
-      "role": "Appels de modèles de Memory (refuse local_only, budgets) ; clés par autorisation Walter Secrets (allow memory), sans repli fichier",
+      "role": "Memory's model calls (refuses local_only, budgets); keys through Walter Secrets grants, no file fallback",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/memory"
@@ -334,7 +340,7 @@
     {
       "id": "migrations",
       "path": "migrations",
-      "role": "Migrations Postgres",
+      "role": "PostgreSQL migrations",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/memory/migrations"
@@ -342,7 +348,7 @@
     {
       "id": "overland",
       "path": "walter_memory/overland.py",
-      "role": "Réception GPS (Overland, :3010)",
+      "role": "GPS reception (Overland, :3010)",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -352,6 +358,18 @@
         }
       ],
       "vision_target": "cognition/memory/connectors"
+    },
+    {
+      "id": "beeper-native",
+      "path": "connectors/beeper_watch.py",
+      "role": "Event-driven Beeper ingestion; HTTP catch-up and canonical deduplication",
+      "status": "implemented",
+      "readme": "README.md",
+      "vision_target": "cognition/memory/connectors",
+      "data": [
+        "postgres:core",
+        "postgres:ingestion"
+      ]
     }
   ]
 }

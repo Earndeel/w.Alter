@@ -1,11 +1,15 @@
-# walter-logs — ce que les agents ont fait
+# walter-logs
 
-Journal brut de toutes les sessions d'agents (Hermes et ses profils, Claude Code, Codex, DSH) : messages, raisonnements, appels d'outils avec arguments complets, résultats complets, résumés de compaction. Walter Memory garde la vie de {{owner.address}} ; walter-logs garde le travail des agents.
+**Role.** The canonical journal of agent execution. Walter Memory keeps {{owner.address}}'s life; walter-logs keeps
+the agents' work: messages, reasoning, tool calls with full arguments, full results, compaction summaries, model
+selections — for the engine and every external agent session.
 
-**Organisation** : schéma `walter_logs` (sessions, événements), append-only, secrets masqués à l'écriture, synchronisé en quelques secondes depuis chaque runtime.
+**Organisation.** Schema `walter_logs` (sessions, events), append-only, secrets masked at write, privacy class per
+event, synchronised within seconds from each runtime.
 
-**Utilisation**
-- `logs_search(query, runtime, event_type, tool, since)` : mots ou chaîne exacte (chemin, erreur, identifiant) ; chaque résultat porte `session#seq`.
-- `logs_timeline(session, seq)` : le déroulé autour ; `logs_get(session, seq)` : un événement en entier.
+**Tools**
+- `logs_search(query, runtime, event_type, tool, since)`: words or an exact string (path, error, identifier); each
+  hit carries `session#seq`.
+- `logs_timeline(session, seq)`: what happened around it, in order; `logs_get(session, seq)`: one event in full.
 
-Pour retrouver comment une tâche a été menée, une commande exacte, ou ce qui précédait une compaction.
+Use it to find how a task was carried out, an exact command or error, or what preceded a compaction.

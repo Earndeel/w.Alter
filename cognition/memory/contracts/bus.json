@@ -113,7 +113,7 @@
     {
       "id": "bus",
       "path": "walter_memory/bus.py",
-      "role": "Bus Walter (schéma bus, LISTEN/NOTIFY, curseurs, dead)",
+      "role": "Walter bus: schema bus, LISTEN/NOTIFY, per-consumer cursors, dead letters",
       "status": "active",
       "readme": "README.md",
       "data": [
@@ -121,5 +121,13 @@
       ],
       "vision_target": "core/bus"
     }
-  ]
+  ],
+  "presentation": {
+    "audience": "agent",
+    "title": "Walter bus",
+    "order": 25,
+    "summary": "manifest/bus/SUMMARY.md",
+    "manifest": "manifest/bus/MANIFEST.md",
+    "tools": []
+  }
 }

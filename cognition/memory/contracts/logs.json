@@ -145,7 +145,7 @@
     {
       "id": "logs-store",
       "path": "walter_memory/logs.py",
-      "role": "Journal canonique d'exécution walter_logs (masquage à l'écriture)",
+      "role": "Canonical execution journal walter_logs (secrets masked at write)",
       "status": "active",
       "readme": "README.md",
       "data": [
@@ -156,7 +156,7 @@
     {
       "id": "logs-watch",
       "path": "connectors/walter_logs.py",
-      "role": "Synchronisation des journaux de tous les runtimes (inotify)",
+      "role": "Synchronisation of every runtime's logs (inotify)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "core/observability"
