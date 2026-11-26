@@ -106,10 +106,14 @@ def _interpreted(conn, threads, allowed, at):
                         (list(KINDS), allowed, at, [s for s, _ in threads], [t for _, t in threads],
                          [f"{s}/{t}" for s, t in threads], at, at)).fetchall()
     out = {k: [] for k in KINDS}
+    from . import nature
+    typed = nature.restitution_on()     # M3: filed by nature once known (an opinion is not a rule of the thread)
     for r in rows:
         if r["stage"] in ("abandoned", "done", "cancelled"):
             continue
-        out[r["kind"]].append({"id": r["item_id"], "text": r["content"], "state": r["stage"], "stage": r["stage"],
+        kind = nature.reader_kind(r["kind"], r["attributes"]) if typed else r["kind"]
+        text = nature.reader_text(r["content"], r["attributes"]) if typed else r["content"]
+        out[kind].append({"id": r["item_id"], "text": text, "state": r["stage"], "stage": r["stage"],
                                "scope": r["scope"], "epistemic": r["epistemic"], "lineage": r["lineage_id"],
                                "replaced": ((r["attributes"] or {}).get("replacement_proposed") or {}).get("by"),
                                "at": r["valid_from"] or r["created_at"],
@@ -439,6 +443,7 @@ def render(st: dict, budget: dict | None = None, shown: list | None = None) -> s
 RULE_KINDS = ("constraint", "preference", "correction")
 RULES_BUDGET = 350
 RULE_SIM = 0.35                   # local cosine above which a rule is related to the message
+PREFS_SHARE = 0.3                 # M3: share of the rules budget kept for the related preferences when there are some
 
 
 def _always_shown(r: dict) -> bool:
@@ -459,7 +464,11 @@ def owner_rules(query: str = "", *, audience: str = "cloud_model", budget: int =
                 exclude: set[str] | None = None, limit: int = 40) -> dict:
     """The stable layer (P1.1/P1.8): the owner's durable rules in force — constraints, preferences and corrections he
     stated himself (g1), from every thread and runtime — closest to the query first, then the most recent. A weak
-    classification of the message must never lose a rule that always holds. Model-free (local embeddings)."""
+    classification of the message must never lose a rule that always holds. Model-free (local embeddings).
+    [nature] restitution = "applicable" (M3): _applicable_rules — only the consignes that apply to the message."""
+    from . import nature
+    if nature.restitution_on():
+        return _applicable_rules(query, audience=audience, budget=budget, exclude=exclude or set(), limit=limit)
     allowed = privacy.allowed_classes("local_only" if audience == "owner_local" else "cloud_allowed")
     exclude = exclude or set()
     qv = None
@@ -512,6 +521,112 @@ def owner_rules(query: str = "", *, audience: str = "cloud_model", budget: int =
     cls = privacy.strictest(*(i["privacy_class"] for i in items if i["id"] in shown)) if shown else "cloud_allowed"
     text = "\n".join(lines)
     return {"text": text, "ids": shown, "privacy_class": cls, "tokens": _tok(text) if text else 0}
+
+
+def _applicable_rules(query: str, *, audience: str, budget: int, exclude: set[str], limit: int) -> dict:
+    """M3 (owner 2026-11-25): what the owner said durably, sorted by its nature and its portée (walter_memory.nature).
+    - "text": the consignes (nature instruction) that APPLY to this message (nature.applicable: universal ones always;
+      a project, domain, person or situation one only when the message is about it; a task one never — the thread's
+      working state carries it). Only these are presented to the general model as instructions.
+    - "preferences": his preferences that apply to the message by the same portée rule (a universal one always), and
+      the statements whose nature is not known yet (« à typer »), only when related to the message (local cosine above
+      RULE_SIM, or the message names what they are limited to): they orient, they do not oblige.
+    - opinions, facts, decisions, goals: not here — they reach the model through the relevant memory, like any other
+      knowledge (nothing is lost, the knowledge search still ranks them).
+    One budget, consignes first. Without a message only the universal consignes (no relevance signal)."""
+    from . import nature
+    from .search import embed, vec
+    allowed = privacy.allowed_classes("local_only" if audience == "owner_local" else "cloud_allowed")
+    qv = None
+    if query.strip():
+        try:
+            qv = vec(embed([query[:2000]])[0])
+        except Exception:
+            qv = None
+    with connection() as conn:
+        rows = conn.execute("""
+            select d.item_id::text as id, d.kind, d.content, d.created_at, coalesce(d.valid_from, d.created_at) as at,
+                   d.privacy_class, d.stage, d.scope, d.epistemic, d.attributes->'replacement_proposed'->>'by' as replaced,
+                   d.attributes->>'act' as act, d.attributes->>'reach' as reach, d.attributes->>'reach_on' as reach_on,
+                   d.attributes->>'domain' as domain, d.attributes->>'project' as project,
+                   case when %s::text is null then null else 1 - (c.embedding <=> %s::vector) end as sim
+            from core.derived_items d
+            left join lateral (select embedding from search.chunks c where c.kind = 'derived' and c.ref_id = d.item_id
+                               and c.embedding is not null limit 1) c on true
+            where d.derived_by = 'l3.extract' and d.generation = 'g1'
+              and (d.kind = any(%s) or d.attributes->>'act' = any(%s))
+              and d.status in ('derived', 'verified') and d.privacy_class = any(%s)
+              and coalesce(d.epistemic, 'stated_owner') = 'stated_owner' and coalesce(d.scope, 'durable') <> 'task'
+              and coalesce(d.attributes->>'domain', 'personal') not in ('task', 'test')
+              and coalesce(d.attributes->>'reach', '') <> 'task'
+              and (d.valid_to is null or d.valid_to > now())
+            order by d.created_at desc limit 800""",
+                            (qv, qv, list(RULE_KINDS), ["instruction", "preference"], allowed)).fetchall()
+        projects = []
+        if query.strip():
+            try:
+                from .projection import find_projects
+                projects = find_projects(query, conn)
+            except Exception:
+                projects = []
+    consignes, related = [], []
+    for r in rows:
+        if r["id"] in exclude:
+            continue
+        if r["reach"] == "task":            # the thread's working state carries a task's rules
+            continue
+        act = r["act"] if r["act"] in nature.NATURES else None          # None = nature not known yet (« à typer »)
+        on = r["reach_on"] or (r["project"] if r["domain"] == "project" else None)
+        if act == "instruction":
+            # a typed consigne always has a portée; an old one filed under a project keeps that project
+            reach = r["reach"] or ("project" if r["domain"] == "project" else "universal")
+            if nature.applicable({"reach": reach, "reach_on": on}, query, sim=r["sim"], threshold=RULE_SIM,
+                                 projects=projects):
+                consignes.append({**r, "reach": reach, "reach_on": on})
+        elif act == "preference":
+            # the same portée rule as a consigne (a universal preference holds for every message); shown apart
+            reach = r["reach"] or ("project" if r["domain"] == "project" else "universal")
+            if nature.applicable({"reach": reach, "reach_on": on}, query, sim=r["sim"], threshold=RULE_SIM,
+                                 projects=projects):
+                related.append({**r, "reach": reach, "reach_on": on})
+        elif act is None and qv is not None and ((r["sim"] or 0) > RULE_SIM or nature.mentions(on, query)):
+            related.append({**r, "reach_on": on})          # « à typer »: relevance only
+    # the universal consignes first (they hold for every message), in the stable layer's order (closest to the message
+    # when clearly related, then the newest); then the ones limited to a project, domain, person or situation the
+    # message is about, closest first. Not by closeness alone: a consigne that always holds is general and rarely close
+    # to a message, while a consigne of the message's project nearly always is (bench 26/11, judged per item: universal
+    # 74 % applicable at cosine median 0.13; project 15 % applicable at 0.43-0.48 — sorting by closeness put them first)
+    order = lambda r: (r["replaced"] is not None, r.get("reach") not in (None, "universal"),  # noqa: E731
+                       -(r["sim"] or 0) if (r["sim"] or 0) > RULE_SIM else 0, -r["created_at"].timestamp())
+
+    def fit(rs, room, word):
+        rs = sorted(rs, key=order)[:limit]
+        items = densify([{"id": r["id"], "text": r["content"], "at": r["at"], "privacy_class": r["privacy_class"],
+                          "kind": r["kind"], "replaced": r["replaced"], "reach": r.get("reach"),
+                          "reach_on": r.get("reach_on")} for r in rs][::-1])[::-1]
+        lines, used, shown = [], 0, []
+        for i in items:
+            where = "" if i["reach"] in (None, "universal") else \
+                f" [{nature.REACHES[i['reach']][1]}{' : ' + i['reach_on'] if i.get('reach_on') else ''}]"
+            line = f"- {_compact(i['text'], i['id'])}{where} ({i['at']:%d/%m/%Y})" + \
+                (f" [peut-être remplacé par {i['replaced'][:8]}, à confirmer]" if i.get("replaced") else "")
+            if used + _tok(line) > room:
+                continue
+            lines.append(line); used += _tok(line); shown.append(i)
+        if len(rs) > len(shown):
+            lines.append(f"- (+{len(rs) - len(shown)} autres {word} : memory_search ou memory_view details)")
+        text = "\n".join(lines)
+        return text, shown, (_tok(text) if text else 0)
+
+    # one budget, consignes first; when related preferences exist they keep at least PREFS_SHARE of it
+    c_text, c_shown, c_tok = fit(consignes, budget if not related else int(budget * (1 - PREFS_SHARE)),
+                                 "consignes applicables")
+    p_text, p_shown, p_tok = fit(related, max(0, budget - c_tok), "énoncés liés")
+    shown = c_shown + p_shown
+    cls = privacy.strictest(*(i["privacy_class"] for i in shown)) if shown else "cloud_allowed"
+    return {"text": c_text, "ids": [i["id"] for i in shown], "privacy_class": cls, "tokens": c_tok + p_tok,
+            "mode": "applicable", "consignes": [i["id"] for i in c_shown],
+            "preferences": {"text": p_text, "ids": [i["id"] for i in p_shown], "tokens": p_tok}}
 
 
 def session_state(st: dict) -> dict:

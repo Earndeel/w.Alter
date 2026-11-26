@@ -35,6 +35,10 @@ catchup = "active"
 # reconcile_existing = existing knowledge never reconciled (written before 19/11 10:40 or judged "new"), newest first,
 # through the same candidates, decision and write gate (knowledge.reconcile_existing), one slice per catch-up run.
 reconcile_existing = "active"
+# M5 (2026-11-25, owner: « je valide M1 à M5 ») : la boucle de rattrapage type la nature et la portée de chaque
+# connaissance qui n'en a pas (nature.retype, même poste et mêmes définitions que l'extraction, porte d'écriture,
+# étiquette réversible knowledge.revert). "paused" tant que les bancs ne sont pas présentés à Monsieur.
+retype = "paused"
 subjects = "paused"
 reconsolidation = "paused"
 episode_summaries = "paused"
@@ -73,6 +77,18 @@ mode = "adaptive"
 always = "instructions"
 relevance_only_channels = ["contact"]
 relevance_only_subjects = ["project:"]
+
+[nature]
+# Nature × portée des connaissances (2026-11-25, M1–M5 validés par Monsieur ; nature.py). Deux dimensions
+# indépendantes : la nature (consigne, préférence, opinion, fait, décision, objectif = attributes.act) et la portée
+# (universelle, projet, domaine, personne, situation, tâche = attributes.reach / reach_on).
+# extraction : "v3" = prompt typé du 19/11 (préférence et contrainte mêlées) ; "v4" = consigne, opinion et portée.
+# restitution : "rules" = couche « Règles durables » choisie par genre (avant) ; "applicable" = seules les consignes
+# applicables au message sont des instructions, les préférences viennent à part et seulement si le message s'y
+# rapporte, opinions et faits seulement par la mémoire pertinente (M3). Retour arrière : remettre "v3" / "rules".
+# Rien n'est activé avant que Monsieur ait vu les bancs.
+extraction = "v3"
+restitution = "rules"
 
 [consolidation]
 # P1.2: g1 subject views rebuilt from current V1 knowledge and evidence (status 'shadow': built, not served).

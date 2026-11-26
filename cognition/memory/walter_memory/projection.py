@@ -740,8 +740,14 @@ def project(key: str, *, at: datetime | str | None = None, max_privacy: str = "c
         tasks = _task_status(conn, items)
         recent_kids, kid_counts, allchanges = fut.result() if fut else side(conn)
         by_kind: dict[str, list[dict]] = {}
+        from . import nature
+        typed = nature.restitution_on()     # M3: filed by nature once known (an opinion is never a rule in force)
         for r in items:
-            by_kind.setdefault(r["kind"], []).append(r)
+            if typed and (r.get("attributes") or {}).get("act") in nature.NATURES:
+                r = {**r, "content": nature.reader_text(r["content"], r.get("attributes"))}
+                by_kind.setdefault(nature.reader_kind(r["kind"], r.get("attributes")), []).append(r)
+            else:
+                by_kind.setdefault(r["kind"], []).append(r)
         newest = lambda rs: sorted(rs, key=lambda r: r["from"], reverse=True)   # noqa: E731
         # objectives and tasks, by what their evidence shows (effective): achieved and verified, announced done
         # (not verified), really under way (an open Run Plane objective or a step in the last ACTIVE days), blocked,
@@ -750,7 +756,8 @@ def project(key: str, *, at: datetime | str | None = None, max_privacy: str = "c
         # decisions and rules in force; a proposal nobody took is counted, not shown as in force
         decisions, proposals = [], 0
         for r in by_kind.get("decision", []):
-            if r["stage"] in IN_FORCE or (r["stage"] == "requested" and r["epistemic"] == "stated_owner"):
+            if r["stage"] in IN_FORCE or (r["stage"] == "requested" and r["epistemic"] == "stated_owner") \
+                    or r["kind"] != "decision":     # a statement filed here by its nature (M3): in force as stated
                 decisions.append(r)
             elif r["stage"] not in DROPPED:
                 proposals += 1

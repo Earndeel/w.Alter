@@ -13,12 +13,13 @@ DEFAULTS = {"generations": {"enforce": True}, "extraction": {"mode": "active"}, 
             "privacy": {"cloud_context": "cloud_allowed", "pseudonymise": True, "kardex_cloud": "policy"},
             "stages": {},
             "rules": {"always": "all", "relevance_only_channels": ["contact"], "relevance_only_subjects": ["project:"]},
+            "nature": {"extraction": "v3", "restitution": "rules"},
             "reconcile": {"mode": "decision", "candidates": 5, "batch": 12, "min_confidence": 0.5,
                           "state_ttl_days": 7}}
 
 # The model-driven stages of the organic chain, each with its own switch (A2, 2026-11-19). A stage absent from
 # [stages] follows [extraction] mode (the single switch of 2026-11-14), so an older config keeps its meaning.
-STAGES = ("extraction", "catchup", "reconcile_existing", "subjects", "reconsolidation", "episode_summaries")
+STAGES = ("extraction", "catchup", "reconcile_existing", "retype", "subjects", "reconsolidation", "episode_summaries")
 
 
 @lru_cache(maxsize=1)

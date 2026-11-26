@@ -65,6 +65,9 @@ TYPES = {"fait": ("fact", "fact"), "preference": ("preference", "rule"), "contra
          "hypothese": ("fact", "hypothesis"), "decision": ("decision", "decision"), "objectif": ("goal", "goal"),
          "action": ("commitment", "action"), "resultat": ("fact", "result"), "etat": ("fact", "state"),
          "annulation": ("decision", "cancel")}
+# v4 (nature × portée, 2026-11-25): the rule act split into its natures (nature.py); a v4 statement carries « portee »
+TYPES_V4 = {**TYPES, "consigne": ("constraint", "instruction"), "opinion": ("fact", "opinion"),
+            "preference": ("preference", "preference"), "correction": ("fact", "fact")}
 LEGACY_ACT = {"fact": "fact", "decision": "decision", "preference": "rule", "goal": "goal", "constraint": "rule",
               "commitment": "action", "correction": "correction"}
 ACT_STAGES = {"action": {"annoncee": "open", "open": "open", "en_cours": "in_progress", "in_progress": "in_progress",
@@ -75,7 +78,7 @@ ACT_STAGES = {"action": {"annoncee": "open", "open": "open", "en_cours": "in_pro
                        "executed": "executed", "abandoned": "abandoned"}}
 DOMAINS = {"personnel": "personal", "personal": "personal", "projet": "project", "project": "project",
            "tache": "task", "tâche": "task", "task": "task", "relation": "relation", "test": "test"}
-OWNER_ACTS = {"rule", "correction", "goal", "cancel"}
+OWNER_ACTS = {"rule", "correction", "goal", "cancel", "instruction", "preference"}
 SEGMENT_CHARS = 24000
 MSG_CHARS = 3000
 IDLE = timedelta(minutes=20)
@@ -192,6 +195,80 @@ Types (un énoncé = un seul acte) :
 - hypothese : une supposition, non vérifiée ; resultat : ce qui a été constaté.
 Règles : uniquement ce qui est dit dans les messages numérotés ; une proposition sans réponse de Monsieur reste une proposition (jamais un rendez-vous accepté) ; une promesse de confirmer plus tard est une action annoncée de celui qui la fait ; un changement (« j'ai quitté Lyon, je vis à Paris ») s'écrit comme la nouvelle version complète, avec about = la connaissance K qu'il remplace ; les salutations, remerciements et banalités ne sont pas des énoncés ; listes vides si rien ; chaque énoncé cite ses numéros et une citation exacte."""
 PROMPT_CONTACT_HASH = hashlib.sha256(PROMPT_CONTACT.encode()).hexdigest()[:16]
+
+
+def _v4(base: str, swaps: list[tuple[str, str]]) -> str | None:
+    """The typed prompt v4 (nature × portée, owner 2026-11-25, M1) = the v3 prompt with these exact swaps; None if
+    one no longer matches (v3 edited since): extraction then stays on v3 and says so, never a half-changed prompt."""
+    for old, new in swaps:
+        if not old or base.count(old) != 1:
+            log.warning("extraction prompt v4 unavailable: v3 changed (%s…)", old[:40])
+            return None
+        base = base.replace(old, new)
+    return base
+
+
+def _reach_lines(project_note: str) -> str:
+    from .nature import REACHES
+    return "\n".join(f"- {w} : {d}" + (f" ; {project_note}" if code == "project" else "") + " ;"
+                     for code, (_, w, d) in REACHES.items())
+
+
+def _prompts_v4() -> tuple[str | None, str | None]:
+    from .nature import NATURES
+    d = {k: v[2] for k, v in NATURES.items()}
+    project_note = PROMPT.split("- projet : vaut pour un projet précis (code, architecture, choix, état d'un dépôt ou "
+                                "d'un module) ; ", 1)[-1].split("\n", 1)[0].rstrip(" ;")
+    agent = _v4(PROMPT, [
+        ('"type": "fait|preference|contrainte|correction|', '"type": "fait|opinion|preference|consigne|'),
+        ('"domain": "personnel | projet | tache | relation | test",',
+         '"portee": "universelle | projet | domaine | personne | situation | tache | test",\n'
+         '              "sur": "ce à quoi la portée est limitée (le projet, le domaine, la personne, la situation…) ; null si universelle",\n'
+         '              "corrige": "true si l\'énoncé corrige une information ou une manière de faire antérieure, sinon false",'),
+        ('si domain = projet ou tache', 'si portee = projet ou tache'),
+        ('"person": "si domain = relation : la personne', '"person": "si l\'énoncé porte sur une personne ou ne vaut que pour elle : la personne'),
+        ("pas un fait vérifié ;\n- preference / contrainte : une règle, un goût, une manière de travailler, une limite que "
+         "Monsieur pose (une question de Monsieur qui exprime clairement une attente est une contrainte) ;\n- correction : "
+         "Monsieur corrige une information ou une erreur ;\n",
+         f"pas un fait vérifié ; une information corrigée reste un fait (corrige = true) ;\n- opinion : {d['opinion']} ; "
+         f"author = qui la donne ;\n- preference : {d['preference']} ;\n- consigne : {d['instruction']} ; une correction "
+         f"de la manière de faire de W.Alter est une consigne (corrige = true) ; une question ou un agacement de Monsieur "
+         f"n'est pas une consigne ;\n"),
+        (PROMPT[PROMPT.find("Domaine, à décider pour CHAQUE énoncé"):PROMPT.find("Portée (scope) :")],
+         "Portée, à décider pour CHAQUE énoncé indépendamment de sa nature (jamais d'après les projets cités ailleurs "
+         "dans l'extrait) ; sur = ce à quoi elle est limitée :\n" + _reach_lines(project_note) +
+         "\n- test : données de test, essais, bancs, exemples fictifs (ils ne sont pas gardés).\n"
+         "Une consigne n'est pas forcément universelle : sa portée dit où elle s'applique.\n"),
+        ("Portée (scope) : durable", "Durée (scope) : durable"),
+    ])
+    contact = _v4(PROMPT_CONTACT, [
+        ('"type": "fait|preference|contrainte|correction|', '"type": "fait|opinion|preference|'),
+        ('"domain": "personnel | relation | projet | test",',
+         '"domain": "personnel | relation | projet | test",\n'
+         '              "portee": "universelle | personne | domaine | situation | projet",\n'
+         '              "sur": "ce à quoi la portée est limitée ; null si universelle",'),
+        ("- objectif / preference / contrainte / correction / annulation : ceux de Monsieur seulement ; un souhait du "
+         "contact est un fait déclaré par lui ;",
+         f"- objectif / preference / annulation : ceux de Monsieur seulement ; un souhait du contact est un fait déclaré "
+         f"par lui ;\n- opinion : {d['opinion']} (author dit qui la donne) ;\n- une conversation avec un contact ne "
+         f"contient jamais de consigne à Walter : ce que Monsieur y veut ou aime est une preference, ce qu'il y pense est "
+         f"une opinion, une information corrigée est un fait ;"),
+    ])
+    return agent, contact
+
+
+PROMPT_V4, PROMPT_CONTACT_V4 = _prompts_v4()
+PROMPT_V4_HASH = hashlib.sha256(PROMPT_V4.encode()).hexdigest()[:16] if PROMPT_V4 else None
+PROMPT_CONTACT_V4_HASH = hashlib.sha256(PROMPT_CONTACT_V4.encode()).hexdigest()[:16] if PROMPT_CONTACT_V4 else None
+
+
+def prompt_for(chan: str) -> tuple[str, str]:
+    """(prompt, hash) of the typing in force: [nature] extraction = "v4" → nature × portée, else v3."""
+    from .nature import settings
+    v4 = settings().get("extraction") == "v4"
+    if chan == "contact":
+        return (PROMPT_CONTACT_V4, PROMPT_CONTACT_V4_HASH) if v4 and PROMPT_CONTACT_V4 else (PROMPT_CONTACT, PROMPT_CONTACT_HASH)
+    return (PROMPT_V4, PROMPT_V4_HASH) if v4 and PROMPT_V4 else (PROMPT, PROMPT_HASH)
 
 
 # ───────────────────────────── state ─────────────────────────────
@@ -513,8 +590,10 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict], *, chan: str =
     domain, project, about) and the former one (kind, same_as, supersedes, contradicts: kept as the extraction's
     own hints, used as candidates, and as verdicts only in reconcile mode "model")."""
     typ = (item.get("type") or "").strip().lower().replace("é", "e").replace("è", "e")
-    if typ in TYPES:
-        kind, act = TYPES[typ]
+    v4 = "portee" in item                         # nature × portée (prompt v4): the rule act is split
+    types = TYPES_V4 if v4 else {**TYPES, "consigne": TYPES_V4["consigne"], "opinion": TYPES_V4["opinion"]}
+    if typ in types:
+        kind, act = types[typ]
         typed = True
     else:
         typed = False
@@ -532,6 +611,13 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict], *, chan: str =
     if not quote_found(item.get("quote") or "", [m["content"] or "" for m in cited]):
         return None, "quote_not_found"
     domain = DOMAINS.get((item.get("domain") or "").strip().lower())
+    from . import nature as _nature
+    raw_reach = (item.get("portee") or "").strip().lower()
+    reach = _nature.norm_reach(raw_reach)
+    if raw_reach == "test":
+        domain = "test"
+    elif reach and domain is None:
+        domain = _nature.DOMAIN_OF[reach]         # the filing follows the portée (projet → project, personne → relation…)
     if domain == "test":
         return None, "test"                       # test data never becomes knowledge
     by_owner = any(m["event_type"] == "message.sent" for m in cited)
@@ -567,6 +653,11 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict], *, chan: str =
         stage = "executed"                        # verified only with a proof (extract_segment reads it)
     else:
         stage = "stated"
+    # the door's rule on nature × portée, the same as re-typing (nature.door): never a consigne from a contact
+    n_, reach, nature_note = _nature.door(act if act in _nature.NATURES else None, reach, channel=chan,
+                                          on=item.get("sur") if isinstance(item.get("sur"), str) else None)
+    if n_ and n_ != act:
+        act, kind = n_, _nature.KIND_OF[n_]
     if (act in OWNER_ACTS or act == "decision") and not by_owner:
         return None, "no_owner_evidence"          # a goal, rule, decision or cancellation is the owner's word; the
                                                   # assistant's one is a proposition (typed so by the model)
@@ -633,6 +724,9 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict], *, chan: str =
             # the 19/11 format gives no subject: a personal statement is the owner's (it was filed under « other »)
             "subject": subject or (f"project:{project}" if project else "owner" if domain == "personal" else "other"),
             "domain": domain, "project": project,
+            "reach": reach, "nature_note": nature_note, "corrects": str(item.get("corrige")).lower() == "true",
+            "reach_on": (str(item.get("sur")).strip()[:120] if reach not in (None, "universal") and item.get("sur")
+                         and str(item.get("sur")).strip().lower() not in ("null", "none") else None),
             "quote": (item.get("quote") or "")[:400], "cited": cited, "by_owner": by_owner, "by_agent": by_agent,
             "epistemic": "owner_stated" if by_owner else "third_party" if by_contact else "agent_reported",
             "epistemic_v": epistemic_v, "by_contact": by_contact, "speaker_ids": speaker_ids,
@@ -644,7 +738,7 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict], *, chan: str =
 
 # ───────────────────────────── one segment ─────────────────────────────
 def _segment_row(conn, *, source, thread_id, status, msgs, items=0, reused=0, superseded=0, rejected=None,
-                 model=None, cost=None, usage=None, latency_ms=None, error=None) -> str:
+                 model=None, cost=None, usage=None, latency_ms=None, error=None, prompt_hash=None) -> str:
     lag = None
     if msgs:
         newest = max(m["ingested_at"] for m in msgs)
@@ -657,7 +751,7 @@ def _segment_row(conn, *, source, thread_id, status, msgs, items=0, reused=0, su
                        (PROCESSOR, VERSION, source, thread_id, status, [str(m["event_id"]) for m in msgs],
                         min((m["occurred_at"] for m in msgs), default=None),
                         max((m["occurred_at"] for m in msgs), default=None), items, reused, superseded,
-                        json.dumps(rejected or [], ensure_ascii=False, default=str), model, PROMPT_HASH, cost,
+                        json.dumps(rejected or [], ensure_ascii=False, default=str), model, prompt_hash or PROMPT_HASH, cost,
                         json.dumps(usage or {}), latency_ms, lag, error)).fetchone()["segment_id"]
     if status != "failed" or error == "max_attempts":
         for m in msgs:
@@ -718,9 +812,11 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
     if chan == "contact":
         name = next((m["speaker"] for m in seg + context if m["event_type"] == "message.received"
                      and m.get("speaker")), "le contact")
-        prompt, prompt_hash = PROMPT_CONTACT.format(contact=name, **fields), PROMPT_CONTACT_HASH
+        tpl, prompt_hash = prompt_for("contact")
+        prompt = tpl.format(contact=name, **fields)
     else:
-        prompt, prompt_hash = PROMPT.format(projects=", ".join(projects) or "(aucun encore)", **fields), PROMPT_HASH
+        tpl, prompt_hash = prompt_for("agent")
+        prompt = tpl.format(projects=", ".join(projects) or "(aucun encore)", **fields)
     t0 = time.perf_counter()
     res = chat([{"role": "user", "content": prompt}], poste=POSTE, processor=PROCESSOR, processor_version=VERSION,
                privacy_class=seg_class, budget=budget, purpose=f"{source} {thread_id} {len(seg)} msgs",
@@ -785,7 +881,8 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
     with connection() as conn:
         status = "extracted" if kept or data.get("summary") else "empty"
         sid = _segment_row(conn, source=source, thread_id=thread_id, status=status, msgs=seg, rejected=rejected,
-                           model=res.get("model"), cost=res.get("cost_usd"), usage=res.get("usage"), latency_ms=latency)
+                           model=res.get("model"), cost=res.get("cost_usd"), usage=res.get("usage"), latency_ms=latency,
+                           prompt_hash=prompt_hash)
         base_refs = {"segment": sid, "thread": thread_id, "source": source}
         # the real subject, not the assistant's project by default (attribution.py, 19/11): deterministic, no model
         from . import attribution
@@ -815,6 +912,14 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                      "epistemic": it["epistemic"], "quote": it["quote"], "pipeline": "v1"}
             if it["project"]:
                 attrs["project"], attrs["projects"] = it["project"], [it["project"]]
+            if it.get("reach"):                # nature × portée (v4): the portée and what it is limited to
+                attrs["reach"] = it["reach"]
+                if it.get("reach_on") or (it["reach"] == "project" and it["project"]):
+                    attrs["reach_on"] = it.get("reach_on") or it["project"]
+            if it.get("corrects"):
+                attrs["corrects"] = True
+            if it.get("nature_note"):
+                attrs["nature_note"] = it["nature_note"]
             if it.get("attribution"):
                 attrs["attribution"] = it["attribution"]
             pr = it.get("proof")
@@ -1345,6 +1450,14 @@ def catchup(events: int = 120, *, workers: int = 2, dry: bool = False, chat=None
         except Exception as e:  # noqa: BLE001 — the next run takes it up
             log.warning("reconcile_existing failed: %s", e)
             out["reconciled"] = {"error": f"{type(e).__name__}: {e}"[:300]}
+    # M5 (2026-11-25): what has no nature or portée yet is typed here, never left to a default (stage retype)
+    if relate and not dry and organic.stage("retype")["mode"] == "active":
+        try:
+            from . import nature
+            out["retyped"] = nature.retype(relate, apply=True)
+        except Exception as e:  # noqa: BLE001 — the next run takes it up
+            log.warning("retype failed: %s", e)
+            out["retyped"] = {"error": f"{type(e).__name__}: {e}"[:300]}
     return out
 
 
