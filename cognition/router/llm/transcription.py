@@ -13,6 +13,41 @@ import uuid
 
 OPENROUTER_TRANSCRIPTIONS = "https://openrouter.ai/api/v1/audio/transcriptions"
 RETRY_WAITS = (1.5, 3.0, 4.0)
+# formats the endpoint takes for MAI-Transcribe-2, checked 2026-11-23: ogg, mp3, wav, flac pass; m4a/mp4, aac and webm
+# answer HTTP 400 (iPhone voice notes from Beeper are audio/mp4: they failed every night since 20/11). Any other format
+# is turned into mp3 by ffmpeg first, from a file (an mp4 with its index at the end cannot be read from a pipe).
+ACCEPTED_FORMATS = {"ogg", "mp3", "wav", "flac"}
+CONVERT_TIMEOUT_S = 120
+
+
+async def accepted_audio(audio: dict) -> dict:
+    """{data, format} the endpoint takes: as given when its format is accepted, else converted to mono mp3."""
+    fmt = (audio.get("format") or "mp3").lower()
+    if fmt in ACCEPTED_FORMATS:
+        return {"data": audio["data"], "format": fmt}
+    import asyncio
+    import base64
+    import binascii
+    import tempfile
+    from pathlib import Path
+    try:
+        raw = base64.b64decode(audio["data"], validate=False)
+    except (binascii.Error, ValueError):
+        raise ValueError(f"transcription_audio_unreadable:{fmt}") from None
+    with tempfile.TemporaryDirectory(prefix="walter-stt-") as d:
+        src, dst = Path(d) / "in.audio", Path(d) / "out.mp3"
+        src.write_bytes(raw)
+        proc = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-ar", "16000",
+            "-b:a", "48k", str(dst), stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=CONVERT_TIMEOUT_S)
+        except asyncio.TimeoutError:
+            proc.kill()
+            raise ValueError(f"transcription_audio_unreadable:{fmt}") from None
+        if proc.returncode != 0 or not dst.is_file() or dst.stat().st_size == 0:
+            raise ValueError(f"transcription_audio_unreadable:{fmt}")
+        return {"data": base64.b64encode(dst.read_bytes()).decode("ascii"), "format": "mp3"}
 
 
 def audio_part(messages: list[dict]) -> dict | None:
@@ -48,7 +83,7 @@ async def completion(model: str, api_key: str, messages: list[dict], *, stream: 
     if not audio or not audio.get("data"):
         raise ValueError("transcription_model_needs_input_audio")
     import httpx
-    body = {"model": model, "input_audio": {"data": audio["data"], "format": audio.get("format") or "mp3"}}
+    body = {"model": model, "input_audio": await accepted_audio(audio)}
     if language:
         body["language"] = language
     import asyncio

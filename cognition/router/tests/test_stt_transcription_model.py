@@ -55,3 +55,42 @@ def test_router_marks_a_transcription_only_model():
             return
         assert not media_exec.chat_capable(conn, "mai-transcribe-2")
         assert media_exec.chat_capable(conn, "gemini-3-1-flash-lite")
+
+
+# 2026-11-23: MAI-Transcribe-2 refuses m4a/mp4, aac and webm on /audio/transcriptions (HTTP 400; ogg, mp3, wav, flac
+# pass) — iPhone voice notes from Beeper (audio/mp4) failed every night since 20/11. Such audio is turned into mp3 first.
+def _sine(tmp_path, ext, *args):
+    import shutil
+    import subprocess
+    if not shutil.which("ffmpeg"):
+        import pytest
+        pytest.skip("ffmpeg absent")
+    p = tmp_path / f"s.{ext}"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", *args, str(p)],
+                   check=True)
+    return p
+
+
+def test_a_refused_format_is_sent_as_mp3(tmp_path):
+    import base64
+    m4a = _sine(tmp_path, "m4a", "-c:a", "aac")
+    msgs = [{"role": "user", "content": [{"type": "input_audio", "input_audio": {
+        "data": base64.b64encode(m4a.read_bytes()).decode(), "format": "mp4"}}]}]
+    c = _Client([_Resp(200, {"text": "", "usage": {}})])
+    asyncio.run(transcription.completion("microsoft/mai-transcribe-2", "k", msgs, client=c))
+    sent = c.bodies[0]["input_audio"]
+    assert sent["format"] == "mp3"
+    assert base64.b64decode(sent["data"])[:3] in (b"ID3", b"\xff\xfb", b"\xff\xf3", b"\xff\xf2")
+
+
+def test_an_accepted_format_is_sent_untouched():
+    c = _Client([_Resp(200, {"text": "x", "usage": {}})])
+    asyncio.run(transcription.completion("m", "k", MSGS, client=c))
+    assert c.bodies[0]["input_audio"] == {"data": "QUJD", "format": "ogg"}
+
+
+def test_audio_that_cannot_be_converted_is_refused_without_a_call():
+    import pytest
+    msgs = [{"role": "user", "content": [{"type": "input_audio", "input_audio": {"data": "QUJD", "format": "m4a"}}]}]
+    with pytest.raises(ValueError, match="transcription_audio_unreadable"):
+        asyncio.run(transcription.completion("m", "k", msgs, client=_Client([])))
