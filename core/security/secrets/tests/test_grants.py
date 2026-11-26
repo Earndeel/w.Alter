@@ -157,6 +157,31 @@ def test_claude_refresh_failure_preserves_the_existing_file(home):
         with pytest.raises(grants.GrantError, match="HTTP 401"):
             grants.access("claude")
     assert (home / "claude.json").read_bytes() == before
+    health = grants.check("claude")["grants"][0]       # a refused refresh is reported, not shown OK (25/11)
+    assert not health["ok"] and "HTTP 401" in health["problems"][0] and "new owner login" in health["problems"][0]
+
+
+def test_unrenewed_expired_token_is_reported(home):
+    claude_card(home)
+    private(home / "claude.json", json.dumps({"claudeAiOauth": {
+        "accessToken": "fake-old", "refreshToken": "fake-refresh", "expiresAt": int((time.time() - 7300) * 1000)}}))
+    health = grants.check("claude")["grants"][0]
+    assert not health["ok"] and "not renewed" in health["problems"][0]
+
+
+def test_google_auth_token_file_is_read_with_its_iso_expiry(home):
+    from datetime import datetime, timedelta, timezone
+    soon = (datetime.now(timezone.utc) + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    private(home / "gtok.json", json.dumps({"token": "fake-google", "refresh_token": "r", "expiry": soon}))
+    card(home, "gw", f'owner = "owner"\nkind = "oauth"\nrenewer = "vendor:google-workspace-skill"\n[secret]\n'
+         f'token = "file:{home}/gtok.json"\n')
+    assert grants.access("gw") == "fake-google"
+    row = grants.check("gw")["grants"][0]
+    assert row["ok"] and 1700 < row["access_expires_in_s"] <= 1800
+    gone = (datetime.now(timezone.utc) - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    private(home / "gtok.json", json.dumps({"token": "fake-google", "refresh_token": "r", "expiry": gone}))
+    with pytest.raises(grants.GrantError, match="renews it"):
+        grants.access("gw")
 
 
 def _api_card(home, ident="provider", allow='["llm", "router"]'):

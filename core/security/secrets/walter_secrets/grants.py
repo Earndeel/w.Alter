@@ -39,7 +39,42 @@ from . import settings
 KINDS = {"api_key", "bot", "oauth", "subscription", "tunnel", "storage", "cookies"}
 OWNERS = {"walter", "owner"}
 REFRESH_MARGIN = {"oauth": 60, "subscription": 3600}
+STALE_AFTER_S = 3600   # a token walter-secrets renews but left expired this long is not being renewed: report it
 _lock = threading.Lock()
+
+
+def _oauth_state(tok: dict) -> tuple[str | None, float]:
+    """(access token, expiry epoch) of an OAuth token file, in either shape kept on this host: ours
+    {access_token, expires_at} or google-auth's authorized-user file {token, expiry: ISO 8601 UTC} (written by the
+    Google Workspace skill). Reading only `expires_at` saw every google-auth file as expired since 1970 (25/11)."""
+    if tok.get("expires_at") is not None:
+        return tok.get("access_token"), float(tok["expires_at"])
+    expiry = tok.get("expiry")
+    if expiry:
+        from datetime import datetime, timezone
+        when = datetime.fromisoformat(str(expiry).replace("Z", "+00:00"))
+        return tok.get("access_token") or tok.get("token"), \
+            (when if when.tzinfo else when.replace(tzinfo=timezone.utc)).timestamp()
+    return tok.get("access_token") or tok.get("token"), 0.0
+
+
+def _refresh_error_file(path: Path) -> Path:
+    return path.with_name(path.name + ".refresh-error")
+
+
+def _note_refresh(path: Path, status: int | None) -> None:
+    """Remember the last refused refresh beside the token (metadata only), so health reports it; a success clears it."""
+    note = _refresh_error_file(path)
+    old = os.umask(0o077)
+    try:
+        if status is None:
+            note.unlink(missing_ok=True)
+        else:
+            note.write_text(json.dumps({"at": time.time(), "http_status": status}))
+    except OSError:
+        pass       # a health note must never change the refresh outcome
+    finally:
+        os.umask(old)
 
 
 class GrantError(RuntimeError):
@@ -155,8 +190,9 @@ def _oauth_access(c: dict) -> str:
     path = _file(where)
     with _lock:
         tok = json.loads(path.read_text())
-        if tok.get("expires_at", 0) - REFRESH_MARGIN["oauth"] >= time.time() and tok.get("access_token"):
-            return tok["access_token"]
+        current, expires_at = _oauth_state(tok)
+        if current and expires_at - REFRESH_MARGIN["oauth"] >= time.time():
+            return current
         if c["renewer"] != "walter-secrets":
             raise GrantError(f"grant {c['id']}: access token expired and {c['renewer']} renews it")
         import httpx
@@ -166,7 +202,9 @@ def _oauth_access(c: dict) -> str:
             "client_id": client["client_id"], "client_secret": client["client_secret"],
             "refresh_token": tok["refresh_token"], "grant_type": "refresh_token"})
         if r.status_code >= 400:
+            _note_refresh(path, r.status_code)
             raise GrantError(f"grant {c['id']}: refresh refused (HTTP {r.status_code})")
+        _note_refresh(path, None)
         d = r.json()
         tok.update(access_token=d["access_token"], expires_at=time.time() + d["expires_in"])
         tmp = path.with_name(path.name + ".tmp")
@@ -225,7 +263,9 @@ def _claude_subscription_access(c: dict) -> str:
             "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
             "scope": " ".join(token.get("scopes") or ["user:profile", "user:inference"])})
         if response.status_code != 200:
+            _note_refresh(path, response.status_code)
             raise GrantError(f"Claude subscription refresh refused (HTTP {response.status_code})")
+        _note_refresh(path, None)
         fresh = response.json()
         if not fresh.get("access_token") or float(fresh.get("expires_in", 0)) <= 0:
             raise GrantError("Claude subscription refresh response invalid")
@@ -361,17 +401,26 @@ def _storage_health(storage: str) -> dict:
     return {"storage": "vault", "ok": ok, **({} if ok else {"problem": f"no field {key}"})}
 
 
+def _refresh_error(path: Path) -> dict:
+    try:
+        return {"refresh_error": json.loads(_refresh_error_file(path).read_text())}
+    except (OSError, ValueError):
+        return {}
+
+
 def _expiry(c: dict) -> dict:
     try:
         if c["kind"] == "oauth":
-            tok = json.loads(_file(_split(c["secret"]["token"])[1]).read_text())
-            return {"refreshable": bool(tok.get("refresh_token")), "access_expires_in_s": int(tok.get("expires_at", 0) - time.time())}
+            path = _file(_split(c["secret"]["token"])[1])
+            tok = json.loads(path.read_text())
+            return {"refreshable": bool(tok.get("refresh_token")),
+                    "access_expires_in_s": int(_oauth_state(tok)[1] - time.time()), **_refresh_error(path)}
         if c["kind"] == "subscription":
             if c.get("provider") == "anthropic-claude":
                 path = _file(_split(c["secret"]["token"])[1])
                 tok = json.loads(path.read_text()).get("claudeAiOauth") or {}
                 return {"access_expires_in_s": int(tok.get("expiresAt", 0) / 1000 - time.time()),
-                        "refreshable": bool(tok.get("refreshToken"))}
+                        "refreshable": bool(tok.get("refreshToken")), **_refresh_error(path)}
             tok = str(_read(c["secret"]["token"]) or "")
             return {"access_expires_in_s": int(_jwt_exp(tok) - time.time()) if tok else None}
     except Exception as exc:  # noqa: BLE001
@@ -397,6 +446,15 @@ def check(ident: str | None = None) -> dict:
         if c["kind"] == "subscription" and isinstance(row.get("access_expires_in_s"), int) and row["access_expires_in_s"] < 0 \
                 and c["renewer"] == "none":
             problems.append("session expired")
+        if c["renewer"] == "walter-secrets":
+            # A token we renew ourselves must never stay expired: either the last refresh was refused (recorded by
+            # the refresher), or nothing renewed it for an hour. Both need attention (Claude n°1, 23→25/11: shown OK).
+            if row.get("refresh_error"):
+                e = row["refresh_error"]
+                problems.append(f"refresh refused (HTTP {e.get('http_status')}) at "
+                                f"{time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime(e.get('at', 0)))}: new owner login needed")
+            elif isinstance(row.get("access_expires_in_s"), int) and row["access_expires_in_s"] < -STALE_AFTER_S:
+                problems.append(f"access expired for {-row['access_expires_in_s'] // 3600} h and not renewed")
         row["ok"], row["problems"] = not problems, problems
         rows.append(row)
     return {"ok": all(r["ok"] for r in rows), "grants": rows}
