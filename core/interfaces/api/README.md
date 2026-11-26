@@ -19,7 +19,7 @@
 
 | op | Effet |
 |---|---|
-| `session.open` | `{interface, conversation, principal{kind,id}, mode interactive\|command, permissions?, continue_session?}` → `session_id = <porte>/<compte>/<conversation>`. Première fois : une session du noyau est créée ; ensuite (même après redémarrage) : la même (`resumed: true`). `continue_session: "dsh/vm/<id>"` (propriétaire seulement) rattache une session existante, par exemple commencée sur le web. |
+| `session.open` | `{interface, conversation, principal{kind,id}, mode interactive\|command, permissions?, continue_session?, level?}` → `session_id = <porte>/<compte>/<conversation>`. Première fois : une session du noyau est créée ; ensuite (même après redémarrage) : la même (`resumed: true`). `continue_session: "dsh/vm/<id>"` (propriétaire seulement) rattache une session existante, par exemple commencée sur le web. `level: L1\|L2\|L3` (propriétaire seulement) épingle un niveau de texte du Router sur la conversation, aussi à une réouverture : chacun de ses runs le porte (`routing.requested.pinned_level`), walter-llm l'applique à la place du niveau jugé par le préflight (la tâche reste celle du plan), et le budget d'effort du tour est au moins celui de ce niveau. C'est le chemin du bouton « Reprendre » du tableau de développement (L3). |
 | `session.list` | conversations connues, filtrables par `interface`, `account` |
 | `turn.submit` / `turn.queue` / `turn.steer` | message du propriétaire ; `idempotency_key` (id du message Telegram…) : un rejeu ne s'exécute jamais deux fois ; `wait_ms` attend la fin du tour et renvoie `{status, reason, text, tools}` |
 | `turn.result` | résultat d'un tour par son `request_id`, plus tard ou après redémarrage (lu dans le journal du noyau) |

@@ -106,6 +106,20 @@ test('continuity: an owner carries an existing Walter session into a conversatio
   await assert.rejects(open(api, { conversation: 'cont4', continue_session: web, principal: { kind: 'machine', id: 'router' } }), { code: 'owner_only' });
 });
 
+test('session.open: a tier the owner pins stays on the conversation and is published for the run plan', async () => {
+  const { api } = make();
+  const first = await open(api, { interface: 'web', conversation: 'devboard-w-1', level: 'L3' });
+  assert.equal(first.level, 'L3');
+  const kernel = first.walter_session.replace('dsh/vm/', '');
+  assert.equal(sessionMeta().get(kernel).level, 'L3');
+  assert.equal((await open(api, { interface: 'web', conversation: 'devboard-w-1' })).level, 'L3', 'kept when reopened without one');
+  await open(api, { interface: 'web', conversation: 'old' });                 // an older conversation gets it on its next open
+  assert.equal((await open(api, { interface: 'web', conversation: 'old', level: 'L2' })).level, 'L2');
+  await assert.rejects(open(api, { conversation: 'x', level: 'L9' }), { code: 'invalid_level' });
+  await assert.rejects(open(api, { conversation: 'y', level: 'L3', principal: { kind: 'machine', id: 'router' } }), { code: 'owner_only' });
+  assert.equal((await open(api, { conversation: 'z' })).level, undefined);
+});
+
 test('turn.submit waits for the result; same idempotency key = one prompt; result readable later', async () => {
   const { api, sessions } = make();
   await open(api);
@@ -129,7 +143,7 @@ test('delegate: one engine session per task, parent run published, task model, d
   const r = await api.op({ version: 1, op: 'delegate', caller: 'claude', delegation: d });
   assert.equal(r.ok, true); assert.match(r.output, /^ok:\[Délégation Walter\]/); assert.match(r.session_id, /^mcp\/claude\/task-/);
   const kernel = r.walter_session.replace('dsh/vm/', '');
-  assert.deepEqual(sessionMeta().get(kernel), { channel: 'machine', parent_run_id: 'run-parent', model: null,
+  assert.deepEqual(sessionMeta().get(kernel), { channel: 'machine', parent_run_id: 'run-parent', model: null, level: null,
     interface: 'mcp', engine_session: r.session_id });   // the door and its conversation (traceability, 13/11)
   assert.deepEqual(sessions.selected, [{ sessionId: kernel, provider: 'walter', model: 'general' }]);
   const again = await api.op({ version: 1, op: 'delegate', caller: 'claude', delegation: d });

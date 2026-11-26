@@ -73,6 +73,17 @@ export async function shadowTurn(cfg, { session, turn, step, message }, now = ()
   return row;
 }
 
+/** What a conversation opened by the Engine API asks of every run's plan: the model the owner named (delegation)
+ *  and the text tier he pinned on it (`pinned_level`, which walter-llm puts in place of the preflight's level). */
+const requestedOf = (meta) => {
+  const req = { ...(meta.model?.id ? { model: meta.model.id, ...(meta.model.provider ? { provider: meta.model.provider } : {}) } : {}),
+    ...(/^L[1-3]$/.test(meta.level || '') ? { pinned_level: meta.level } : {}) };
+  return Object.keys(req).length ? req : null;
+};
+/** The turn's effort level for the budget plugin, never below the tier pinned on the conversation. */
+const RANK = ['L0', 'L1', 'L2', 'L3', 'L4'];
+const atLeast = (effort, pinned) => (!pinned || RANK.indexOf(effort) >= RANK.indexOf(pinned) ? effort : pinned);
+
 /** Native intake: run, then context (pack or legacy block) and skills in parallel; every source fails open. */
 export async function nativeTurn(cfg, { session, turn, step, message, parent = null, previous: lastTurn = null, requestId = null }) {
   const t0 = performance.now();
@@ -106,7 +117,8 @@ export async function nativeTurn(cfg, { session, turn, step, message, parent = n
       cancel_run_id: previous && previous.key !== key ? previous.run_id : null,
       routing: { applied: false, configured: true, via: 'walter-llm poste (DSH provider walter)',
         // a model the owner named for this conversation (Engine API delegation): the plan walter-llm reads per call
-        ...(meta.model?.id ? { requested: { model: meta.model.id, ...(meta.model.provider ? { provider: meta.model.provider } : {}) } } : {}) },
+        // and a text tier the owner pinned on it (a board's resume: L3), applied by walter-llm over the preflight's
+        ...(requestedOf(meta) ? { requested: requestedOf(meta) } : {}) },
     }, { auth, timeoutMs: 5000 });
     currentRuns.set(session, { run_id: run.run_id, turn, key });
     trackRun(cfg, session, { run_id: run.run_id, turn });
@@ -136,7 +148,8 @@ export async function nativeTurn(cfg, { session, turn, step, message, parent = n
         plan = { thread: out.plan.thread?.id || null, act: out.plan.act || null, level: out.plan.level || null,
           // what a wake-up turn of this session inherits (no new decision for a runtime notice): the Router task + tier
           task: out.plan.model_profile?.task || null, model_level: out.plan.model_profile?.level || null,
-          effort: out.plan.decision?.effort || null, degraded, channel };
+          effort: meta.level ? atLeast(out.plan.decision?.effort || out.plan.level || null, meta.level)
+            : out.plan.decision?.effort || null, degraded, channel };
         source = degraded ? 'pack_degraded' : 'pack';   // the preflight says so itself in the pack, on the run and on the bus
         return out.text || '';                   // empty = the plan's own decision (L0: nothing beyond the message)
       } catch (e) {

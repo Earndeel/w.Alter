@@ -144,6 +144,14 @@
           "continue_session": {
             "type": "string",
             "description": "Owner only: carry an existing Walter session (dsh/vm/<id>) into this conversation"
+          },
+          "level": {
+            "enum": [
+              "L1",
+              "L2",
+              "L3"
+            ],
+            "description": "Owner only: a Walter Router text tier pinned on this conversation; every run of it is planned on that tier (task from the plan) with at least its effort budget"
           }
         }
       }

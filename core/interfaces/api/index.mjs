@@ -41,6 +41,7 @@ const walterKey = (kernel) => `dsh/vm/${kernel}`;
 
 /** The child's instructions: the caller's goal, its facts, and the shape its answer must take. */
 const MODEL_ID = /^[A-Za-z0-9._:\/-]{1,120}$/;
+const LEVELS = ['L1', 'L2', 'L3'];   // the instance's text tiers (Walter Router)
 
 /** Walter Router validates a model named for a delegation (its declared CLI: `walter-router route - --model …`).
  *  Resolves {ok, error}; a router that cannot be asked is an explicit refusal, never a guess. */
@@ -103,13 +104,14 @@ export class EngineApi {
   }
 
   view = (row) => ({ session_id: row.session_id, interface: row.interface, door: row.door, mode: row.mode,
-    principal: row.principal, walter_session: walterKey(row.kernel), created_at: row.created_at });
+    principal: row.principal, walter_session: walterKey(row.kernel), created_at: row.created_at,
+    ...(row.level ? { level: row.level } : {}) });
 
   health() {
     return { ok: true, version: 1, sessions: Object.keys(this.bindings.rows).length, pending_approvals: this.pending.size };
   }
 
-  async open({ interface: iface, conversation, principal, mode = 'interactive', permissions, continue_session: cont }) {
+  async open({ interface: iface, conversation, principal, mode = 'interactive', permissions, continue_session: cont, level }) {
     if (!DOORS.includes(iface)) throw new ApiError(400, 'invalid_interface');
     if (!principal || !['owner', 'machine', 'test'].includes(principal.kind)) throw new ApiError(400, 'invalid_principal');
     if (!['interactive', 'command'].includes(mode)) throw new ApiError(400, 'invalid_mode');
@@ -119,9 +121,14 @@ export class EngineApi {
     // A caller can only narrow: today a session runs under its door's preset (or the command preset, stricter).
     if (permissions && permissions !== PRESET_OF[door] && permissions !== 'command') throw new ApiError(403, 'permissions_wider_than_door', `door ${door} allows at most ${PRESET_OF[door]}`);
     const finalDoor = permissions === 'command' ? 'command' : door;
-    const known = this.bindings.get(id);
+    // a text tier the owner pins on this conversation (a board's resume button: L3): every run of it is planned on
+    // that tier of Walter Router whatever the preflight judged, and gets at least its effort budget
+    if (level != null && !LEVELS.includes(level)) throw new ApiError(400, 'invalid_level', `level ${LEVELS.join('|')}`);
+    if (level != null && principal.kind !== 'owner') throw new ApiError(403, 'owner_only');
+    let known = this.bindings.get(id);
     if (known) {
       if (known.door !== finalDoor) throw new ApiError(409, 'door_mismatch', `session ${id} runs as ${known.door}`);
+      if (level && known.level !== level) known = this.bindings.set({ ...known, level });
       return { ...this.view(known), resumed: true };
     }
     let kernel;
@@ -135,8 +142,8 @@ export class EngineApi {
       kernel = (await this.sessions.create({ cwd: this.workspace })).sessionId;
     }
     const row = this.bindings.set({ session_id: id, kernel, interface: iface, door: finalDoor, mode, principal,
-      created_at: new Date().toISOString() });
-    this.log('session.open', { session_id: id, door: finalDoor, continued: Boolean(cont) });
+      created_at: new Date().toISOString(), ...(level ? { level } : {}) });
+    this.log('session.open', { session_id: id, door: finalDoor, continued: Boolean(cont), ...(level ? { level } : {}) });
     return { ...this.view(row), resumed: false };
   }
 

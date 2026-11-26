@@ -149,7 +149,13 @@ test('native: a session opened by the Engine API files its runs under its channe
   await intake.nativeTurn(cfg, { session: 'dsh/vm/s-named', turn: 1, step: 0, message: '[Délégation Walter] Objectif : x' });
   const named = calls.filter((c) => c.path === '/v1/runs/start').at(-1);
   assert.deepEqual(named.body.routing.requested, { model: 'claude-opus-5-5', provider: 'venice' });
-  meta.delete('s-deleg'); meta.delete('s-named');
+  // a tier the owner pinned on the conversation (the board's resume: L3): on every run's plan
+  meta.set('s-pinned', { channel: 'owner', parent_run_id: null, model: null, level: 'L3' });
+  await intake.nativeTurn(cfg, { session: 'dsh/vm/s-pinned', turn: 1, step: 0, message: 'Reprise du chantier W-1 du tableau' });
+  const pinned = calls.filter((c) => c.path === '/v1/runs/start').at(-1);
+  assert.deepEqual(pinned.body.routing.requested, { pinned_level: 'L3' });
+  assert.equal(plain.body.routing.requested, undefined);
+  meta.delete('s-deleg'); meta.delete('s-named'); meta.delete('s-pinned');
 });
 
 test('native: an in-process sub-agent turn is a machine run filed under its parent\'s current run (E5)', async () => {

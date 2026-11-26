@@ -33,6 +33,7 @@ function publish(row) {
   doors().set(row.kernel, row.door);
   sessionMeta().set(row.kernel, { channel: channelOf(row.principal), parent_run_id: row.parent?.run_id || null,
     model: row.model || null,      // a model named by the owner and validated by Walter Router (delegation, E5)
+    level: row.level || null,      // a text tier the owner pinned on the conversation (L1–L3, e.g. a board's resume)
     interface: row.door || null, engine_session: row.session_id || null });   // the door and its conversation (traceability)
 }
 
