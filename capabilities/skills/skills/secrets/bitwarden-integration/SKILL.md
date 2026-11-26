@@ -220,3 +220,44 @@ injected server-side; only metadata comes back), then `walter-browser`. **Never 
 - **Type mapping**: 1=Login, 2=Secure Note, 3=Card, 4=Identity. Fields: 0=Text, 1=Hidden, 2=Boolean.
 - **No Xiaomi entry**: As of 2026-06-09, no Xiaomi/MiMo entry exists in Bitwarden. Xiaomi auth was via browser cookies.
 - **vault-lookup overlap**: This skill covers Bitwarden-specific workflows. For the full credential search chain (vault → env → bw → project files), see `vault-lookup`.
+
+## Validate the secrets guardian against stale grant health
+
+- Verify the guardian is scheduled and inspect its effective playbook before changing anything:
+  ```bash
+  systemctl list-timers --all --no-pager | grep -iE 'guardian|secret'
+  walter-guardian playbook --module secrets
+  systemctl cat walter-guardians.service | grep -E 'Exec|Environment'
+  ```
+- Do not assume a green `walter_health` result proves that every grant works. Compare the underlying grant metadata and problems directly:
+  ```bash
+  timeout 300 walter-secret grants
+  timeout 120 walter-secret grants claude-subscription
+  ```
+  A grant with renewal failures, expiration, or non-empty `problems` must produce a guardian incident even if the aggregate health endpoint reports `ok`.
+- Before editing the secrets guardian playbook, read it and make a metadata-only backup:
+  ```bash
+  P=/walter/core/security/secrets/guardian/playbook.json
+  D=/user/Lucas/backups/changes/$(date +%F)-grants-health
+  mkdir -p "$D"
+  cp "$P" "$D/playbook.json.orig"
+  cat "$P"
+  ```
+- Test detection without exposing credentials by creating a `0700` temporary grants directory containing only synthetic expired-grant metadata, then run the module check with that directory injected:
+  ```bash
+  S=/tmp/walter-guardian-fake-grants
+  rm -rf "$S" && install -d -m 700 "$S"
+  WALTER_GRANTS_DIR="$S" timeout 120 /walter/core/security/secrets/guardian/check
+  ```
+  The result must contain a `grant:<id>` incident for the synthetic expired/unrenewable grant, with high severity and a human-readable owner/escalation message.
+- Validate the playbook and perform a dry run before relying on the fix:
+  ```bash
+  walter-guardian playbook --module secrets
+  WALTER_GRANTS_DIR="$S" timeout 300 walter-guardian run --module secrets --dry-run
+  ```
+- Confirm the real supervisor is active and inspect the latest module verdict after the change:
+  ```bash
+  systemctl is-active walter-guardians
+  journalctl -u walter-guardians --since '-1 hour' --no-pager -o cat
+  ```
+- Preserve the distinction between automatic repair and owner escalation: vault master-password/device-approval/2FA requirements are `needs_owner`; stale or failed grant renewal must not be silently treated as healthy. Never print or include secret values in fixtures, logs, backups, or incident messages.
