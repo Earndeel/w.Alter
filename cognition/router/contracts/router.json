@@ -203,6 +203,150 @@
         "tasks"
       ],
       "sections": "tasks (key, label, interface)"
+    },
+    "capabilities": {
+      "walter_route": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "returns": {
+          "type": "object",
+          "properties": {
+            "task": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "walter_run": {
+        "effects": [
+          "cost"
+        ],
+        "concurrency": "parallel",
+        "produces": [
+          "file",
+          "agent"
+        ],
+        "idempotency": "none",
+        "returns": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean"
+            },
+            "answer": {
+              "type": "string"
+            },
+            "files": {
+              "type": "array"
+            }
+          }
+        },
+        "errors": [
+          "invalid_request",
+          "budget_exceeded",
+          "dependency_unavailable",
+          "outcome_unknown"
+        ]
+      },
+      "walter_decide": {
+        "effects": [
+          "cost"
+        ],
+        "concurrency": "parallel",
+        "idempotency": "natural",
+        "returns": {
+          "type": "object",
+          "properties": {
+            "choice": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      "walter_plans": {
+        "effects": [
+          "record"
+        ],
+        "concurrency": {
+          "resource": "router-plans"
+        },
+        "consumes": [
+          "plan"
+        ],
+        "produces": [
+          "plan"
+        ],
+        "idempotency": "natural",
+        "returns": {
+          "type": "object",
+          "properties": {
+            "plans": {
+              "type": "array"
+            }
+          }
+        }
+      },
+      "walter_web": {
+        "effects": [
+          "outgoing",
+          "external_state"
+        ],
+        "concurrency": {
+          "resource": "web-chat-service",
+          "key": "service",
+          "key_default": "default"
+        },
+        "consumes": [
+          "file"
+        ],
+        "produces": [
+          "file"
+        ],
+        "idempotency": "key:request_id",
+        "returns": {
+          "type": "object",
+          "properties": {
+            "reply": {
+              "type": "string"
+            },
+            "files": {
+              "type": "array"
+            }
+          }
+        },
+        "errors": [
+          "invalid_request",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "outcome_unknown"
+        ]
+      },
+      "audio_transcribe": {
+        "effects": [
+          "cost"
+        ],
+        "concurrency": "parallel",
+        "consumes": [
+          "file"
+        ],
+        "idempotency": "natural",
+        "returns": {
+          "type": "object",
+          "properties": {
+            "results": {
+              "type": "array"
+            }
+          }
+        }
+      }
     }
   },
   "components": [
