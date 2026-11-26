@@ -396,7 +396,7 @@ Deterministic detection: what is wrong with the module right now. No model is ca
 - `providers(conn)` — 
 - `dirty_paths(root=None)` — Files with uncommitted changes in the live module (someone's work in progress), relative to its root.
 - `run_tests(root, timeout: int=TEST_TIMEOUT)` — The module's test suite in `root`: {ok, failures: {node id: one-line reason}, tail}.
-- `tests(root=None)` — Failing tests, except those whose test file is itself someone's uncommitted work (still being written).
+- `tests(root=None, skip: frozenset[str]=frozenset())` — Failing tests, except those whose test file is itself someone's uncommitted work (still being written) and
 - `docs_check()` — `walter-router docs --check`: the generated reference against code and schema. {} when the installed version
 - `docs()` — 
 - `padlocks(conn)` — Invariant of the open padlocks (owner 2026-11-16/20): the model in use is the best callable one of its
@@ -597,6 +597,7 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `test_gate(route: dict, body: dict)` — None when this paid call of a test fits the budget, else the refusal (and one Telegram notice per window).
 - `_sub_key(route: dict)` — 
 - `test_reserve(route: dict)` — Why a test call leaves this subscription route to production (see TEST_BUDGET), else None.
+- `exact_test_reserve(route: dict)` — test_reserve for a test call that names its route (walter-llm call: benches and judges, 26/11: the reserve held
 - `test_hold(route: dict)` — A test call met this subscription's real limit: tests leave it for `limit_hold_minutes`.
 - `_charge(route: dict, entry: dict, telemetry: dict, body: dict)` — Record the paid spend of a test call (provider cost, else estimated from its usage or size).
 - `_telegram(text: str)` — One message to the owner through Walter's Telegram door (`walter-telegram send`, lot E6; best effort).

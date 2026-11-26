@@ -7396,9 +7396,9 @@
             "signature": "root, timeout: int=TEST_TIMEOUT"
           },
           {
-            "description": "Failing tests, except those whose test file is itself someone's uncommitted work (still being written).",
+            "description": "Failing tests, except those whose test file is itself someone's uncommitted work (still being written) and",
             "name": "tests",
-            "signature": "root=None"
+            "signature": "root=None, skip: frozenset[str]=frozenset()"
           },
           {
             "description": "`walter-router docs --check`: the generated reference against code and schema. {} when the installed version",
@@ -8169,6 +8169,11 @@
           {
             "description": "Why a test call leaves this subscription route to production (see TEST_BUDGET), else None.",
             "name": "test_reserve",
+            "signature": "route: dict"
+          },
+          {
+            "description": "test_reserve for a test call that names its route (walter-llm call: benches and judges, 26/11: the reserve held",
+            "name": "exact_test_reserve",
             "signature": "route: dict"
           },
           {
@@ -16553,6 +16558,12 @@
         ]
       },
       {
+        "comment": "",
+        "file": "guardian/checks.py",
+        "name": "REFERENCE_TEST",
+        "value": "tests/test_documentation.py::test_generated_reference_is_current_without_private_data_or_a_db_call"
+      },
+      {
         "comment": "composite points: below, two models are tied and the one in use stays",
         "file": "guardian/checks.py",
         "name": "PADLOCK_MARGIN",
@@ -19842,10 +19853,10 @@
     "guardian/__main__.py": "507846e4c26dd1f427861a627daa6a4aea91e91710ed1640405f1e074d11b064",
     "guardian/advice.py": "cdbfe137ef4011547e044e6fd8ea3c6035f1102a01fb85a681447ffd43736297",
     "guardian/agent.py": "45b543d716f8f97eb5584e0f90fda2b3da8175cbfbb189fbeba8505def0b438d",
-    "guardian/checks.py": "510e008432bbcf0c31287163bed9afdf42242380486fc6039b86dd7eba51f341",
+    "guardian/checks.py": "1354be6c37d6529a2f482d4af8ba7d41fe1adb89fed4a97519e0a61124f2269b",
     "guardian/playbook.json": "8c8db87d07242e19f70cfb9a99600f507abc8aa6782f4d806d2fac45ca1e1216",
     "guardian/repair.py": "50604a48872e4684ba7a8cbe031eafde5ec7cbfe1c04697927dd9447d3dd29cd",
-    "guardian/run.py": "c4fb1261f8b665ebee2f8516cf5a48350e1ad9de52a17d9b90161eb6c1745c6b",
+    "guardian/run.py": "8a821fe4d36c1cabf8e6dfd994af90b2ebe551f9e50dd527b4b5218cc950e668",
     "health.py": "aeb89568df1f3c699a749117efac4c6d7074edc441b57de32672f50dbf38eac8",
     "instance.py": "36db02bb67646d6b98b00a34c836545866e50329c82785c49c2a367a3f04b263",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
@@ -19863,7 +19874,7 @@
     "llm/config/gateway.json": "df03d00db101e3efadd264d79a4eeaf8e935aeeb18cbabe77743743d52d9144b",
     "llm/contracts/llm.json": "9fcfa41021312906a987d598fe8b1a728e5a952e43994e143cb766dd7e497fd0",
     "llm/decision.py": "999ffcf20c7a4598878369e9ad5439b0113b6a0d1b77bf7b0124c44557aba305",
-    "llm/gateway.py": "8a052ed8eadffaca531854a3e81532acba8891d48f1558a5d91292f73b28e12d",
+    "llm/gateway.py": "a3ae68879c391170dacee7ea8ba2fc836e2123ee45572a15d5c3f3093f8966a1",
     "llm/resolver.py": "cd04d0c818891381f988d044cc910902ec3fc11e1d1401ad16190e601935d188",
     "llm/structured.py": "4a8e241f6033f6e61753d6090dbc920d28a4fdcf45150140d70fdf169ff742da",
     "llm/transcription.py": "808239e594b6cc84ea99d4cb0ba6fa0bff0a2558c951956a13486e03f59a908e",
