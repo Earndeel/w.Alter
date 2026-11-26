@@ -320,7 +320,7 @@ def retype(limit: int = 200, *, apply: bool = False, tag: str | None = None, onl
             continue
         with connection() as conn:
             gate = knowledge.Gate(conn, generation="g1", tag=tag, segment=None)
-            st = gate.change(r["item_id"], {"attributes": new}, op="retype", key=f"retype:{VERSION}:{r['item_id']}",
+            st = gate.change(r["item_id"], {"attributes": new}, op="attribute", key=f"retype:{VERSION}:{r['item_id']}",
                              decided_by=f"{NEED}:{POSTE}", reason="nature × portée (M4/M5, 2026-11-25)")
             out["changed"] += st == "applied"
     if apply:

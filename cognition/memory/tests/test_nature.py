@@ -247,3 +247,31 @@ def test_context_titles_the_consignes_as_the_only_instructions(monkeypatch, stor
     _mode(monkeypatch, "rules")
     out = context.get_context(f"refais les tableaux {tag} du rapport", include_profile=False)
     assert "Consignes de Monsieur" not in out["text"] and "sauf la section" not in out["text"]
+
+
+def test_retype_apply_records_an_attribute_change_the_history_accepts(monkeypatch):
+    """26/11: the first real apply was refused by core.derived_changes (op « retype » unknown). A re-typing is an
+    attribute change like attribution's: op « attribute », before/after attributes, tagged, undone by revert."""
+    from walter_memory import knowledge
+    from walter_memory.db import connection
+    row = {"item_id": "00000000-0000-4000-8000-000000000001", "kind": "constraint", "content": "x",
+           "privacy_class": "cloud_allowed", "epistemic": "stated_owner", "attributes": {"act": "rule"}}
+    monkeypatch.setattr(nature, "pending", lambda conn, limit, **kw: [row])
+    monkeypatch.setattr(nature, "classify", lambda part, **kw: {row["item_id"]: {"nature": "instruction",
+                                                                                "reach": "universal", "reach_on": None}})
+    ops = []
+
+    class Gate:
+        def __init__(self, conn, **kw):
+            pass
+
+        def change(self, item_id, fields, *, op, **kw):
+            ops.append((op, kw["key"], fields["attributes"]["act"]))
+            return "applied"
+    monkeypatch.setattr(knowledge, "Gate", Gate)
+    out = nature.retype(5, apply=True, tag="t")
+    assert out["changed"] == 1 and ops[0][2] == "instruction"
+    with connection() as conn:
+        allowed = conn.execute("select pg_get_constraintdef(oid) d from pg_constraint "
+                               "where conname = 'derived_changes_op_check'").fetchone()["d"]
+    assert f"'{ops[0][0]}'" in allowed
