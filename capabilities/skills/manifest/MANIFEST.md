@@ -1,9 +1,15 @@
-# W.Alter Skills — procédures et workflows
+# W.Alter Skills
 
-Bibliothèque de procédures testées et de workflows (qui enchaînent plusieurs skills), partagée entre les agents. Le Curator l'entretient en continu : noms, descriptions, domaines, fusions, archivage, et l'index.
+**Role.** A library of tested procedures and of workflows (which chain several skills), shared by every agent and
+independent of any runtime. A curator maintains it continuously: names, descriptions, domains, merges, archiving and
+the index.
 
-**Utilisation**
-1. Repérer le domaine ci-dessous, puis `skills_index(domain)` (ou `module_index("skills", domain)`) : à quoi sert chaque entrée, workflows d'abord.
-2. Si le domaine est inconnu : `skills_search(query)` par intention.
-3. `skill_read(name)`, puis seulement les références utiles. Un workflow renvoie à ses skills composants.
-4. Après une tâche qui se reproduira : `skill_propose` ; un skill faux ou périmé : `skill_patch`.
+**Use**
+1. Find the domain (the session's domain map, or `skills_index()`), then `skills_index(domain)`: what each entry is
+   for, workflows first.
+2. Unknown domain: `skills_search(query)` by intent.
+3. `skill_read(name)`, then only the useful references. A workflow points to its component skills.
+4. After a task that will recur: `skill_propose`; a wrong or outdated skill: `skill_patch`.
+
+Dormant skills stay findable (marked "reserve") and return to service when read. Live contents:
+`module_index("skills")`.

@@ -1,1 +1,1 @@
-Procédures et workflows testés : `skills_index(domain)` ou `skills_search(query)`, puis `skill_read(name)` avant d'agir.
+W.Alter Skills is the shared library of tested procedures and workflows: how W.Alter does recurring technical and personal tasks, found by domain or intent and read before acting.

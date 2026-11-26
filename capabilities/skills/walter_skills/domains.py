@@ -102,28 +102,28 @@ def manifest(root: Path | None = None) -> str:
 def render(search_tool: str) -> str:
     index_tool, manifest_tool = 'skills_index', 'skills_manifest'
     data = index()
-    header = ("W.Alter Skills — bibliothèque de procédures et workflows, partagée entre les agents.\n"
-              f"{manifest_tool} explique le module ; {index_tool}(domain=…) indique à quoi sert chaque entrée. "
-              f"{search_tool}(query=…) cherche par intention. Lis ensuite le skill choisi et seulement ses références utiles.\n"
-              "Index compact des domaines (total / workflows ; réserve = skills dormants, toujours trouvables, "
-              "réactivés dès qu'on les lit) :\n")
+    header = ("W.Alter Skills — a library of procedures and workflows shared between agents.\n"
+              f"{manifest_tool} explains the module; {index_tool}(domain=…) says what each entry is for. "
+              f"{search_tool}(query=…) searches by intent. Then read the chosen skill and only its useful references.\n"
+              "Compact domain index (total / workflows; reserve = dormant skills, always findable, "
+              "back in service as soon as they are read):\n")
     return header + '\n'.join(_line(d) for d in data['domains'])
 
 
 def _line(d: dict) -> str:
-    return f"- {d['domain']} : {d['count']} / {d['workflows']}" + (f" · réserve {d['reserve']}" if d.get('reserve') else "")
+    return f"- {d['domain']}: {d['count']} / {d['workflows']}" + (f" · reserve {d['reserve']}" if d.get('reserve') else "")
 
 
 def domain_map() -> str:
     """Live part of the module's level-1 manifest: the compact domain map (manifest/MANIFEST.md says how to use it)."""
     data = index()
-    return ("Domaines (total / workflows · réserve) :\n" + '\n'.join(_line(d) for d in data['domains']))
+    return ("Domains (total / workflows · reserve):\n" + '\n'.join(_line(d) for d in data['domains']))
 
 
 def brief_document(search_tool: str = 'skills_search') -> dict:
     """Level 0 of the module in the shared v1 note envelope consumed by walter-context (walter present)."""
     import hashlib
-    content = '### W.Alter Skills — procédures et workflows partagés entre les agents\n' + render(search_tool).split('\n', 1)[1]
+    content = '### W.Alter Skills — procedures and workflows shared between agents\n' + render(search_tool).split('\n', 1)[1]
     tools = [search_tool, 'skills_index', 'skill_read']
     return {'schema_version': 1, 'note_version': 1, 'id': 'walter-skills.brief', 'module': 'skills',
             'format': 'text/markdown', 'content': content, 'sha256': hashlib.sha256(content.encode()).hexdigest(),

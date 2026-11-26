@@ -118,7 +118,7 @@ class Engine:
             if via:
                 row["via"] = via
             if state == "reserve":
-                row["summary"] = "[réserve — skill_read le remet en service] " + row["summary"]
+                row["summary"] = "[reserve — skill_read puts it back in service] " + row["summary"]
             out.append(row)
         return out
 

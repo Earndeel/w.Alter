@@ -66,7 +66,7 @@ def test_index_lists_entries_first_and_the_reserve_last(tmp_path, monkeypatch):
     page = domains.index("images")
     assert [e["name"] for e in page["entries"]] == ["image-generation", "kie-image-generation-operations", "face-grid-overlay"]
     assert page["entries"][-1]["kind"] == "reserve"
-    assert "images : 2 / 0 · réserve 1" in domains.render("skills_search")
+    assert "images: 2 / 0 · reserve 1" in domains.render("skills_search")
 
 
 def test_curator_never_rewrites_a_workflow_that_already_exists(tmp_path, monkeypatch):

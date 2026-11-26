@@ -170,11 +170,6 @@
     "summary": "manifest/SUMMARY.md",
     "manifest": "manifest/MANIFEST.md",
     "guide": "manifest/GUIDE.md",
-    "manifest_command": [
-      "walter-skills",
-      "brief",
-      "--map-only"
-    ],
     "tools": [
       "skills_search",
       "skills_index",
@@ -187,14 +182,14 @@
       ],
       "section_arg": "--domain",
       "paged": true,
-      "sections": "domaines (sans section : la liste des domaines)"
+      "sections": "domains (without section: the list of domains)"
     }
   },
   "components": [
     {
       "id": "core",
       "path": "walter_skills",
-      "role": "Noyau des skills (store git, cartes Postgres, politique d'exposition, apprentissage)",
+      "role": "Skills core (git store, PostgreSQL cards, exposure policy, learning)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "capabilities/skills"
@@ -216,7 +211,7 @@
     {
       "id": "consumer",
       "path": "walter_skills/consumer.py",
-      "role": "Consommateur du bus walter-skills-bus",
+      "role": "Bus consumer walter-skills-bus",
       "status": "active",
       "readme": "README.md",
       "vision_target": "capabilities/skills"
@@ -224,7 +219,7 @@
     {
       "id": "library",
       "path": "skills",
-      "role": "Bibliothèque de procédures (SKILL.md)",
+      "role": "Library of procedures (SKILL.md)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "capabilities/skills/library"
@@ -232,7 +227,7 @@
     {
       "id": "archive",
       "path": "archive",
-      "role": "Skills retirés (réserve)",
+      "role": "Retired skills (reserve)",
       "status": "obsolete",
       "readme": "README.md",
       "vision_target": "capabilities/skills/archive"
