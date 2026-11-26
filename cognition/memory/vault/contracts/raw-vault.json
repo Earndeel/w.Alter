@@ -144,7 +144,91 @@
       "vault_search",
       "vault_get",
       "vault_put"
-    ]
+    ],
+    "capabilities": {
+      "vault_search": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "consumes": [
+          "thread",
+          "event"
+        ],
+        "produces": [
+          "object"
+        ],
+        "returns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "object_id": {
+                "type": "string"
+              },
+              "typed_ref": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "derived_text": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "vault_get": {
+        "effects": [
+          "local_write"
+        ],
+        "concurrency": "parallel",
+        "consumes": [
+          "object"
+        ],
+        "produces": [
+          "file"
+        ],
+        "idempotency": "natural",
+        "returns": {
+          "type": "string"
+        }
+      },
+      "vault_put": {
+        "effects": [
+          "record"
+        ],
+        "concurrency": "parallel",
+        "consumes": [
+          "file",
+          "entity",
+          "event",
+          "thread"
+        ],
+        "produces": [
+          "object"
+        ],
+        "idempotency": "natural",
+        "returns": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "created": {
+              "type": "boolean"
+            },
+            "kind": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
   },
   "components": [
     {
