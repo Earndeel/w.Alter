@@ -38,7 +38,9 @@ LEVELS = {
 # The four plans measured in lot 1 map onto the first four levels.
 PLAN_TO_LEVEL = {"none": "L0", "last_exchange": "L1", "thread": "L2", "thread_and_memory": "L3"}
 ACTS = ("new", "continue", "approve", "correct", "inform")
-DOMAINS = ("projects", "profile", "activities", "relations", "agenda", "decisions", "goals")
+DOMAINS = ("projects", "profile", "activities", "relations", "agenda", "decisions", "goals", "walter")
+# "walter" (lot 3d, 2026-11-24): the message is about W.Alter itself; its D2 comes as a tool card, no memory read
+MEMORY_DOMAINS = tuple(d for d in DOMAINS if d != "walter")   # the domains Walter Memory holds views for
 HORIZONS = ("instant", "day", "medium", "long", "stable")
 DEPTHS = ("index", "overview", "synthesis", "details", "sources")
 CAPABILITIES = ("tools", "skills", "memory", "web", "browser", "delegation", "secrets")
@@ -240,7 +242,7 @@ class MemoryViewQuery:
         if not self.key and not self.domain:
             raise ContractError("MemoryViewQuery: a key or a domain")
         if self.domain is not None:
-            _one_of("domain", self.domain, DOMAINS)
+            _one_of("domain", self.domain, MEMORY_DOMAINS)
         if self.horizon is not None:
             _one_of("horizon", self.horizon, HORIZONS)
         _one_of("privacy", self.privacy, ("cloud_allowed", "redacted_cloud", "local_only"))
@@ -346,7 +348,7 @@ def schemas() -> dict[str, dict]:
             "type": "object", "required": ["version", "depth"],
             "anyOf": [{"required": ["key"]}, {"required": ["domain"]}],
             "properties": {"version": {"const": VERSION}, "depth": _enum(DEPTHS), "key": {"type": "string"},
-                           "domain": _enum(DOMAINS), "horizon": _enum(HORIZONS),
+                           "domain": _enum(MEMORY_DOMAINS), "horizon": _enum(HORIZONS),
                            "max_tokens": {"type": "integer", "minimum": 1, "maximum": 64000},
                            "max_age_s": {"type": ["integer", "null"], "minimum": 0},
                            "privacy": _enum(("cloud_allowed", "redacted_cloud", "local_only"))}},

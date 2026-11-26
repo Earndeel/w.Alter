@@ -359,3 +359,22 @@ def test_expired_notes_are_answered_at_once_and_refreshed_beside(monkeypatch):
             break
         _t.sleep(0.02)
     assert retrieval._notes(600) == [{"id": "v1"}]
+
+
+def test_a_message_about_walter_gets_its_d2_and_no_memory_read(monkeypatch):
+    """Lot 3d (2026-11-24): domain "walter" brings W.Alter's D2 as a tool card; alone, it does not open the owner's
+    memory at L1/L2 (a question about W.Alter's organisation is not one about the owner's life)."""
+    from walter_context import retrieval
+    from walter_context.plan import ContextPlan, ThreadChoice
+    notes = [{"id": "walter-walter.manifest", "module": "walter", "content": "### W.Alter\n\nD2 body"},
+             {"id": "walter-memory.summary", "module": "memory", "content": "- `memory` — M0"},
+             {"id": "walter-memory.manifest", "module": "memory", "content": "M1 mem"}]
+    monkeypatch.setattr(retrieval, "_notes", lambda ttl=600: notes)
+    mk = lambda level, doms, caps=(): ContextPlan(turn_id="t", thread=ThreadChoice(id=None, new=True), act="new",
+                                                  level=level, domains=list(doms), capabilities=["tools", *caps])
+    b = retrieval.tool_cards(mk("L1", ["walter"]))
+    assert b.sources == ["walter"] and b.text.startswith("W.Alter modules for this request:") and "D2 body" in b.text
+    assert "D2 body" not in retrieval.capabilities(mk("L1", ["walter"])).text      # never in the cached M0 layer
+    assert not retrieval._gets_memory(mk("L1", ["walter"])) and not retrieval._gets_memory(mk("L2", ["walter"]))
+    assert retrieval._gets_memory(mk("L1", ["profile"]))
+    assert retrieval.tool_cards(mk("L1", ["walter"], ["memory"])).sources == ["memory", "walter"]

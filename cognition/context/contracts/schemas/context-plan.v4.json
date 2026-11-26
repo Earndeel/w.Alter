@@ -80,7 +80,8 @@
           "relations",
           "agenda",
           "decisions",
-          "goals"
+          "goals",
+          "walter"
         ]
       },
       "uniqueItems": true

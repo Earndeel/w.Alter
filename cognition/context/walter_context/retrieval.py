@@ -24,7 +24,7 @@ from concurrent.futures import wait
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 
-from .config import pack_settings
+from .config import dedupe_settings, pack_settings
 from .plan import ContextPlan
 from .preflight import _words
 
@@ -32,9 +32,12 @@ from .preflight import _words
 CAPABILITY_MODULES = {"skills": ["skills"], "memory": ["memory"], "web": ["browse"], "browser": ["browse", "computer"],
                       "delegation": ["router"], "secrets": ["secrets"]}
 DOMAIN_MODULES = {"relations": ["memory"], "agenda": ["memory"], "profile": ["memory"], "activities": ["memory"],
-                  "decisions": ["memory"], "goals": ["memory"]}
+                  "decisions": ["memory"], "goals": ["memory"],
+                  "walter": ["walter"]}      # lot 3d: W.Alter's own D2 (its organisation and every module's D1)
+NO_MEMORY_DOMAINS = {"projects", "walter"}     # domains that alone do not open the owner's memory at L1/L2
 SUBJECT_DEPTH = {"L0": None, "L1": "index", "L2": "overview", "L3": "synthesis", "L4": "synthesis"}
 PACK = pack_settings()
+DEDUPE = dedupe_settings()                       # payload lot 1 (23/11): said once
 MEMORY_BUDGET = PACK["memory_budget"]           # L3 / L4 sections of Memory's context assembly
 RECORDS_BUDGET = PACK["records_budget"]
 STATE_BUDGET = PACK["state_budget"]             # layer 2 (Memory V1 P1.1): every level but L0 without a thread
@@ -143,7 +146,7 @@ def tool_cards(plan: ContextPlan) -> Block | None:
     texts = [(m, t) for m, t in texts if t]
     if not texts:
         return None
-    return Block("tool_cards", 4, "Outils W.Alter pour cette demande :\n\n" + "\n\n".join(t for _, t in texts),
+    return Block("tool_cards", 4, "W.Alter modules for this request:\n\n" + "\n\n".join(t for _, t in texts),
                  sources=[m for m, _ in texts])
 
 
@@ -208,7 +211,20 @@ def session_state(plan: ContextPlan, message: str, session_key: str | None, socl
     if not r.get("text"):
         return None
     refs = [ref for s in (r.get("trace") or {}).get("sections", {}).values() for ref in (s.get("refs") or [])]
-    return Block("session_state", 2, r["text"], sources=refs[:30])
+    return Block("session_state", 2, _body(r["text"]), sources=refs[:30])
+
+
+MEMORY_PREAMBLE = "Contexte daté tiré de la mémoire de Walter"
+
+
+def _body(text: str) -> str:
+    """Memory's assembled text without its own preamble when [dedupe] memory_header: the pack's header says the same
+    (data, not instructions; answer from it with its date; the most recent wins), once for the whole pack — Memory's
+    preamble came once per Memory block, so twice in a pack with the working state and the memory."""
+    if not DEDUPE["memory_header"] or not text.startswith(MEMORY_PREAMBLE):
+        return text
+    head, sep, rest = text.partition("\n\n")
+    return rest if sep and rest.strip() else text
 
 
 def _age(built_at, at: datetime) -> str:
@@ -375,7 +391,7 @@ def experience(plan: ContextPlan, message: str, fetch=_gateway, at: datetime | N
 
 
 def _gets_memory(plan: ContextPlan) -> bool:
-    return plan.level != "L0" and bool(MEMORY_BUDGET.get(plan.level) or (set(plan.domains) - {"projects"}))
+    return plan.level != "L0" and bool(MEMORY_BUDGET.get(plan.level) or (set(plan.domains) - NO_MEMORY_DOMAINS))
 
 
 def _memory_budget(plan: ContextPlan) -> dict | None:
@@ -391,7 +407,7 @@ def _memory_block(message: str, budget: dict) -> Block | None:
     if not r.get("text"):
         return None
     refs = [ref for s in (r.get("trace") or {}).get("sections", {}).values() for ref in (s.get("refs") or [])]
-    return Block("memory", 4, r["text"], sources=refs[:20])
+    return Block("memory", 4, _body(r["text"]), sources=refs[:20])
 
 
 def memory(plan: ContextPlan, message: str) -> Block | None:
@@ -579,7 +595,7 @@ _WORKERS: list = []
 
 def _workers():
     """Shared worker threads of the pack's sources (each one is I/O: Memory's database, its gateway, a command)."""
-    from concurrent.futures import ThreadPoolExecutor
+    from .threads import Executor as ThreadPoolExecutor
     if not _WORKERS:
         _WORKERS.append(ThreadPoolExecutor(max_workers=PACK["workers"], thread_name_prefix="pack-source"))
     return _WORKERS[0]

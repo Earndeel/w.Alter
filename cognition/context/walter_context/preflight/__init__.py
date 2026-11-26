@@ -27,11 +27,12 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..config import digest_settings, preflight_settings, state_settings
+from ..config import anchors_settings, digest_settings, preflight_settings, state_settings
 from ..plan import (ACTS, CAPABILITIES, DOMAINS, HORIZONS, LEVELS, MODEL_LEVELS, ContextPlan, ModelProfile,
                     ThreadChoice, OBSERVATIONS, PERSONAL, URGENCY, CLARITY, IMAGE_KINDS)
 
 SETTINGS = preflight_settings()
+ANCHORS = anchors_settings()                     # payload lot 1 (23/11): a known name is a hint or a trigger
 REPLY_WINDOW_S = SETTINGS["reply_window_s"]      # past that, « ok, regarde X » opens a subject rather than answering one
 FLOOR_WINDOW_S = SETTINGS["floor_window_s"]      # a message this close to the previous exchange needs that exchange
 DECISION_SAMPLES = SETTINGS["decision_samples"]  # parallel decisions averaged (2026-11-09)
@@ -81,6 +82,7 @@ DOMAIN_CRITERIA = {"projects": "a project or piece of work the owner pursues", "
                    " habits, health, identity", "activities": "what they did or do: trips, sport, purchases, events",
                    "relations": "people and their relationships with them", "agenda": "appointments, schedule, dates",
                    "decisions": "decisions already taken and why", "goals": "their objectives and priorities",
+                   "walter": "W.Alter itself: what it is, its modules and components, how it works or is set up",
                    "none": "no stored knowledge needed"}
 HORIZON_CRITERIA = {"instant": "right now, the last hours", "day": "today or yesterday", "medium": "the last weeks",
                     "long": "months or years back", "stable": "lasting facts that do not depend on time",
@@ -379,7 +381,7 @@ class Readings:
 
 
 def _readers():
-    from concurrent.futures import ThreadPoolExecutor
+    from ..threads import Executor as ThreadPoolExecutor
     if not _READERS:
         _READERS.append(ThreadPoolExecutor(max_workers=8, thread_name_prefix="preflight-readings"))
     return _READERS[0]
@@ -426,11 +428,15 @@ def turn(req: Request) -> tuple[dict, list[str], dict]:
     facts = ["threads"] if ids else []
     if any(c.get("task") or c.get("kind") == "task" for c in ids.values()):
         facts.append("open_task")
-    named = _anchors(req.message)                 # deterministic: a name Walter Memory knows (relation
+    named = _named(req.message)                   # deterministic: a name Walter Memory knows (relation
     object.__setattr__(req, "_anchors", named)    # context.named_project_memory reads it; run() reuses it)
-    if named:
+    if named and not ANCHORS["hint"]:
         facts.append("anchor.memory")
     state = _state(req)
+    if named and ANCHORS["hint"]:
+        # payload lot 1 (owner 2026-11-23): « les noms connus doivent être des indices, jamais des déclencheurs
+        # systématiques » — the model weighs the hint; no rule overrides what it answers
+        state["names_known_to_memory"] = {"names": named, "note": HINT_NOTE}
     ds = decision_state_for(req)
     if ds is not None:
         from .. import decision_state as DS
@@ -713,8 +719,8 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
         caps = [c for c in CAPABILITIES if c != "tools" and isinstance(probs.get(c), (int, float)) and probs[c] >= 0.5]
     seen = observations(res.get("signals") or {}, req.message) if SIGNALS != "questions" and not pending else {}
     named = getattr(req, "_anchors", None)
-    named = _anchors(req.message) if named is None else named
-    if named and "memory" not in caps:      # a project the owner's memory knows is named: memory, whatever the model said
+    named = _named(req.message) if named is None else named
+    if named and "memory" not in caps and not ANCHORS["hint"]:   # [anchors] hint = false (before 23/11): a known name
         caps.insert(0, "memory")
     memory_by = void_thread_memory(a, thread, req) if "memory" not in caps else None
     if memory_by:
@@ -858,6 +864,21 @@ def void_thread_memory(a: dict, thread: "ThreadChoice", req: Request) -> str | N
     beyond = 1 - float(plan_p["none"])
     stored = 1 - float(dom_p.get("none") or 0)
     return "void_thread" if beyond >= 0.5 and stored >= 0.5 else None
+
+
+HINT_NOTE = ("names the owner's memory knows (projects, organisations), found in the new message by exact match; a hint "
+             "only: long-term memory is needed when answering depends on what memory holds about them, not because "
+             "a name appears")
+
+
+def _named(message: str) -> list[str]:
+    """The names of the message Walter Memory knows; with [anchors] hint, never the assistant's own name (« salut
+    walter » named the project `walter` and pulled the owner's memory into a greeting: 17 of 83 memory turns, 17-23/11)."""
+    names = _anchors(message)
+    if ANCHORS["hint"]:
+        mine = {n.lower() for n in ANCHORS["assistant_names"]}
+        names = [n for n in names if n.strip().lower() not in mine]
+    return names
 
 
 def _anchors(message: str) -> list[str]:
