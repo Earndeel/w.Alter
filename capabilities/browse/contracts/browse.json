@@ -174,7 +174,60 @@
       "walter_browse",
       "browser_session",
       "browser_sites"
-    ]
+    ],
+    "capabilities": {
+      "walter_browse": {
+        "effects": [
+          "external_state"
+        ],
+        "concurrency": {
+          "resource": "browser-session",
+          "key": "session_id"
+        },
+        "consumes": [
+          "browser_session"
+        ],
+        "idempotency": "natural",
+        "returns": {
+          "type": "string"
+        }
+      },
+      "browser_session": {
+        "effects": [
+          "external_state"
+        ],
+        "concurrency": {
+          "resource": "browser-session",
+          "key": "session",
+          "key_default": "{site}-me"
+        },
+        "produces": [
+          "browser_session"
+        ],
+        "idempotency": "natural",
+        "returns": {
+          "type": "object",
+          "properties": {
+            "session": {
+              "type": "string"
+            },
+            "authenticated": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "browser_sites": {
+        "effects": [
+          "none"
+        ],
+        "concurrency": "parallel",
+        "returns": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    }
   },
   "components": [
     {
