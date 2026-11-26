@@ -11,6 +11,12 @@ import os
 import time
 
 import httpx
+import contextvars
+
+# Lot 0 of the payload plan (owner 2026-11-23): the run an owner message opened, carried as a TRACE label on the
+# structured calls made for it (decision, rerank), so the gateway journal adds up a message's preparatory calls with
+# its model calls. A label only: unlike X-Walter-Run-Id it asks the gateway for no run lookup and no policy.
+TRACE_RUN: contextvars.ContextVar = contextvars.ContextVar("walter_trace_run", default=None)
 
 from . import privacy
 from .db import connection
@@ -196,8 +202,10 @@ class GatewayError(RuntimeError):
 def _structured(path: str, body: dict, timeout: float) -> dict:
     """POST to a structured gateway endpoint; GatewayError with the attempts on any refusal or failure."""
     try:
-        r = httpx.post(GATEWAY + path, headers={"Authorization": f"Bearer {_gateway_token()}"}, json=body,
-                       timeout=timeout)
+        headers = {"Authorization": f"Bearer {_gateway_token()}"}
+        if TRACE_RUN.get():
+            headers["X-Walter-Trace-Run"] = str(TRACE_RUN.get())
+        r = httpx.post(GATEWAY + path, headers=headers, json=body, timeout=timeout)
     except Exception as exc:  # noqa: BLE001 — gateway down: said, the Router is the only path
         raise GatewayError(f"walter-llm unreachable ({type(exc).__name__})") from None
     try:
