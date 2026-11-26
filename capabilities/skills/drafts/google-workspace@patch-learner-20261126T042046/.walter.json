@@ -1,0 +1,11 @@
+{
+ "base_sha": "0377173f8d4280cc1b6ab8501a5a63ffc158deb3cdb463bce0cf713862d8060b",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-26T04:20:46.991911+00:00",
+ "domain": "productivity",
+ "kind": "patch",
+ "reason": "Écueil découvert dans cette session et absent du skill. La capture jointe à une réponse Zendesk via le connecteur Gmail MCP est arrivée corrompue : le base64 a été mal recopié dans une zone répétitive. Le problème a été confirmé par re-téléchargement, md5 et PIL (« broken data stream »). Le contournement par l'API Gmail avec google_token.json a été bloqué par le classifieur. La procédure de réduction de l'image, de contrôle du base64 et de vérification après envoi s'applique à tout envoi de pièce jointe. [session claude_code/vm/484604a6-a9f0-4487-a26c-2ae8da6a4438]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/484604a6-a9f0-4487-a26c-2ae8da6a4438",
+ "target": "google-workspace"
+}
