@@ -117,7 +117,7 @@
     {
       "id": "bridge",
       "path": "bridge.py",
-      "role": "Pont Colab (GPU à la demande)",
+      "role": "Colab bridge: remote compute on demand",
       "status": "active",
       "readme": "RUNBOOK.md",
       "vision_target": "capabilities/colab"
@@ -125,10 +125,18 @@
     {
       "id": "mcp",
       "path": "mcp",
-      "role": "Serveur MCP Colab",
+      "role": "Colab MCP server",
       "status": "active",
       "readme": "mcp/README.md",
       "vision_target": "capabilities/colab"
     }
-  ]
+  ],
+  "presentation": {
+    "audience": "agent",
+    "title": "Colab",
+    "order": 65,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "tools": []
+  }
 }
