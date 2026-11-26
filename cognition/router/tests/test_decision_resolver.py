@@ -80,14 +80,34 @@ def test_a_certain_fact_fills_an_answer_no_model_gave_and_is_never_changed():
 
 
 def test_a_reporting_relation_changes_nothing_but_says_conflict_or_uncertainty():
-    sure = resolver.resolve(base(**{"context.act": choice("new", 0.9)}), REL, asked=ASKED)
+    # the mechanism, whatever production declares: a relation with prefer « none » only reports
+    reporting = [dict(r, prefer="none") if r["id"] == "context.new_subject_new_thread" else r for r in REL]
+    sure = resolver.resolve(base(**{"context.act": choice("new", 0.9)}), reporting, asked=ASKED)
     assert sure["signals"]["context.thread"]["choice"] == "t-1"
     assert [c["relation"] for c in sure["conflicts"]] == ["context.new_subject_new_thread"]
     unsure = resolver.resolve(base(**{"context.act": choice("new", 0.9), "context.thread": choice("t-1", 0.35)}),
-                              REL, asked=ASKED)
+                              reporting, asked=ASKED)
     assert unsure["signals"]["context.thread"]["choice"] == "t-1" and unsure["uncertain_relations"]
+    # in production memory.resume_not_new_subject reports only
     both = resolver.resolve(base(**{"context.act": choice("new", 0.8), "memory.resume": {"noul": 0.9}}), REL, asked=ASKED)
     assert {c["relation"] for c in both["conflicts"]} >= {"memory.resume_not_new_subject"}
+    assert both["signals"]["context.act"]["choice"] == "new" and both["signals"]["memory.resume"]["noul"] == 0.9
+
+
+def test_a_new_subject_opens_a_new_thread_as_declared_since_26_11():
+    # D2, Monsieur 26/11 (context 5c7976f): new_subject_new_thread prefer « if » — a new subject opens a new thread
+    rel = next(r for r in REL if r["id"] == "context.new_subject_new_thread")
+    assert rel["prefer"] == "if"
+    sure = resolver.resolve(base(**{"context.act": choice("new", 0.9)}), REL, asked=ASKED)
+    assert sure["signals"]["context.thread"]["choice"] == "new"
+    assert [c["relation"] for c in sure["conflicts"]] == ["context.new_subject_new_thread"]
+    assert sure["changed"]["context.thread"]["was"]["choice"] == "t-1"
+    assert sure["changed"]["context.thread"]["by"] == ["context.new_subject_new_thread"]
+    unsure = resolver.resolve(base(**{"context.act": choice("new", 0.9), "context.thread": choice("t-1", 0.35)}),
+                              REL, asked=ASKED)
+    assert unsure["signals"]["context.thread"]["choice"] == "new" and unsure["uncertain_relations"]
+    kept = resolver.resolve(base(**{"context.act": choice("new", 0.35)}), REL, asked=ASKED)   # unsure subject yields
+    assert kept["signals"]["context.thread"]["choice"] == "t-1"
 
 
 def test_missing_and_uncertain_are_said_never_guessed():
