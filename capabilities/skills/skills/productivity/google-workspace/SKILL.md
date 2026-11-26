@@ -438,3 +438,25 @@ $GSETUP --revoke
      "open -a 'Brave Browser' '$AUTH_URL'"
    ```
    Then ask user to copy the redirect URL from their browser address bar.
+
+## Pièces jointes envoyées via le connecteur Gmail MCP (claude-desktop)
+- Toujours préparer un brouillon et attendre l'accord de Monsieur avant tout envoi (règle dans `/root/.claude/projects/-root/memory/outgoing-review-rule.md`). Cela vaut aussi pour un message correctif.
+- Le connecteur `reply`/`create_draft` exige que l'agent recopie lui-même l'image en base64 dans l'appel. Les longs passages répétitifs (zones unies) sont mal recopiés et l'image arrive grise ou tronquée. Il faut donc réduire l'image au strict nécessaire avant l'envoi.
+- Préparer l'image dans le scratchpad de la session :
+  - Recadrer sur la partie utile et retirer les grandes zones vides. Assembler plusieurs crops si besoin, avec `Image.new` puis `paste`.
+  - Passer en niveaux de gris : `convert('L')`.
+  - Redimensionner à environ 800-1000 px de large avec `LANCZOS`.
+  - Enregistrer en `quantize(8).save(x.png, optimize=True)` ou en JPEG `quality=45`.
+  - Viser un fichier de quelques Ko.
+  - Relire le résultat avec `Read` pour vérifier qu'il reste lisible.
+- Contrôler le base64 avant l'envoi :
+  - Mesurer la plus longue suite d'un même caractère : `max(len(m.group(0)) for m in re.finditer(r'(.)\1*', s))`.
+  - Compter les sous-chaînes de 16 caractères qui reviennent. Si ces deux valeurs sont élevées, recadrer davantage.
+  - Noter le `md5sum` du fichier local.
+- Vérifier après l'envoi :
+  - Lancer `download_gmail_attachment` avec le `messageId` du message envoyé et `attachmentIndex: 0`. Le fichier arrive dans `/root/.claude/projects/-root/<session>/tool-results/`.
+  - Comparer son md5 à celui du fichier local.
+  - L'ouvrir avec `PIL` puis `im.load()`. L'erreur `OSError: broken data stream` signifie que la pièce jointe est corrompue.
+- Ne jamais ouvrir directement une image corrompue avec `Read` : l'API la rejette (« image could not be processed »). La recharger d'abord avec `ImageFile.LOAD_TRUNCATED_IMAGES=True`, la sauver en PNG, puis la lire.
+- Ne pas contourner par l'API Gmail directe. Un script qui rafraîchit `/root/.hermes/google_token.json` pour envoyer depuis la VM est refusé par le classifieur auto-mode de Claude Code ([Unauthorized Access]). Ne pas réessayer par un autre biais.
+- En cas de corruption, le dire franchement à Monsieur. Lui proposer un court message correctif avec une capture vérifiée, ou qu'il l'envoie depuis son propre client.
