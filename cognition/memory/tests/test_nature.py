@@ -275,3 +275,21 @@ def test_retype_apply_records_an_attribute_change_the_history_accepts(monkeypatc
         allowed = conn.execute("select pg_get_constraintdef(oid) d from pg_constraint "
                                "where conname = 'derived_changes_op_check'").fetchone()["d"]
     assert f"'{ops[0][0]}'" in allowed
+
+
+def test_the_catchup_retypes_only_when_its_stage_is_active_and_no_provider_hold(monkeypatch):
+    """M5: the catch-up loop types what has no nature or portée yet, on the same poste as the messages — a real
+    provider limit (quota.gate) holds it too, nothing is called; a paused stage does nothing."""
+    from walter_memory import extract2, organic, quota
+    monkeypatch.setattr(extract2, "catchup_messages", lambda *a, **k: {})
+    mode = {"retype": "paused"}
+    monkeypatch.setattr(organic, "stage", lambda name: {"mode": mode.get(name, "paused"), "from": "stages"})
+    called = []
+    monkeypatch.setattr(nature, "retype", lambda limit, **kw: called.append(limit) or {"changed": 0})
+    hold = {"ok": True}
+    monkeypatch.setattr(quota, "gate", lambda *a, **k: hold)
+    assert "retyped" not in extract2.catchup(1, relate=5) and not called
+    mode["retype"] = "active"
+    assert extract2.catchup(1, relate=5)["retyped"] == {"changed": 0} and called == [5]
+    hold.update(ok=False, reason="limite réelle")
+    assert extract2.catchup(1, relate=5)["retyped"] == {"quota_stopped": "limite réelle"} and called == [5]

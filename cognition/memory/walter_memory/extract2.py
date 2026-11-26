@@ -1452,9 +1452,11 @@ def catchup(events: int = 120, *, workers: int = 2, dry: bool = False, chat=None
             out["reconciled"] = {"error": f"{type(e).__name__}: {e}"[:300]}
     # M5 (2026-11-25): what has no nature or portée yet is typed here, never left to a default (stage retype)
     if relate and not dry and organic.stage("retype")["mode"] == "active":
+        from . import quota
+        q = quota.gate()                 # the same poste as the messages: a real provider limit holds it too
         try:
             from . import nature
-            out["retyped"] = nature.retype(relate, apply=True)
+            out["retyped"] = nature.retype(relate, apply=True) if q["ok"] else {"quota_stopped": q.get("reason")}
         except Exception as e:  # noqa: BLE001 — the next run takes it up
             log.warning("retype failed: %s", e)
             out["retyped"] = {"error": f"{type(e).__name__}: {e}"[:300]}
