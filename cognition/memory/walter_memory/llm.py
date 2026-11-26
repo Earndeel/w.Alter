@@ -33,6 +33,13 @@ GATEWAY_URL = GATEWAY + "/v1/chat/completions"
 GATEWAY_TOKEN_PARTS = ("bootstrap", "walter-llm", "walter-memory.env")
 
 
+def _channel_headers() -> dict:
+    """A process run as a test (WALTER_RUN_CHANNEL=test: benches, judges, replays) labels its calls so; the gateway
+    then keeps production's reserve of subscription quota and OpenRouter credit, and counts them in the test budget
+    (owner, 2026-11-26). The label only ever tightens."""
+    return {"X-Walter-Channel": "test"} if os.environ.get("WALTER_RUN_CHANNEL") == "test" else {}
+
+
 class PrivacyRefused(PermissionError):
     pass
 
@@ -142,7 +149,7 @@ def chat(messages: list[dict], *, model: str | None = None, poste: str | None = 
         messages = red
     t0 = time.perf_counter()
     try:
-        headers = {"Authorization": f"Bearer {_gateway_token()}"}
+        headers = {"Authorization": f"Bearer {_gateway_token()}", **_channel_headers()}
         if poste:   # the router decides the reasoning level of the route
             params.pop("reasoning", None)
         else:       # a named model: exactly that one (Router-validated), the paid floor of this budget applies
@@ -202,7 +209,7 @@ class GatewayError(RuntimeError):
 def _structured(path: str, body: dict, timeout: float) -> dict:
     """POST to a structured gateway endpoint; GatewayError with the attempts on any refusal or failure."""
     try:
-        headers = {"Authorization": f"Bearer {_gateway_token()}"}
+        headers = {"Authorization": f"Bearer {_gateway_token()}", **_channel_headers()}
         if TRACE_RUN.get():
             headers["X-Walter-Trace-Run"] = str(TRACE_RUN.get())
         r = httpx.post(GATEWAY + path, headers=headers, json=body, timeout=timeout)
