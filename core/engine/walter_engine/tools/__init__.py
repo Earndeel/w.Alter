@@ -18,11 +18,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from .. import config
+
+log = logging.getLogger("walter_engine.tools")
 
 
 def capabilities():
@@ -66,6 +69,7 @@ class Tool:
     source: str = "engine"            # engine | mcp:walter
     hidden: bool = False              # reachable from Python only (not offered to the model)
     spec: dict | None = None          # capability declaration (lot 3e); None = undeclared (effectful, serial)
+    module: str | None = None         # the module that owns it (its contract declares it); engine tools: core
 
     def schema(self) -> dict:
         return {"type": "function", "function": {"name": self.name, "description": self.description,
@@ -116,36 +120,11 @@ NATIVE_SPECS = {
 }
 
 
-# French words of a discovery query → the English vocabulary the tools are described in (accents folded)
-_FR = {"fichier": "file", "dossier": "directory", "repertoire": "directory", "lire": "read", "ecrire": "write",
-       "modifier": "edit", "chercher": "search", "recherche": "search", "trouver": "find", "memoire": "memory",
-       "souvenir": "memory", "navigateur": "browser", "page": "web", "internet": "web", "commande": "command",
-       "executer": "run", "lancer": "run", "tache": "task", "travail": "job", "envoyer": "send", "message": "message",
-       "personne": "person", "contact": "person", "agenda": "calendar", "calendrier": "calendar", "image": "image",
-       "photo": "image", "secret": "secret", "mot": "password", "sous": "subagent", "agent": "agent",
-       "deleguer": "delegate", "competence": "skill", "journal": "log", "coffre": "vault", "son": "audio",
-       "vocal": "audio", "telegramme": "telegram", "courriel": "mail", "e-mail": "mail"}
-
-
-def _fold(text: str) -> str:
-    import unicodedata
-    return "".join(c for c in unicodedata.normalize("NFKD", str(text or "").lower()) if not unicodedata.combining(c))
-
-
-def _terms(query: str) -> list[tuple[str, ...]]:
-    """Each word of a query with what else it may be written as: its stem (plural, conjugation) and, for a French
-    word, the English word of the tool descriptions."""
-    out = []
-    for w in "".join(c if c.isalnum() or c in "_-" else " " for c in _fold(query)).split():
-        if len(w) < 2:
-            continue
-        alts = {w, w[:-1] if len(w) > 4 and w.endswith("s") else w}
-        stem = w.rstrip("s")
-        for fr, en in _FR.items():
-            if stem == fr or (len(stem) >= 5 and stem.startswith(fr[:5]) and len(fr) >= 5):
-                alts.add(en)
-        out.append(tuple(sorted(alts)))
-    return out
+def discovery():
+    """walter_platform.discovery (core's library): the one capability search, shared with every door."""
+    capabilities()                                       # puts the core library on the path
+    from walter_platform import discovery as d
+    return d
 
 
 class Registry:
@@ -155,14 +134,49 @@ class Registry:
         self.locks = capabilities().ResourceLocks()      # in-process: every agent, session and door of the engine
 
     def add(self, tool: Tool) -> None:
-        if tool.spec is None and tool.source == "engine":
-            tool.spec = NATIVE_SPECS.get(tool.name)
+        if tool.source == "engine":
+            if tool.spec is None:
+                tool.spec = NATIVE_SPECS.get(tool.name)
+            tool.module = tool.module or "core"
         self.tools[tool.name] = tool
 
     def spec(self, name: str) -> dict:
         t = self.tools.get(name)
         caps = capabilities()
         return {**caps.DEFAULT_SPEC, **(t.spec or {})} if t else dict(caps.DEFAULT_SPEC)
+
+    def _searchable(self) -> list[Tool]:
+        return [t for n, t in sorted(self.tools.items()) if n != "python"]
+
+    def _index(self):
+        """The search index over the current tools, rebuilt when a tool, its description, its declaration or the
+        generated intents change (cheap: ~25 ms for 60 tools)."""
+        d = discovery()
+        tools = self._searchable()
+        try:
+            stamp = d.cards_path().stat().st_mtime_ns
+        except OSError:
+            stamp = None
+        key = (stamp, tuple((t.name, t.description, t.module, json.dumps(t.spec, sort_keys=True, default=str))
+                            for t in tools))
+        cached = getattr(self, "_search_cache", None)
+        if cached and cached[0] == key:
+            return cached[1]
+        texts = getattr(self, "_module_texts", None)
+        if texts is None:
+            try:
+                texts = d.module_texts()
+            except Exception as e:  # noqa: BLE001 — discovery degrades to the tools' own text
+                log.warning("module presentations unreadable for discovery: %s", e)
+                texts = {}
+            self._module_texts = texts
+        idx = d.Index([self._entry(t) for t in tools], texts, d.load_intents())
+        self._search_cache = (key, idx)
+        return idx
+
+    def _entry(self, t: Tool) -> dict:
+        return {"name": t.name, "description": t.description, "parameters": t.parameters, "module": t.module,
+                "spec": {**capabilities().DEFAULT_SPEC, **(t.spec or {})}}
 
     def remove_source(self, source: str) -> None:
         for name in [n for n, t in self.tools.items() if t.source == source]:
@@ -175,25 +189,34 @@ class Registry:
         return sorted(self.tools)
 
     def search(self, query: str, limit: int = 8) -> list[dict]:
-        """Discovery for `await tools.search("…")`: words of the query (French or English, accents and plurals
-        ignored, a few French words also read as their English tool vocabulary) against names and descriptions."""
-        words = _terms(query)
-        scored = []
-        for t in self.tools.values():
-            if t.name == "python":
-                continue
-            n, d = _fold(t.name), _fold(t.description)
-            score = sum(max((3 if v in n else 0) + (1 if v in d else 0) for v in alts) for alts in words) if words else 1
-            if score > 0:
-                scored.append((-score, t.name, t.description[:240]))
-        scored.sort()
-        return [{"name": n, "description": d} for _, n, d in scored[: max(1, min(50, int(limit or 8)))]]
+        """Discovery for `await tools.search("…")`: BM25 over each tool's card, derived from its description, its
+        module's presentation, its declaration and the intents generated from them (walter_platform.discovery).
+        Each row: name, description, module, effects, score."""
+        return self._index().search(str(query or ""), limit)
 
     def describe(self, name: str) -> dict:
+        """A tool's whole contract: description, parameters, owner, effects, concurrency, references, returns."""
         t = self.tools.get(name)
         if not t:
             raise KeyError(f"no tool named {name}; await tools.search(\"…\")")
-        return {"name": t.name, "description": t.description, "parameters": t.parameters}
+        return capabilities().describe_record(t.name, t.description, t.parameters,
+                                              {**self.spec(name), "module": t.module})
+
+    def catalog(self, module: str = "") -> dict:
+        """Every tool reachable from Python, by owner, with its one-line summary and declared effects; the modules
+        with their D1 line. `module` keeps one owner."""
+        caps = capabilities()
+        rows = []
+        for t in self._searchable():
+            if module and t.module != module:
+                continue
+            spec = self.spec(t.name)
+            rows.append({"name": t.name, "module": t.module, "summary": caps.summary(t.description)[:240],
+                         "effects": spec.get("effects"), "concurrency": spec.get("concurrency"),
+                         "offered_to_model": not t.hidden})
+        mods = sorted({r["module"] for r in rows if r["module"]})
+        texts = getattr(self, "_module_texts", None) or {}
+        return {"tools": rows, "modules": [{"module": m, "summary": texts.get(f"{m}:d1", "")} for m in mods]}
 
 
 def parse_args(raw: Any) -> tuple[dict, str | None]:

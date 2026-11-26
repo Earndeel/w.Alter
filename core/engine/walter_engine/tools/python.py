@@ -38,7 +38,7 @@ DESCRIPTION = (
     "print() output is shown. Keep large data in variables instead of printing it. The kernel runs with the engine's "
     "rights: Walter's real directories, local services and databases, system commands (`await bash(\"cmd\")` → "
     ".stdout .stderr .code .ok), `pip install`. Every engine tool is reachable: `await tools.search(\"mémoire\")` finds "
-    "them, `await tools.describe(name)` gives their parameters, `await tools.<name>(**args)` runs one under the same "
+    "them, `await tools.describe(name)` gives their contract (parameters, owner, effects), `await tools.catalog()` lists them all by module, `await tools.<name>(**args)` runs one under the same "
     "policy as a direct call (Walter tools by their short name too, e.g. `await tools.memory_search(query=…)`); run "
     "independent calls together with `await asyncio.gather(...)`. Long work: `bash(\"cmd\", background=True)` or "
     "`spawn(coro, label)` start an engine job and return it at once (job.id for job_output / job_kill) — end your turn, "
@@ -228,6 +228,8 @@ class Kernel:
                 result = reg.search(params.get("query"), params.get("limit") or 8)
             elif method == "describe":
                 result = reg.describe(_resolve(reg, str(params.get("name") or "")))
+            elif method == "catalog":
+                result = reg.catalog(str(params.get("module") or ""))
             elif method == "tool":
                 name = _resolve(reg, str(params.get("name") or ""))
                 if name == "python":
@@ -443,6 +445,6 @@ class PythonHost:
     def tool(self) -> Tool:
         return Tool("python", DESCRIPTION, obj({
             "code": {"type": "string", "description": "Python code to run in the persistent kernel."},
-            "description": {"type": "string", "description": "A short label for what this code does (shown to Monsieur)."},
+            "description": {"type": "string", "description": "A short label for what this code does (shown to the owner)."},
             "timeout_s": {"type": "number", "description": "Seconds before the cell is interrupted (default 600)."}},
             ["code"]), self.run)

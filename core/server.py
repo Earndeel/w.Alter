@@ -158,7 +158,7 @@ def skills_index(domain: str = "", offset: int = 0, limit: int = 20, cursor: str
 
 @mcp.tool()
 def skills_search(query: str = "", limit: int = 8, context: str = "", include_archived: bool = False) -> str:
-    """Find the W.Alter skills (tested procedures for Monsieur's tools, infra, projects and workflows) that match an
+    """Find the W.Alter skills (tested procedures for the owner's tools, infra, projects and workflows) that match an
     intent. Pass the user's request as `query` (any language, plain words) and optionally the previous turn as
     `context`. Read the chosen skill with skill_read before acting. include_archived=True also searches retired
     skills (marked [archived])."""
@@ -186,7 +186,7 @@ def _skills_door(kind: str, body: dict) -> str:
 def skill_propose(name: str, skill_md: str, reason: str, files_json: str = "", domain: str = "",
                   session_id: str = "") -> str:
     """Propose a NEW W.Alter skill after solving a task that will recur (a procedure that took several steps, a fix
-    found the hard way, a workflow Monsieur asked for). skill_md = full SKILL.md with frontmatter (name: <name>,
+    found the hard way, a workflow the owner asked for). skill_md = full SKILL.md with frontmatter (name: <name>,
     description: one line starting with "Use when …"), then the procedure as imperative rules with exact commands,
     paths and checks. Never paste secrets: say where they live. files_json = optional JSON {"references/x.md": "…",
     "scripts/y.sh": "…"}. Goes to drafts; judged within a minute before it is live."""
@@ -353,7 +353,7 @@ def memory_view(key: str = "", query: str = "", depth: str = "overview", max_tok
     the owner's rules in force, dated states, goals by their evidence, states to re-check; key now = where, agenda,
     open work, the freshness of personal knowledge and why it is late, each with its freshness; key me = both,
     « où en suis-je »; key person:<name or id> = the relation with one person: who they are, what is known of the
-    relation by who says it (the person / Monsieur / the data / a hypothesis), recent changes, exchanges as measures,
+    relation by who says it (the person / the owner / the data / a hypothesis), recent changes, exchanges as measures,
     commitments, possible follow-ups (nothing is created), contexts, measured rhythm, replaced information; a name
     shared by several people lists them, never merged). Key
     derived:<id> (a memory_search `typed_ref`) reads one knowledge item with its evidence. Give `query` instead to
@@ -369,7 +369,7 @@ def memory_view(key: str = "", query: str = "", depth: str = "overview", max_tok
 @mcp.tool()
 def person_lookup(name: str) -> str:
     """Kardex social card for a person (name, alias, handle or phone): their accounts across networks, relationship
-    metrics with Monsieur (volume, who initiates, reply latencies, first/last contact), measured communication changes,
+    metrics with the owner (volume, who initiates, reply latencies, first/last contact), measured communication changes,
     what Kardex knows (respecting mention policies), shared groups, recent interactions, media counts.
     Only facts measured or stated with evidence; deviations are observations, never causes."""
     return _walter_memory("social", "person", name, "--cloud-safe", timeout=60)
@@ -404,8 +404,8 @@ def memory_events(text: str = "", source: str = "", event_type: str = "", thread
 @mcp.tool()
 def logs_search(query: str = "", runtime: str = "", event_type: str = "", tool: str = "", session: str = "",
                 since: str = "", until: str = "", limit: int = 20) -> str:
-    """walter-logs: search what Walter's agents DID in past sessions, any runtime (Hermes and its profiles, Claude
-    Code, Codex, DSH): user/assistant messages, reasoning, tool calls with their full arguments, tool results in full,
+    """walter-logs: search what Walter's agents DID in past sessions, any runtime (Walter Engine, Claude
+    Code, Codex; earlier Hermes and DSH sessions): user/assistant messages, reasoning, tool calls with their full arguments, tool results in full,
     compaction summaries. Words (full-text, accent-insensitive) or an exact string (paths, error messages, ids).
     Filters: runtime (hermes, claude_code, codex, dsh), event_type (user/message, assistant/message,
     assistant/reasoning, tool/call, tool/result, compaction/summary), tool (e.g. terminal, Bash, walter_route),
@@ -454,8 +454,8 @@ def logs_get(session: str = "", seq: int = -1, ref: str = "") -> str:
 @mcp.tool()
 def vault_search(text: str = "", kind: str = "", source: str = "", thread: str = "", event_id: str = "",
                  since: str = "", until: str = "", limit: int = 20) -> str:
-    """Search the Raw Vault: every raw file of the user's life that is not text (photos, screenshots, videos,
-    voice notes, documents). Matches file names and derived text (OCR/transcripts/captions); empty text lists
+    """Search the Raw Vault: every raw file of the user's life that is not text (photos, pictures, screenshots,
+    videos, voice notes, scanned or received documents: quotes, invoices, PDFs). Matches file names and derived text (OCR/transcripts/captions); empty text lists
     the newest permitted metadata. kind: image|screenshot|video|audio|document|archive. thread: the files of one
     conversation (a thread_id from memory_events), oldest first — « the voice notes of conversation X » =
     vault_search(kind="audio", thread=X); event_id: the files of one message. since/until: ISO dates (capture time).
@@ -494,8 +494,8 @@ def vault_put(path: str, source: str = "", captured_at: str = "", links: list[st
 
 @mcp.tool()
 def browser_session(site: str, session: str = "", verify: bool = True, engine: str = "camoufox") -> str:
-    """Open (or refresh) a Camoufox browser session logged in as Monsieur on a site (google, meta, linkedin, x…; see
-    browser_sites), so you can use a web interface on his behalf. His current Brave cookies are copied from his Mac,
+    """Open (or refresh) a Camoufox browser session logged in as the owner on a site (google, meta, linkedin, x…; see
+    browser_sites), so you can use a web interface on the owner's behalf. Their current Brave cookies are copied from his Mac,
     decrypted and injected server-side: only metadata comes back (cookie counts, authenticated yes/no), never a value.
     Then drive the browser with the Camoufox HTTP API on 127.0.0.1:9377 (/tab/new, /tab/navigate, /tab/snapshot,
     /tab/click, /tab/keyboard-type, /tab/fetch-binary, /tab/close) using userId = the returned session name.
@@ -520,10 +520,9 @@ def browser_sites() -> str:
 
 @mcp.tool()
 def walter_health() -> str:
-    """Status of the W.Alter stack: core services, Walter Engine and its Telegram door, deploy freshness (services
+    """Is everything working? Status and health of the W.Alter stack: core services, Walter Engine and its Telegram door, deploy freshness (services
     running code older than the code on disk), context preflight (health, plans decided without their model in the
-    last 30 min), Walter Memory model-call failures per processor, memory health score, model router, disk.
-    (Hermes retired 2026-11-10: no longer checked.)"""
+    last 30 min), Walter Memory model-call failures per processor, memory health score, model router, disk."""
     out = []
     units = _stack_units()
     states = subprocess.run(["systemctl", "is-active", *units], capture_output=True, text=True).stdout.split()

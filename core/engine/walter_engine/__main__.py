@@ -126,6 +126,70 @@ def import_dsh(settings: config.Settings, args) -> int:
     return 0 if not rep["errors"] else 1
 
 
+async def _tool_registry(settings: config.Settings, *, with_mcp: bool = True):
+    """The tools the engine would offer: its own, then the Walter MCP server's (spawned for this command only)."""
+    from .tools import Registry, agents, builtin
+    from .tools.mcp import McpClient
+    reg = Registry()
+    builtin.register(reg)
+    agents.register(reg)
+    client = McpClient(settings, reg) if with_mcp else None
+    if client:
+        await client.start()
+    return reg, client
+
+
+def _ask_poste(settings: config.Settings, poste: str, prompt: str, timeout: float = 600) -> str:
+    """One model call on a Walter Router poste (the Router picks the model) through walter-llm, under the engine's
+    token. A run of channel test (WALTER_RUN_CHANNEL=test) is declared as such and counts in the test budget."""
+    import httpx
+    headers = {"Authorization": f"Bearer {config.env_value(settings.llm_env_file, 'WALTER_LLM_TOKEN')}"}
+    if os.environ.get("WALTER_RUN_CHANNEL") == "test":
+        headers["X-Walter-Channel"] = "test"
+    r = httpx.post(config.LLM_URL + "/v1/chat/completions", headers=headers, timeout=timeout,
+                   json={"model": poste, "messages": [{"role": "user", "content": prompt}]})
+    r.raise_for_status()
+    return ((r.json().get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+
+
+def capabilities_cmd(settings: config.Settings, args) -> int:
+    """Catalogue, search, contracts and search intents of the tools, as the engine sees them (lot 3e step 3)."""
+    from .tools import discovery
+
+    async def go():
+        reg, client = await _tool_registry(settings)
+        try:
+            if args.action == "list":
+                return reg.catalog(args.module or "")
+            if args.action == "search":
+                return reg.search(args.query or "", args.limit)
+            if args.action == "describe":
+                name = args.query if args.query in reg.tools else "mcp__walter__" + str(args.query)
+                return reg.describe(name)
+            d = discovery()
+            tools = [reg._entry(t) for t in reg._searchable()]
+            cards = Path(args.cards) if args.cards else None
+            intents = d.load_intents(cards)
+            todo = d.stale(tools, intents)
+            if args.action == "stale" or args.dry_run:
+                return {"tools": len(tools), "stale": todo, "cards": str(cards or d.cards_path())}
+            wanted = [t for t in tools if t["name"].removeprefix("mcp__walter__") in set(todo)][: args.limit or None]
+            fresh = {}
+            for i in range(0, len(wanted), 20):          # one call per 20 tools: answers stay well-formed
+                batch = wanted[i:i + 20]
+                fresh.update(d.parse_generated(_ask_poste(settings, args.poste, d.generation_prompt(batch)), batch))
+            keep = {t["name"].removeprefix("mcp__walter__") for t in tools}
+            path = d.save_intents(fresh, cards, keep=keep)
+            return {"generated": sorted(fresh), "missing": sorted(set(t["name"].removeprefix("mcp__walter__")
+                                                                      for t in wanted) - set(fresh)),
+                    "stale_left": d.stale(tools, d.load_intents(cards)), "cards": str(path), "poste": args.poste}
+        finally:
+            if client:
+                await client.close()
+    print(json.dumps(asyncio.run(go()), ensure_ascii=False, indent=1, default=str))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="walter-engine")
     p.add_argument("--state", help="engine state directory (default: @instance/state/core/engine/native)")
@@ -138,6 +202,14 @@ def main(argv: list[str] | None = None) -> int:
     imp.add_argument("--bindings", help="bindings file to read and complete (default: the engine's API state)")
     imp.add_argument("--only", help="comma-separated DSH session ids")
     imp.add_argument("--no-secret", action="store_true")
+    cap = sub.add_parser("capabilities", help="tool catalogue, search, contracts, search intents (lot 3e)")
+    cap.add_argument("action", choices=["list", "search", "describe", "stale", "refresh-cards"])
+    cap.add_argument("query", nargs="?", default="")
+    cap.add_argument("--module", default="")
+    cap.add_argument("--limit", type=int, default=8)
+    cap.add_argument("--poste", default="general/L1", help="Walter Router poste that writes the intents")
+    cap.add_argument("--dry-run", action="store_true")
+    cap.add_argument("--cards", default="", help="intents file (default: @instance/state/core/capabilities/cards.json)")
     args = p.parse_args(argv)
     _logging(args.log_level)
     settings = config.load(Path(args.state) if args.state else None)
@@ -145,6 +217,8 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(serve(settings))
     if args.cmd == "check":
         return check(settings)
+    if args.cmd == "capabilities":
+        return capabilities_cmd(settings, args)
     return import_dsh(settings, args)
 
 

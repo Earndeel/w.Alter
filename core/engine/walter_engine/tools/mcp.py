@@ -98,7 +98,8 @@ class McpClient:
             spec = {k: v for k, v in d.items() if k not in ("module", "declared")} if d and d.get("declared") else None
             parallel = spec["concurrency"] == "parallel" if spec else _read_only(name)
             self.registry.add(Tool(PREFIX + name, str(t.get("description") or "")[:4000], schema,
-                                   self._runner(name), parallel=parallel, source="mcp:walter", hidden=hidden, spec=spec))
+                                   self._runner(name), parallel=parallel, source="mcp:walter", hidden=hidden, spec=spec,
+                                   module=(d or {}).get("module")))
             if d:
                 self.owners[name] = d.get("module")
         if hidden_names:

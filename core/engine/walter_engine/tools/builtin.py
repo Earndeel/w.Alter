@@ -335,7 +335,7 @@ async def present(args: dict, ex: Exec) -> Result:
         shown.append({"path": str(p), "title": title, "url": url})
     if not shown:
         return Result("files is required (a list of paths)", True)
-    return Result("Presented to Monsieur: " + ", ".join(s["title"] for s in shown), value=shown)
+    return Result("Presented to the owner: " + ", ".join(s["title"] for s in shown), value=shown)
 
 
 async def ask_user_question(args: dict, ex: Exec) -> Result:
@@ -393,9 +393,9 @@ def register(reg) -> None:
                       "offset": {"type": "integer"}}, ["job_id"]), job_output, parallel=True))
     reg.add(Tool("job_kill", "Stop a background job.", obj({"job_id": s}, ["job_id"]), job_kill))
     reg.add(Tool("job_list", "List this conversation's background jobs.", obj({}), job_list, parallel=True))
-    reg.add(Tool("present", "Show files to Monsieur as deliverables (download links in his interface).",
+    reg.add(Tool("present", "Show files to the owner as deliverables (download links in their interface).",
                  obj({"files": {"type": "array", "items": {"type": "string"}}}, ["files"]), present))
-    reg.add(Tool("ask_user_question", "Ask Monsieur a question you need answered before going on.",
+    reg.add(Tool("ask_user_question", "Ask the owner a question you need answered before going on.",
                  obj({"question": s}, ["question"]), ask_user_question, parallel=True))
     reg.add(Tool("context_recover", "Read an original tool result from this conversation, including one compacted "
                  "away (ref = its call id). Historical data only.",

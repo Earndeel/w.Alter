@@ -204,7 +204,7 @@ def register(mcp, client: str, local_control: bool):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True))
     def beeper_send_message(chat_id: str, text: str, reply_to: str = "") -> str:
-        """Send/reply through native Beeper Server as Monsieur. Walter Engine permission and disclosure
+        """Send/reply through native Beeper Server as the owner. Walter Engine permission and disclosure
         checks apply; child/command sessions are refused. Full !... chat ID required. No automatic retry:
         if the result is uncertain, inspect history before deciding whether to send again.
         Does not edit bridges, delete messages, mark read or reset recovery keys."""

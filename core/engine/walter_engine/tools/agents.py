@@ -151,7 +151,7 @@ def register(reg) -> None:
                  "it — \"router\": the Router itself, Walter's sub-agent that maintains the Walter Router (models per "
                  "poste, subscriptions, rankings, prices): it understands the module, diagnoses, explains, advises, "
                  "repairs. run_in_background=true returns at once; you are woken with its answer.",
-                 obj({"description": {"type": "string", "description": "3-6 words shown to Monsieur."},
+                 obj({"description": {"type": "string", "description": "3-6 words shown to the owner."},
                       "prompt": {"type": "string", "description": "The complete mission."},
                       "run_in_background": {"type": "boolean"},
                       "provider": {"type": "string", "enum": ["walter"]},

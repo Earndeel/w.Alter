@@ -157,7 +157,7 @@ def register(mcp,client='unknown',*,local_control=True):
     def secret_reference(item: str,field: str) -> str:
         """Return a Walter Secret reference for an entry and field, without disclosing its value.
         References are identifiers, not authorization tokens. Bind locally with walter-secret exec;
-        do not attempt Hermes placeholder substitution in another harness."""
+        never substitute a placeholder yourself."""
         try:return json.dumps(_module('secrets','walter_secrets.service').reference(item,field),ensure_ascii=False)
         except Exception as exc:return _error('secrets',exc)
 
@@ -165,8 +165,8 @@ def register(mcp,client='unknown',*,local_control=True):
     async def walter_browse(query: str='',url: str='',objective: str='',expected_fields: dict|None=None,
                            required_fields: list[str]|None=None,content_only: bool=False,profile: str='',
                            capability: str='',session_id: str='',min_records: int=1,mode: str='auto') -> str:
-        """Walter's shared web search and extraction engine, also used by Hermes. Supply query OR public URL.
-        For URL reading set content_only=true; structured extraction uses expected_fields aliases and
+        """Look something up on the web: search the internet (query) or read a public page (url) — opening hours,
+        prices, news, documentation, any public fact. Supply query OR public URL. For URL reading set content_only=true; structured extraction uses expected_fields aliases and
         required_fields. Internal engine selection stays in Walter. Authenticated interaction uses browser_session."""
         args=dict(query=query or None,url=url or None,objective=objective,expected_fields=expected_fields,
                   required_fields=required_fields or [],content_only=content_only,profile=profile or None,
@@ -174,7 +174,7 @@ def register(mcp,client='unknown',*,local_control=True):
         try:return await _module('browse','walter_browse').browse(args)
         except Exception as exc:return _error('browse',exc)
 
-    # Walter Router: the same tools as the Hermes plugin, same names; every decision and every run is the router's
+    # Walter Router: the same tools on every door, same names; every decision and every run is the router's
     # (`walter-router route | run | ask | plans`). What they can do is the router's brief, in the server instructions.
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
     def walter_route(request: str='',task: str='',level: str='',model: str='',provider: str='',require: str='',
@@ -200,7 +200,8 @@ def register(mcp,client='unknown',*,local_control=True):
         skills, memory); context = anything more it needs. constraints = {"geo": {"zone", "pays", "devise", "langue"},
         …} for local research; output_schema = the JSON its answer must follow; persist="observations" stores each
         item of its answer's "observations" list as a sourced observation of the current run. IMAGE / VIDEO / MUSIC
-        / VOICE: generated, files returned — COSTS MONEY, only when the user asked. Your own model stays yours."""
+        / VOICE: generate a picture, poster, illustration, video, song or spoken audio — files returned — COSTS
+        MONEY, only when the user asked. Your own model stays yours."""
         spec={k:v for k,v in dict(request=request,goal=goal,context=context,task=task,level=level,model=model,
               provider=provider,require=require,conversation=conversation,toolsets=toolsets,max_turns=max_turns,
               budget_seconds=budget_seconds,role=role,image_urls=image_urls,aspect_ratio=aspect_ratio,duration=duration,
@@ -279,7 +280,7 @@ def register(mcp,client='unknown',*,local_control=True):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False,destructiveHint=True))
     async def computer_use(session_id: str,action: str,arguments: dict|None=None):
-        """Call Walter Computer Use directly without delegating to Hermes. Atomic actions: list_apps,
+        """Control the owner's computer (the Mac): see the screen and use its apps. Atomic actions: list_apps,
         list_windows, device_context, capture, click, type, key, scroll, drag, set_value, focus_app,
         launch_app, open_url, click_visual_ref, targeted_verify, wait, close. Capture an exact app
         before input; close when done. Host approvals and user task authorization apply to input/pixels.

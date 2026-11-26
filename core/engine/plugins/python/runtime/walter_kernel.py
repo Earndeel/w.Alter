@@ -23,7 +23,7 @@ Kernel → host:
   {"event":"out","id":ID|null,"job":JID|null,"stream":"stdout"|"stderr","text":str}
   {"event":"result","id":ID,"text":str}
   {"event":"done","id":ID,"status":"ok"|"error"|"interrupted","error":{...}?,"names":[...]?,"jobs":[...]?}
-  {"event":"host","id":HID,"cell":ID|null,"job":JID|null,"method":"tool"|"search"|"describe","params":{...}}
+  {"event":"host","id":HID,"cell":ID|null,"job":JID|null,"method":"tool"|"search"|"describe"|"catalog","params":{...}}
   {"event":"host_cancel","id":HID}
   {"event":"job","job":JID,"state":"start"|"completed"|"failed"|"killed","label":str,"result":str?}
 """
@@ -147,7 +147,7 @@ async def host(method: str, params: dict) -> Any:
 
 class Tools:
     """The engine's tools, from Python. `await tools.search("mémoire")` finds them, `await tools.describe(name)` gives
-    a tool's parameters, `await tools.<name>(**args)` or `await tools.call(name, **args)` runs one."""
+    a tool's contract (parameters, owner, effects, concurrency), `await tools.catalog()` lists them by module, `await tools.<name>(**args)` or `await tools.call(name, **args)` runs one."""
 
     def __init__(self) -> None:
         self._names: list[str] = []
@@ -160,6 +160,10 @@ class Tools:
 
     async def describe(self, name: str) -> dict:
         return await host("describe", {"name": str(name)})
+
+    async def catalog(self, module: str = "") -> dict:
+        """Every tool by owner module (summary, effects, concurrency) and the modules' D1 lines."""
+        return await host("catalog", {"module": str(module or "")})
 
     async def call(self, name: str, /, **arguments: Any) -> Any:
         return await host("tool", {"name": str(name), "arguments": arguments})
@@ -174,7 +178,7 @@ class Tools:
         return bound
 
     def __dir__(self):
-        return sorted(set(self._names) | {"search", "describe", "call", "names"})
+        return sorted(set(self._names) | {"search", "describe", "catalog", "call", "names"})
 
     def __repr__(self) -> str:
         return f"<{len(self._names)} engine tools — await tools.search('…'), await tools.<name>(**args)>"
