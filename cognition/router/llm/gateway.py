@@ -255,6 +255,28 @@ def test_reserve(route: dict) -> str | None:
     return None
 
 
+def exact_test_reserve(route: dict) -> str | None:
+    """test_reserve for a test call that names its route (walter-llm call: benches and judges, 26/11: the reserve held
+    for routed calls only, a bench judging on a named subscription could use it up). The named route carries no meter:
+    the Router's own state of that model on that provider gives it — the named account, else the gateway's default one
+    (claude_accounts), the one provider_completion would use. A route the Router does not list is not served here: a
+    Router that cannot be read refuses the test call (production's quota first)."""
+    task = exact_task({"model": route.get("model"), "provider": route.get("provider")})
+    if task is None:
+        return "test_reserve:meter_unknown"
+    try:
+        d = _refresh(task)
+    except Exception:  # noqa: BLE001 — no meter, no test call on a subscription
+        return "test_reserve:meter_unknown"
+    account = route.get("account")
+    if route.get("provider") == "claude-pro" and not account:
+        account = next(iter(claude_accounts(dict(_CONF.get("claude_subscription") or {}))))
+    for r in d.get("execution") or []:
+        if r.get("provider") == route.get("provider") and (r.get("account") or None) == (account or None):
+            return test_reserve(r)
+    return "test_reserve:meter_unknown"
+
+
 def test_hold(route: dict) -> None:
     """A test call met this subscription's real limit: tests leave it for `limit_hold_minutes`."""
     _test_holds[_sub_key(route)] = time.time() + float(TEST_BUDGET["limit_hold_minutes"]) * 60
@@ -874,6 +896,10 @@ async def exact_call(spec: dict) -> dict:
             refused = test_gate(route, spec)
             if refused:
                 return {"ok": False, "error": "test_budget", "detail": refused}
+        if test and provider not in PAID:        # a subscription: production's reserve first (TEST_BUDGET)
+            reserved = exact_test_reserve(route)
+            if reserved:
+                return {"ok": False, "error": "test_budget", "detail": reserved}
         if provider == "codex":
             _install_codex_auth()
         target = litellm_target(route)

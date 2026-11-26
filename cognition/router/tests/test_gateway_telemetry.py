@@ -26,7 +26,7 @@ def gateway(tmp_path, monkeypatch):
     source=Path(__file__).resolve().parents[1]/'llm'/'gateway.py'
     tree=ast.parse(source.read_text())
     names={'_usage','_number','_telemetry','_uuid','_dsh_session','_correlation','_channel','_session_run','_run_metadata','_record_attempt','exact_call','log','build_app',
-           'start_completion','_rate_limited','_charge','_price_usd','_priced','test_budget','test_gate','_ledger','_ledger_add','approve_tests','test_reserve','test_hold','_sub_key',
+           'start_completion','_rate_limited','_charge','_price_usd','_priced','test_budget','test_gate','_ledger','_ledger_add','approve_tests','test_reserve','exact_test_reserve','claude_accounts','test_hold','_sub_key',
            'planned_task','exact_task','owner_tasks','rule_answer','_text_parts','_rule_completion','_rule_stream','_rule_routing',
            'route_state','selection_plan','selection_check','log_selection','cost_headers','request_needs','decision_needs'}
     nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name in names]
@@ -602,6 +602,37 @@ def test_a_declared_test_leaves_production_its_subscription_reserve(tmp_path,mon
     assert 'channel' not in logs[-1]
     # any other value of the label is not read
     assert post(app,{'model':'coding','messages':[]},{'X-Walter-Channel':'owner'}).status_code==200 and used[-1]=='claude-pro'
+
+
+def test_a_test_naming_its_subscription_route_leaves_production_its_reserve(tmp_path,monkeypatch):
+    # owner 2026-11-26: walter-llm call (benches, judges) names its route; the reserve holds there too, read from the
+    # Router's state of that model, account by account (the default one when none is named)
+    ns=gateway(tmp_path,monkeypatch);used=[]
+    async def complete(route,**kw):
+        used.append(route.get('account'))
+        return SimpleNamespace(usage={'prompt_tokens':10,'completion_tokens':1},_hidden_params={},model='m',
+                               choices=[SimpleNamespace(message=SimpleNamespace(model_dump=lambda **k:{'content':'ok'}))])
+    meters={'anthropic-pro':(74.0,71.0),'anthropic-pro-2':(0.0,0.0)}
+    asked=[]
+    def refresh(task):
+        asked.append(task)
+        return {'execution':[{'provider':'claude-pro','model':'m','account':a,'access':'subscription',
+                              'subscription':{'quota_used_percent':w,'session_used_percent':s}} for a,(w,s) in meters.items()]}
+    ns.update(provider_completion=complete,_refresh=refresh,
+              _CONF={'claude_subscription':{'accounts':{'anthropic-pro':'g1','anthropic-pro-2':'g2'}}})
+    call=lambda route:asyncio.run(ns['exact_call']({'route':route,'messages':[]}))
+    monkeypatch.setenv('WALTER_RUN_CHANNEL','test')
+    out=call({'provider':'claude-pro','model':'m'})                       # default account: session at 71 % ≥ 70 %
+    assert out=={'ok':False,'error':'test_budget','detail':'test_reserve:session_quota'} and used==[]
+    assert asked==['exact:m@claude-pro']
+    out=call({'provider':'claude-pro','model':'m','account':'anthropic-pro-2'})
+    assert out.get('error')!='test_budget' and used==['anthropic-pro-2']
+    ns['_refresh']=lambda task:(_ for _ in ()).throw(RuntimeError('router down'))
+    assert call({'provider':'claude-pro','model':'m','account':'anthropic-pro-2'})['detail']=='test_reserve:meter_unknown'
+    monkeypatch.delenv('WALTER_RUN_CHANNEL')
+    meters['anthropic-pro']=(99.0,99.0);ns['_refresh']=refresh;before=len(asked)
+    call({'provider':'claude-pro','model':'m'})                            # production: no reserve, never asked
+    assert used[-1] is None and len(asked)==before
 
 
 def test_a_test_that_meets_a_real_limit_leaves_the_subscription_for_a_while(tmp_path,monkeypatch):
