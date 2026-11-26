@@ -508,7 +508,8 @@ def _universal_items(conn) -> list[dict]:
     if not ids:
         return []
     return conn.execute("""
-        select item_id::text as id, kind, content, stage, scope, epistemic, valid_from, created_at, privacy_class
+        select item_id::text as id, kind, content, stage, scope, epistemic, valid_from, created_at, privacy_class,
+               attributes->'replacement_refused' as refused
         from core.derived_items where item_id = any(%s::uuid[]) and status in ('derived','verified')
           and privacy_class = 'cloud_allowed' order by coalesce(valid_from, created_at)""", (ids,)).fetchall()
 
@@ -570,6 +571,8 @@ def reconsolidate_universal(*, chat=None, apply: bool | None = None) -> dict:
     for s in data.get("supersede") or []:
         old, new = short.get(str(s.get("old"))), short.get(str(s.get("new")))
         if old and new and old is not new and when(new) >= when(old) and (new["epistemic"] or "stated_owner") == "stated_owner":
+            if any(isinstance(r, dict) and r.get("by") == new["id"] for r in old.get("refused") or []):
+                continue                 # the owner refused this very replacement (owner_universal): never proposed again
             ok["supersede"].append({"old": old["id"], "new": new["id"], "why": str(s.get("why", ""))[:300]})
     for r in data.get("reach") or []:
         it = short.get(str(r.get("id")))
@@ -602,6 +605,82 @@ def reconsolidate_universal(*, chat=None, apply: bool | None = None) -> dict:
                                   'at', now())) where item_id = %s and status in ('derived','verified')""",
                              (r["reach"], r["on"], r["why"], r["id"]))
     return {"proposals": ok, "withheld": held, "applied": apply, "items": len(items), "model": model}
+
+def owner_universal(decisions: dict, *, evidence: list[str], decided_by: str, tag: str, apply: bool = False) -> dict:
+    """The owner's decision on the reconsolidation of the universal consignes (owner 2026-11-26: « Conserve toutes les
+    sources, les nuances pertinentes et l'historique des consignes consolidées »), through the knowledge gate (one
+    transaction, every change in core.derived_changes under `tag`: knowledge.revert(tag) undoes it).
+      keep  [{"keep": id, "drop": [ids], "how": "merged"|"replaced", "content"?: str, "reach"?: str, "reach_on"?: str,
+              "why": str}]: each dropped consigne ends (superseded_by the kept one, link « supersedes »); the kept one
+              gains their sources and the owner's message (evidence), and lists them in attributes.consolidated_from
+              (id, date, text: the nuances stay readable); a new text or portée is the owner's, its former value stays
+              in the change's « before ».
+      refuse [{"old": id, "new": id, "why": str}]: the replacement is refused; marked on the old consigne
+              (attributes.replacement_refused) so reconsolidate_universal never proposes it again.
+    Dry run unless apply."""
+    from . import nature, search
+    from .knowledge import Gate
+    keep, refuse = decisions.get("keep") or [], decisions.get("refuse") or []
+    ids = sorted({x for k in keep for x in [k["keep"], *k["drop"]]} | {x for r in refuse for x in (r["old"], r["new"])})
+    out = {"keep": len(keep), "dropped": sum(len(k["drop"]) for k in keep), "refused": len(refuse), "applied": apply,
+           "tag": tag}
+    with connection() as conn:
+        rows = {r["id"]: r for r in conn.execute(
+            """select item_id::text as id, content, status, attributes, source_event_ids, valid_from, created_at
+               from core.derived_items where item_id = any(%s::uuid[])""", (ids,)).fetchall()}
+        missing = [i for i in ids if i not in rows or rows[i]["status"] not in ("derived", "verified")]
+        if missing:
+            return {**out, "error": "not in force", "ids": missing}
+        for k in keep:
+            if k.get("reach") and k["reach"] not in nature.REACHES:
+                return {**out, "error": "unknown reach", "reach": k["reach"]}
+        if not apply:
+            return out
+        gate = Gate(conn, generation="g1", tag=tag, segment=None)
+        at = _now().isoformat()
+        for k in keep:
+            kept = rows[k["keep"]]
+            attrs = dict(kept["attributes"] or {})
+            attrs["consolidated_from"] = [*(attrs.get("consolidated_from") or []), *[
+                {"id": d, "how": k.get("how", "merged"), "date": f"{(rows[d]['valid_from'] or rows[d]['created_at']):%Y-%m-%d}",
+                 "text": rows[d]["content"]} for d in k["drop"]]]
+            attrs["consolidation"] = {"by": decided_by, "at": at, "why": k.get("why", "")[:300]}
+            if k.get("reach"):
+                attrs["reach"] = k["reach"]
+                if k.get("reach_on"):
+                    attrs["reach_on"] = k["reach_on"][:120]
+                else:
+                    attrs.pop("reach_on", None)
+                attrs["reach_changed_at"] = at
+            fields = {"attributes": attrs}
+            if k.get("content"):
+                fields["content"] = k["content"]
+            srcs = sorted({str(e) for d in k["drop"] for e in rows[d]["source_event_ids"] or []}
+                          - {str(e) for e in kept["source_event_ids"] or []})
+            gate.change(k["keep"], fields, op="reconcile", key=f"{tag}:keep:{k['keep']}", verdict="enriches",
+                        decided_by=decided_by, evidence=[*srcs, *evidence], reason=k.get("why"))
+            for d in k["drop"]:
+                da = {**(rows[d]["attributes"] or {}), "superseded_by": k["keep"], "how": k.get("how", "merged")}
+                gate.change(d, {"status": "superseded", "valid_to": _now(), "attributes": da}, op="supersede",
+                            key=f"{tag}:drop:{d}", verdict="replaces", decided_by=decided_by,
+                            links=[(k["keep"], d, "supersedes")], reason=k.get("why"))
+        for r in refuse:
+            ra = dict(rows[r["old"]]["attributes"] or {})
+            ra["replacement_refused"] = [*(ra.get("replacement_refused") or []),
+                                         {"by": r["new"], "why": r.get("why", "")[:300], "at": at, "decided_by": decided_by}]
+            gate.change(r["old"], {"attributes": ra}, op="attribute", key=f"{tag}:refuse:{r['old']}:{r['new']}",
+                        verdict=None, decided_by=decided_by, reason=r.get("why"))
+        conn.execute("insert into views.ledger (view_key, action, detail) values (%s, %s, %s)",
+                     (UNIVERSAL_KEY, "reconsolidate.owner_applied",
+                      json.dumps({"decisions": decisions, "tag": tag, "decided_by": decided_by, "evidence": evidence},
+                                 ensure_ascii=False)))
+        changed = sorted(set(gate.changed))
+    try:
+        search.reindex_derived(changed)
+    except Exception as e:  # noqa: BLE001
+        log.warning("reindex after owner_universal failed: %s", e)
+    return {**out, "changed": len(changed)}
+
 
 def _safe(ok: dict, by_id: dict) -> tuple[dict, dict]:
     """What may be applied without the owner: merges of strict duplicates only (same kind and scope, close meaning,

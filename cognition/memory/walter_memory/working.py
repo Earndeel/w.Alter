@@ -525,7 +525,7 @@ def owner_rules(query: str = "", *, audience: str = "cloud_model", budget: int =
 
 
 def _applicable_rules(query: str, *, audience: str, budget: int, exclude: set[str], limit: int,
-                      exclude_universal: bool = False) -> dict:
+                      exclude_universal: bool = False, full: bool = False) -> dict:
     """M3 (owner 2026-11-25): what the owner said durably, sorted by its nature and its portée (walter_memory.nature).
     - "text": the consignes (nature instruction) that APPLY to this message (nature.applicable: universal ones always;
       a project, domain, person or situation one only when the message is about it; a task one never — the thread's
@@ -616,7 +616,8 @@ def _applicable_rules(query: str, *, audience: str, budget: int, exclude: set[st
         for i in items:
             where = "" if i["reach"] in (None, "universal") else \
                 f" [{nature.REACHES[i['reach']][1]}{' : ' + i['reach_on'] if i.get('reach_on') else ''}]"
-            line = f"- {_compact(i['text'], i['id'])}{where} ({i['at']:%d/%m/%Y})" + \
+            body = " ".join(i["text"].split()) if full else _compact(i["text"], i["id"])   # full: the stable block
+            line = f"- {body}{where} ({i['at']:%d/%m/%Y})" + \
                 (f" [peut-être remplacé par {i['replaced'][:8]}, à confirmer]" if i.get("replaced") else "")
             if used + _tok(line) > room:
                 continue
@@ -651,7 +652,9 @@ def universal_consignes(audience: str = "cloud_model") -> dict:
     lost when the instruction that covered it changes. `sha` changes with the block; `epoch` is the last time a
     consigne or preference stopped being in force or changed its portée (old packs older than it may be stale)."""
     import hashlib
-    r = _applicable_rules("", audience=audience, budget=10 ** 6, exclude=set(), limit=10 ** 4)
+    # full text (owner 2026-11-26, « vérifie le bloc stable généré »): the block is cached once, nothing justifies the
+    # compact form of a pack, which cut a consigne's own conditions (tables « selon le sujet et l'interface »)
+    r = _applicable_rules("", audience=audience, budget=10 ** 6, exclude=set(), limit=10 ** 4, full=True)
     lines = [x for x in (r.get("text") or "").splitlines() if x.startswith("- ")]
     ids = r.get("consignes") or []
     with connection() as conn:

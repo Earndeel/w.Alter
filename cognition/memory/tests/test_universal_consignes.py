@@ -49,3 +49,20 @@ def test_an_empty_answer_is_a_failure_not_nothing_to_propose(scripted):
     with pytest.raises(RuntimeError):
         consolidate.reconsolidate_universal(chat=lambda messages, **kw: {"model": "scripted", "content": ""},
                                             apply=False)
+
+
+def test_a_replacement_the_owner_refused_is_never_proposed_again(scripted):
+    a, b, c = (i["id"][:8] for i in scripted)
+    scripted[0]["refused"] = [{"by": scripted[1]["id"], "why": "complémentaires"}]
+
+    def chat(messages, **kw):
+        return {"model": "scripted", "content": json.dumps({
+            "supersede": [{"old": a, "new": b, "why": "x"}, {"old": a, "new": c, "why": "y"}]})}
+    p = consolidate.reconsolidate_universal(chat=chat, apply=False)["proposals"]
+    assert p["supersede"] == [{"old": scripted[0]["id"], "new": scripted[2]["id"], "why": "y"}]
+
+
+def test_owner_decision_refuses_items_not_in_force_and_is_a_dry_run_by_default():
+    r = consolidate.owner_universal({"keep": [{"keep": str(uuid.uuid4()), "drop": [str(uuid.uuid4())]}]},
+                                    evidence=[], decided_by="test", tag="test-owner-universal")
+    assert r["error"] == "not in force" and r["applied"] is False

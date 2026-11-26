@@ -322,6 +322,16 @@ def test_universal_block_holds_every_universal_consigne_and_only_them(monkeypatc
     assert u["sha"] and u["title"].startswith("Consignes universelles") and all("covered_by" in i for i in u["items"])
 
 
+def test_universal_block_gives_each_consigne_in_full_the_pack_its_compact_form(monkeypatch, stored):
+    """26/11: the block is cached once; the compact form of a pack cut a consigne's own conditions."""
+    tag, s = stored
+    _mode(monkeypatch, "applicable")
+    monkeypatch.setattr(working, "ITEM_CHARS", 12)
+    full = [i["line"] for i in working.universal_consignes()["items"]]
+    assert any(s["univ"] in x for x in full)
+    assert s["univ"] not in working.owner_rules("", budget=5000)["text"]     # a pack: compact, cut marked
+
+
 def test_pack_title_says_the_universal_consignes_are_in_the_instructions(monkeypatch, stored):
     from walter_memory import context as ctx
     tag, s = stored
