@@ -1423,6 +1423,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--search", default=None,
                         help="Web search query (lite path: no browser, no LLM; results as links+snippets)")
     parser.add_argument("--search-count", type=int, default=5, help="Max search results (1-8)")
+    parser.add_argument("--search-backend", choices=("auto", "parallel", "brave", "ddg"),
+                        default=os.environ.get("WALTER_BROWSE_SEARCH_BACKEND", "auto"),
+                        help="search-lite backend (auto = Brave then DuckDuckGo; parallel = trial)")
     return parser
 
 
@@ -1497,7 +1500,7 @@ async def _run_cli(args: argparse.Namespace) -> int:
         # lightest route. No LLM, no browser, ~1s.
         from search_lite import search_lite
 
-        payload = search_lite(args.search, count=max(1, min(args.search_count, 8)))
+        payload = search_lite(args.search, count=max(1, min(args.search_count, 8)), backend=args.search_backend)
         print(json.dumps(payload, ensure_ascii=False, indent=2 if args.pretty else None, default=str))
         return 0 if payload["success"] else 2
     spec = _spec_from_args(args)
