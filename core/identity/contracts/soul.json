@@ -135,7 +135,7 @@
     {
       "id": "renderer",
       "path": "bin/walter-soul",
-      "role": "Rendu de l'identité vers chaque runtime (SOUL.md, profils)",
+      "role": "Renders the identity for each runtime (Soul, conduct, profiles)",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -149,7 +149,7 @@
     {
       "id": "runtimes",
       "path": "runtimes",
-      "role": "Adaptateurs neutres par runtime",
+      "role": "Neutral adapters per runtime",
       "status": "active",
       "readme": "README.md",
       "vision_target": "core/identity/runtimes"

@@ -1,1 +1,1 @@
-Identité de W.Alter et profil de {{owner.address}} : `walter_profile()` quand ses préférences comptent.
+walter-soul gives every runtime the same W.Alter identity, rules and owner profile, rendered from the instance's Soul.

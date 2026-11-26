@@ -1,5 +1,7 @@
-# walter-soul — identité et profil
+# walter-soul
 
-La même identité de W.Alter, les mêmes règles et le même profil de {{owner.address}} dans chaque runtime. Le logiciel est neutre ; l'identité appartient à l'instance.
+**Role.** The same identity of W.Alter, the same rules and the same profile of {{owner.address}} in every runtime.
+The software is neutral; the identity belongs to the instance (`@instance/soul`, versioned).
 
-**Utilisation** : `walter_profile()` renvoie le profil de {{owner.address}}, l'identité et les règles de W.Alter, et la mémoire critique. Court ; à charger quand ses préférences comptent et qu'elles ne sont pas déjà dans le prompt.
+**Use**: `walter_profile()` returns {{owner.address}}'s profile, W.Alter's identity and rules, and the critical
+memory. Load it when their preferences matter and they are not already in your instructions (the engine has them).
