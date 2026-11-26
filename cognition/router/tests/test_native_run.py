@@ -41,7 +41,8 @@ def _gateway_function():
           "_usage": lambda response: {}, "_telemetry": lambda response: {
               "usage": {}, "cost_usd": None, "cost_status": "unknown"},
           "_install_codex_auth": lambda: None, "os": os, "PAID": {"kie", "openrouter", "arnict"},
-          "test_gate": lambda route, spec: None, "_charge": lambda *a: None}
+          "test_gate": lambda route, spec: None, "_charge": lambda *a: None,
+          "cache_layout": lambda route, kwargs, conf=None: kwargs}
     exec(compile(ast.Module(body=nodes, type_ignores=[]), "gateway.py", "exec"), ns)
     return ns["exact_call"]
 

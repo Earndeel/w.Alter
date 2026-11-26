@@ -37,5 +37,16 @@
       "timeout_s": 300,
       "note": "Disabled by default: OpenAI's Terms of Use forbid automatically or programmatically extracting output from ChatGPT; only an instance owner enables it, knowingly, in the instance config (DECISIONS 2026-11-08)."
     }
+  },
+  "codex_prompt_cache": {
+    "_doc": "Codex (ChatGPT) : texte système envoyé en 1er message « developer » (le fournisseur ne met jamais en cache ce qui suit des « instructions » personnalisées, mesuré le 23/11) + clé de routage du cache = session hachée. false = comportement d'avant (retour arrière : redémarrer walter-llm).",
+    "developer_instructions": true,
+    "prompt_cache_key": true,
+    "_doc_base_instructions": "Texte Codex CLI de LiteLLM (~7,6 k caractères, ~1 600 jetons) : imposé par notre implémentation, pas par le service. « empty » = champ instructions vide (Monsieur, 25/11 : cache 99 % contre 81 %, pas d'effet mesurable sur le comportement) ; « litellm » = comportement d'avant (retour arrière : redémarrer walter-llm).",
+    "base_instructions": "empty"
+  },
+  "cache_layout": {
+    "_doc": "Mise en page du cache selon le protocole (24/11) : Claude (abonnement, Kie, OpenRouter anthropic/*) = marqueur sur le texte système (celui posé par l'appelant est gardé) + marqueur sur le dernier message seulement pour une conversation ; protocoles OpenAI = marqueurs retirés, blocs système recollés à l'identique. false = comportement d'avant (retour arrière : redémarrer walter-llm).",
+    "enabled": true
   }
 }

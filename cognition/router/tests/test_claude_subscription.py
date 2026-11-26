@@ -221,7 +221,8 @@ def test_an_agent_call_without_a_timeout_gets_minutes_not_the_transport_default(
     source = paths.ROOT / "llm/gateway.py"
     tree = ast.parse(source.read_text())
     nodes = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-             and n.name in {"provider_completion", "claude_accounts"}]
+             and n.name in {"provider_completion", "claude_accounts", "cache_layout", "anthropic_protocol",
+                            "_all_text_parts", "_unmarked"}]
     seen = {}
 
     async def fake_completion(config, token, **kwargs):
@@ -234,7 +235,7 @@ def test_an_agent_call_without_a_timeout_gets_minutes_not_the_transport_default(
     async def inline(fn, *args, **kwargs):
         return fn(*args, **kwargs)
     monkeypatch.setattr(asyncio, "to_thread", inline)
-    ns = {"_CONF": {"claude_subscription": {"grant": "g"}}}
+    ns = {"_CONF": {"claude_subscription": {"grant": "g"}}, "KIE_GPT": ("gpt-",)}
     exec(compile(ast.Module(body=nodes, type_ignores=[]), str(source), "exec"), ns)
     asyncio.run(ns["provider_completion"]({"provider": "claude-pro"}, model="claude-test", messages=[]))
     assert seen["timeout"] == 600

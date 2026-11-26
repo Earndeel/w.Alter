@@ -452,7 +452,7 @@ def test_second_claude_account_is_tried_without_waiting_and_each_attempt_names_i
 def test_claude_account_secret_comes_from_the_gateway_setting_never_from_the_route(monkeypatch):
     source=Path(__file__).resolve().parents[1]/'llm'/'gateway.py'
     tree=ast.parse(source.read_text())
-    nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name in {'provider_completion','claude_accounts'}]
+    nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name in {'provider_completion','claude_accounts','cache_layout','anthropic_protocol','_all_text_parts','_unmarked'}]
     asked=[]
     grants=SimpleNamespace(access=lambda grant:asked.append(grant) or 'token')
     monkeypatch.setitem(sys.modules,'walter_secrets',SimpleNamespace(grants=grants))
@@ -462,7 +462,7 @@ def test_claude_account_secret_comes_from_the_gateway_setting_never_from_the_rou
     monkeypatch.setattr(asyncio,'to_thread',inline)
     ns={'_CONF':{'claude_subscription':{'grant':'claude-subscription','accounts':{'anthropic-pro':'claude-subscription',
                                                                                  'anthropic-pro-2':'claude-subscription-2'}}},
-        '_instance_path':lambda v:Path(v)}
+        '_instance_path':lambda v:Path(v),'KIE_GPT':('gpt-',)}
     exec(compile(ast.Module(body=nodes,type_ignores=[]),str(source),'exec'),ns)
     run=lambda route:asyncio.run(ns['provider_completion']({'provider':'claude-pro',**route}))
     assert run({'account':'anthropic-pro-2','grant':'telegram-bot'})=='anthropic-pro-2' and asked==['claude-subscription-2']

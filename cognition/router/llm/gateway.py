@@ -479,6 +479,56 @@ def owner_tasks() -> list[str]:
 ANTHROPIC_CACHE_POINTS = [{"location": "message", "role": "system"}, {"location": "message", "index": -1}]
 
 
+# One payload, two cache systems (2026-11-24, payload lot 2). Callers order their payload from the most stable part to
+# the least stable (tools, shared system text, this session's lines, history kept append-only, the turn's own context
+# last) and may mark the end of a stable section with `cache_control` on a content part (the OpenAI-compatible
+# convention LiteLLM and OpenRouter use). Each protocol then gets what it understands:
+# - Anthropic (Claude subscription, Kie /claude, Claude through OpenRouter) caches only up to explicit markers (4 at
+#   most). The caller's own system marker is kept (else one goes on the system text); one goes on the last message only
+#   for a conversation — on a one-shot call it would write the unique tail at 1.25× and never be read (the devboard:
+#   80–95 % of its Claude tokens were writes, 2026-11-14 → 23).
+# - OpenAI protocols cache any repeated prefix by themselves: markers are removed and system parts joined back into the
+#   very text the caller would have sent as one string, so their bytes (and their cache) do not change.
+def anthropic_protocol(route: dict) -> bool:
+    p, m = route.get("provider"), str(route.get("model") or "")
+    return p == "claude-pro" or (p == "kie" and not m.startswith(KIE_GPT)) or (p == "openrouter" and m.startswith("anthropic/"))
+
+
+def _all_text_parts(content) -> bool:
+    return isinstance(content, list) and bool(content) and all(
+        isinstance(p, dict) and p.get("type") == "text" for p in content)
+
+
+def _unmarked(message: dict) -> dict:
+    """The message as an OpenAI protocol takes it: system text parts joined, no cache marker anywhere."""
+    m = {k: v for k, v in message.items() if k != "cache_control"}
+    content = m.get("content")
+    if m.get("role") in ("system", "developer") and _all_text_parts(content):
+        m["content"] = "\n\n".join(p.get("text") or "" for p in content)
+    elif isinstance(content, list):
+        m["content"] = [{k: v for k, v in p.items() if k != "cache_control"} if isinstance(p, dict) else p for p in content]
+    return m
+
+
+def cache_layout(route: dict, kwargs: dict, conf: dict | None = None) -> dict:
+    """The call's cache layout for its route's protocol (switch: gateway.json `cache_layout.enabled`)."""
+    conf = conf if conf is not None else (_CONF.get("cache_layout") or {})
+    if not conf.get("enabled", True):
+        return kwargs
+    messages = kwargs.get("messages") or []
+    if anthropic_protocol(route):
+        talk = sum(1 for m in messages if isinstance(m, dict) and m.get("role") not in ("system", "developer"))
+        points = [{"location": "message", "role": "system"}]      # LiteLLM leaves a system the caller marked as it is
+        if kwargs.get("tools") or talk > 1:
+            points.append({"location": "message", "index": -1})
+        kwargs["cache_control_injection_points"] = points
+        return kwargs
+    kwargs.pop("cache_control_injection_points", None)
+    if any(isinstance(m, dict) and ("cache_control" in m or isinstance(m.get("content"), list)) for m in messages):
+        kwargs["messages"] = [_unmarked(m) if isinstance(m, dict) else m for m in messages]
+    return kwargs
+
+
 def litellm_target(route: dict) -> dict | None:
     """LiteLLM arguments for one router route, or None when this gateway cannot run it (yet)."""
     p, m = route["provider"], route["model"]
@@ -522,6 +572,7 @@ async def provider_completion(route: dict, **kwargs):
         import transcription
         return await transcription.completion(route["model"], kwargs["api_key"], kwargs.get("messages") or [],
                                               stream=bool(kwargs.get("stream")), timeout=float(kwargs.get("timeout") or 180))
+    kwargs = cache_layout(route, kwargs)                      # every provider call passes here: see cache_layout
     if route["provider"] == "antigravity":
         from antigravity_subscription import completion as antigravity
         config = dict(_CONF["antigravity_subscription"])
@@ -596,6 +647,57 @@ def _install_codex_auth() -> None:
     Authenticator.get_access_token = lambda self: codex_access_token()
     Authenticator.get_account_id = lambda self: _codex_account_id()
     _install_codex_stream_arguments()
+    _install_codex_prompt_cache()
+
+
+def codex_cache_request(req: dict, session_id: str | None, base: str, conf: dict | None = None) -> dict:
+    """The ChatGPT request the backend can cache. Measured 2026-11-23 (payload lot 2, same 10k-token conversation
+    replayed): the backend never reuses what follows a custom `instructions` text — 0 % cached without tools, only
+    the tool block (≈ 55 %) with them, whatever the session id or the pause — while the same text sent as the first
+    `developer` input item lets the next call reuse 92–98 % of the previous one. So `instructions` keeps only the
+    base text the backend requires and the caller's system text opens the input. `prompt_cache_key` (the backend's
+    routing key, which the Codex CLI sends and LiteLLM drops) carries the conversation's hashed session id.
+    `base` is LiteLLM's Codex CLI text (`CHATGPT_DEFAULT_INSTRUCTIONS`, ~7.6 k chars, ~1 600 tokens): the backend does
+    not require it — an empty `instructions` is accepted (measured 2026-11-25: HTTP 200, 12 tokens, cache 99 % on the
+    2nd identical call against 81 % with the text, no measurable behaviour change over 204 replayed calls). With
+    `base_instructions = "empty"` (Monsieur, 2026-11-25) it is dropped and `instructions` is sent empty.
+    Switches: gateway.json `codex_prompt_cache` {developer_instructions, prompt_cache_key} (on by default),
+    `base_instructions` ("litellm" by default = the text kept; "empty")."""
+    conf = conf or {}
+    text = req.get("instructions") or ""
+    kept = "" if conf.get("base_instructions", "litellm") == "empty" else base
+    if base and text.startswith(base):
+        own = text[len(base):].lstrip("\n")
+        if conf.get("developer_instructions", True) and own.strip() and isinstance(req.get("input"), list):
+            req["instructions"] = kept
+            req["input"] = [{"type": "message", "role": "developer",
+                             "content": [{"type": "input_text", "text": own}]}, *req["input"]]
+        elif not kept:
+            req["instructions"] = own                    # only the caller's text, or empty when it had none
+    if conf.get("prompt_cache_key", True) and session_id:
+        req["prompt_cache_key"] = session_id
+    return req
+
+
+def _install_codex_prompt_cache() -> None:
+    """Applies `codex_cache_request` to every ChatGPT (Codex) request LiteLLM builds. Idempotent."""
+    from litellm.llms.chatgpt.common_utils import _normalize_litellm_params, get_chatgpt_default_instructions
+    from litellm.llms.chatgpt.responses import transformation as RT
+    cls = RT.ChatGPTResponsesAPIConfig
+    if getattr(cls.transform_responses_api_request, "_walter_cache", False):
+        return
+    build = cls.transform_responses_api_request
+
+    def transform_responses_api_request(self, model, input, response_api_optional_request_params, litellm_params,
+                                        headers):
+        req = build(self, model, input, response_api_optional_request_params, litellm_params, headers)
+        # only the id this gateway set (codex_cache_session): LiteLLM's own fallback is a fresh id per call
+        session = _normalize_litellm_params(litellm_params).get("litellm_session_id")
+        return codex_cache_request(req, str(session) if session else None, get_chatgpt_default_instructions(),
+                                   _CONF.get("codex_prompt_cache") or {})
+
+    transform_responses_api_request._walter_cache = True
+    cls.transform_responses_api_request = transform_responses_api_request
 
 
 def _install_codex_stream_arguments() -> None:
@@ -640,6 +742,13 @@ def codex_cache_session(agent: str, task: str, body: dict, correlation: dict) ->
     else:
         system = next((m.get("content") for m in body.get("messages") or []
                        if isinstance(m, dict) and m.get("role") in ("system", "developer")), "")
+        if isinstance(system, list) and all(isinstance(p, dict) and p.get("type") == "text" for p in system):
+            # The caller marks the end of the part every session shares (`cache_control`: the engine's socle and its
+            # communication profile); only that part names the prefix. Until 2026-11-25 the key hashed the first
+            # 8 000 chars of all blocks joined, so a socle shorter than that let each session's own lines into the
+            # key and the cache was lost between sessions (lot 3c variant s1: 9 % cached).
+            marked = [i for i, p in enumerate(system) if p.get("cache_control")]
+            system = "\n\n".join(p.get("text") or "" for p in (system[:marked[-1] + 1] if marked else system))
         system = system if isinstance(system, str) else json.dumps(system, ensure_ascii=False, sort_keys=True)
         key = f"prefix:{agent}:{task.split('/')[0]}:{hashlib.sha256(system[:8000].encode()).hexdigest()}"
     return str(uuid.uuid5(uuid.NAMESPACE_URL, "walter-llm/codex/" + key))
@@ -1238,7 +1347,9 @@ def build_app():
         correlation = await _correlation(request, body, agent)
         correlation.pop("requested", None)
         needs = decision_needs(body)
-        base = {"agent": agent, "task": task, "kind": task, **({"needs": needs} if needs else {}), **correlation}
+        trace = None if correlation.get("run_id") else _uuid(request.headers.get("X-Walter-Trace-Run"))
+        base = {"agent": agent, "task": task, "kind": task, **({"needs": needs} if needs else {}), **correlation,
+                **({"trace_run": trace} if trace else {})}   # payload plan lot 0 (2026-11-23): a label, no lookup
 
         def attempt(entry: dict) -> None:
             log({**base, "model_id": entry.get("model"), **entry})

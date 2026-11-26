@@ -48,6 +48,23 @@ Le gateway transporte les messages et outils de l'appelant. Il ne crée pas une 
 - Router et Secrets requis ; Memory optionnel pour retrouver le run ouvert d'une session DSH via sa CLI publique.
 - Configuration et état personnels dans l'instance ; aucune clé fournisseur dans une requête du modèle.
 
+## Cache des prompts : un payload, deux protocoles (24/11/2026)
+
+Les appelants rangent leur payload du plus stable au moins stable (outils, texte système commun, lignes de la
+session, historique, contexte du tour) et peuvent marquer la fin d'une partie stable par `cache_control` sur une partie
+de contenu (convention OpenAI-compatible de LiteLLM et OpenRouter). `cache_layout()`, appelé par `provider_completion`
+pour tout appel fournisseur, adapte ensuite la mise en page au protocole de la route :
+- **Claude** (`anthropic_protocol` : abonnement, Kie /claude, OpenRouter `anthropic/*`) : cache seulement jusqu'aux
+  marqueurs (4 au plus). Le marqueur système de l'appelant est gardé (sinon un sur le texte système) ; un marqueur sur
+  le dernier message seulement pour une conversation (plusieurs messages ou des outils), jamais sur un appel ponctuel.
+- **Protocoles OpenAI** (Codex, Kie GPT, autres) : cache automatique de tout début répété ; marqueurs retirés, blocs
+  système recollés avec une ligne vide en l'exact texte d'avant.
+- Codex : texte système en 1er message `developer` et clé `prompt_cache_key` = session hachée (`codex_prompt_cache`).
+- Codex : champ `instructions` vide (`codex_prompt_cache.base_instructions = "empty"`, 25/11 ; S2 validé définitivement
+  par Monsieur le 26/11) au lieu du texte Codex CLI de LiteLLM (~1 600 jetons) ; la clé de cache ne hache que la partie
+  marquée commune (socle), pas les lignes propres à la session. Retour arrière : `"litellm"` puis redémarrer walter-llm.
+Interrupteur `cache_layout.enabled` dans `gateway.json` ; décisions dans `DECISIONS.md` (2026-11-24).
+
 ## Corrélation et coût
 
 Les headers locaux `X-Walter-Run-Id` et `X-Walter-Task-Id` sont des UUID de corrélation par requête. Ils ne donnent
