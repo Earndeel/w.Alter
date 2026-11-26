@@ -202,6 +202,24 @@ def media_settings(path: str | Path | None = None) -> dict:
     return _optional("media", MEDIA_DEFAULTS, path)
 
 
+# Lot 1 of the payload plan (owner 2026-11-23). Absent sections = the behaviour before (rollback = false / the old list).
+ANCHORS_DEFAULTS = {"hint": False,                # true: a name Walter Memory knows is a hint the decision model reads
+                                                  # (state `names_known_to_memory`), never a trigger of memory
+                    "assistant_names": ["walter", "w.alter", "w-alter", "walt"]}   # never a hint (« salut walter »)
+DEDUPE_DEFAULTS = {"memory_header": False,        # true: Memory's own preamble is not repeated under the pack's header
+                   "native_history": ["claude_code", "codex", "dsh"]}   # runtimes that show their history themselves
+
+
+def anchors_settings(path: str | Path | None = None) -> dict:
+    """[anchors] (payload lot 1, 23/11): what a name Walter Memory knows does to the plan."""
+    return _optional("anchors", ANCHORS_DEFAULTS, path)
+
+
+def dedupe_settings(path: str | Path | None = None) -> dict:
+    """[dedupe] (payload lot 1, 23/11): what the pack does not say twice."""
+    return _optional("dedupe", DEDUPE_DEFAULTS, path)
+
+
 # P1 (owner 2026-11-26, after the benches of 25–26/11): an attachment Decision is unsure of brings none of the thread's
 # blocks. Defaults = the behaviour before (no runtime): every chosen thread brings its blocks.
 THREAD_BLOCKS_DEFAULTS = {"runtimes": [], "min_confidence": 0.0}

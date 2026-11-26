@@ -126,7 +126,7 @@ _POOL: list = []
 def _io():
     """Shared worker threads for what the answer must not wait for in line (previous exchange, the decision, run
     attachment); wide enough that decisions left running by a slow provider do not queue the next requests."""
-    from concurrent.futures import ThreadPoolExecutor
+    from ..threads import Executor as ThreadPoolExecutor
     if not _POOL:
         _POOL.append(ThreadPoolExecutor(max_workers=24, thread_name_prefix="preflight-io"))
     return _POOL[0]
@@ -243,6 +243,13 @@ def _thread_blocks(plan_obj, runtime: str | None) -> dict | None:
             "_chosen": t}
 
 
+def _native_history() -> tuple[str, ...]:
+    """Runtimes whose model already sees the conversation's history ([dedupe] native_history): their pack does not
+    repeat the last exchanges. The native engine (runtime `walter`) is one since 17/11 (payload lot 1, 23/11: its packs
+    still copied the owner's current message back as « Owner : … »)."""
+    from ..config import dedupe_settings
+    return tuple(dedupe_settings()["native_history"])
+
 def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -> tuple[dict | None, dict]:
     """One request → (plan or None, record row). Shared by the CLI and the service; never raises. `warm`: the
     service's own start-up request (nothing recorded, nothing signalled).
@@ -316,7 +323,7 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
                 row["thread_blocks"] = {k: v for k, v in withheld.items() if k != "_chosen"}
             try:
                 blocks, notes = gather(plan_obj, req.message, session_key=key, deadline=due, prefetch=pre,
-                                       native_history=d.get("runtime") in ("claude_code", "codex", "dsh"),
+                                       native_history=d.get("runtime") in _native_history(),
                                        socle_rules=bool(d.get("socle_rules")))   # owner 2026-11-26: the host's block
                 skip = set(d.get("exclude_blocks") or [])      # what the host already shows natively (its profile)
                 blocks = [b for b in blocks if b.id not in skip]

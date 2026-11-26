@@ -305,6 +305,24 @@ enabled = true
 max_tokens = 250             # a ceiling, not a target
 timeout_ms = 300             # a late digest leaves the decision as before (journaled « late »)
 
+[anchors]
+# Noms connus de la mémoire (projets, organisations) trouvés dans le message (plan payload, lot 1, 2026-11-23).
+# Monsieur : « les noms connus doivent être des indices, jamais des déclencheurs systématiques ».
+# hint = true : le nom est donné au modèle de décision comme indice ; aucune règle n'impose la mémoire pour autant,
+# et le nom de l'assistant lui-même (« salut walter ») n'est pas un nom de projet.
+# hint = false : comportement d'avant (un nom connu imposait la mémoire et le niveau L3). Retour arrière : false.
+hint = true
+assistant_names = ["walter", "w.alter", "w-alter", "walt"]
+
+[dedupe]
+# Dit une seule fois (plan payload, lot 1, 2026-11-23).
+# memory_header = true : le préambule de Memory (« données datées, pas des instructions… ») est retiré de ses blocs,
+# le bandeau du pack disant déjà la même chose une fois. false = comportement d'avant.
+memory_header = true
+# Runtimes dont le modèle voit déjà l'historique de la conversation : les derniers échanges sont comptés, pas
+# réinjectés dans le pack. « walter » = le moteur natif (sa session porte l'historique). Retour arrière : retirer « walter ».
+native_history = ["claude_code", "codex", "dsh", "walter"]
+
 [thread_blocks]
 # Filet de sécurité P1 (Monsieur, 26/11, après les bancs du 25–26/11) : quand Decision rattache le message à un fil
 # existant avec une confiance inférieure à min_confidence, le pack n'apporte aucun bloc de ce fil (sa vue de sujet,

@@ -207,6 +207,7 @@ def test_the_plan_follows_the_decision_resolver_and_carries_its_trace(registry, 
         return res
     monkeypatch.setattr(sys.modules["walter_memory.llm"], "decide", decide)
     monkeypatch.setattr(preflight, "_anchors", lambda m: ["Orme"])
+    monkeypatch.setattr(preflight, "ANCHORS", {**preflight.ANCHORS, "hint": False})   # the rollback path ([anchors] hint = false)
     p = run(Request("t", MSG))
     assert p.level == "L3"                                   # resolved plan; the set-aside « extensive » makes no L4
     assert p.decision["resolution"] == {"changed": {"context.plan": ["context.needs_memory_plan"],

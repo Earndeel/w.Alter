@@ -63,8 +63,9 @@ def _calls(purpose_prefix: str, since: datetime) -> dict:
     """{case: {calls, cost_usd, models, failed, hedged}} from the gateway journal, for this run only. A question the
     gateway did not send to a model (`unsupported`) is no call; a hedge cancelled in flight is one (`hedged`)."""
     import psycopg
+    from walter_memory.db import DSN       # the host's one declaration (database renamed hindsight → walter, 21/11)
     out: dict = {}
-    with psycopg.connect(host="127.0.0.1", port=5433, dbname="hindsight", user="hindsight") as c:
+    with psycopg.connect(DSN) as c:
         for purpose, model, status, err, n, cost in c.execute(
                 "select purpose, model, status, error, count(*), coalesce(sum(cost_usd), 0) from system.model_calls "
                 "where purpose like %s and at >= %s group by 1, 2, 3, 4", (purpose_prefix + "%", since)):

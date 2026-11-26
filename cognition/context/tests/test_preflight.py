@@ -339,10 +339,11 @@ def test_service_answers_like_the_cli_and_records_shadow_plans(fake_llm, monkeyp
 
 
 def test_named_project_forces_memory(monkeypatch):
-    """A decision model that reads « Le site EDGEWISE, c'est où ? » as a web question still gets the owner's memory."""
+    """Rollback path of [anchors] hint (payload lot 1). A decision model that reads « Le site EDGEWISE, c'est où ? » as a web question still gets the owner's memory."""
     from walter_context import preflight as pf
     monkeypatch.setattr(pf, "_anchors", lambda m: ["edgewise"] if "edgewise" in m.lower() else [])
     monkeypatch.setattr(pf, "router_tasks", lambda: {})
+    monkeypatch.setattr(pf, "ANCHORS", {**pf.ANCHORS, "hint": False})   # the rollback path ([anchors] hint = false, before 23/11)
     monkeypatch.setattr(pf, "decision_chain", lambda: None)
     monkeypatch.setattr(pf, "SIGNALS", "questions")       # answers keyed by the set-2 questions (the rollback path)
     import walter_memory.llm as llm
