@@ -37,8 +37,9 @@ catchup = "active"
 reconcile_existing = "active"
 # M5 (2026-11-25, owner: « je valide M1 à M5 ») : la boucle de rattrapage type la nature et la portée de chaque
 # connaissance qui n'en a pas (nature.retype, même poste et mêmes définitions que l'extraction, porte d'écriture,
-# étiquette réversible knowledge.revert). "paused" tant que les bancs ne sont pas présentés à Monsieur.
-retype = "paused"
+# étiquette réversible knowledge.revert). Actif depuis le 2026-11-26 (bancs présentés, Monsieur : « je valide M1 à M5 ») ;
+# chaque tranche écrit sous l'étiquette retype-AAAA-MM-JJ du jour. Retour arrière : "paused".
+retype = "active"
 subjects = "paused"
 reconsolidation = "paused"
 episode_summaries = "paused"
