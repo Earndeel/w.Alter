@@ -150,7 +150,7 @@
     {
       "id": "rawvault-shim",
       "path": "rawvault.py",
-      "role": "Ancienne entrée du Raw Vault ; renvoie vers walter_memory.objects",
+      "role": "Former Raw Vault entry point; forwards to walter_memory.objects",
       "status": "obsolete",
       "readme": "manifest/MANIFEST.md"
     }

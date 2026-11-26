@@ -1,10 +1,14 @@
-# Raw Vault — fichiers bruts
+# Raw Vault
 
-Les octets originaux de tout ce qui n'est pas du texte : photos, captures, vidéos, notes vocales, documents de {{owner.address}}. Seul le texte dérivé (OCR, transcription, légende) entre dans Walter Memory, avec un lien vers l'objet.
+**Role.** The original files of everything that is not text: photos, screenshots, videos, voice notes, documents.
+Only derived text (OCR, transcript, caption) enters Walter Memory, with a link back to the object.
 
-**Organisation** : fichiers sur Google Drive (en clair, ou chiffrés pour les objets restreints), servis en S3 local ; catalogue unique dans Walter Memory (`core.objects`).
+**Organisation.** Files on Google Drive (plain, or encrypted for restricted objects), served locally as S3; a single
+catalogue in Walter Memory (`core.objects`).
 
-**Utilisation**
-- `vault_search(text, kind)` : nom, OCR, transcription ; `kind` = image, screenshot, video, audio, document, archive.
-- `vault_get(object_id)` : récupérer le fichier sur la VM (intégrité vérifiée) pour le traiter.
-- `vault_put(path, links)` : déposer un fichier à conserver (dédoublonné), relié à des personnes ou conversations.
+**Tools**
+- `vault_search(text, kind, thread, event_id, since, until)`: name, OCR, transcript; `kind` = image, screenshot,
+  video, audio, document, archive; `thread` = the files of a conversation ("X's voice notes" = `kind="audio",
+  thread=…`), `event_id` = those of one message.
+- `vault_get(object_id)`: fetch the file onto the server (integrity checked) to process it.
+- `vault_put(path, links)`: store a file to keep (deduplicated), linked to people or conversations.
