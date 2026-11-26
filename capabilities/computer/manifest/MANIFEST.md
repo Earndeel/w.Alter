@@ -1,10 +1,15 @@
-# Walter Computer — piloter le Mac
+# Walter Computer
 
-Observer et manipuler un appareil de {{owner.address}} par actions atomiques sûres, pour ce qui n'existe que dans une application native. L'agent garde le but et le plan ; le module choisit la cible, vérifie les captures et reprend proprement.
+**Role.** Observe and manipulate one of {{owner.address}}'s devices (their Mac) through safe atomic actions, for what
+exists only in a native application. The agent keeps the goal and the plan; the module chooses the target, checks
+the captures and recovers cleanly.
 
-**Organisation** : noyau de politique et d'observation, sessions par client (verrou par appareil), transport vers l'appareil enrôlé.
+**Organisation.** A policy and observation core, sessions per client (one lock per device), a transport to the
+enrolled device.
 
-**Utilisation** : `computer_use(session_id, action, arguments)` — `list_apps`, `list_windows`, `capture`, `click`, `type`, `key`, `scroll`, `drag`, `focus_app`, `launch_app`, `open_url`, `targeted_verify`, `wait`, `close`.
-1. Capturer l'application exacte avant toute saisie. 2. Vérifier l'effet des actions qui comptent. 3. `close` à la fin.
+**Tool**: `computer_use(session_id, action, arguments)` — `list_apps`, `list_windows`, `device_context`, `capture`,
+`click`, `type`, `key`, `scroll`, `drag`, `set_value`, `focus_app`, `launch_app`, `open_url`, `targeted_verify`,
+`wait`, `close`.
+1. Capture the exact application before any input. 2. Check the effect of actions that matter. 3. `close` at the end.
 
-**Règles** : les autorisations viennent de la politique serveur, jamais des arguments ; client stdio local uniquement.
+**Rules**: permissions come from the server policy, never from arguments; local stdio client only.

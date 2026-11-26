@@ -158,7 +158,7 @@
     {
       "id": "library",
       "path": "walter_computer",
-      "role": "Contrôle des appareils (Mac, bureau)",
+      "role": "Device control (Mac desktop) through atomic actions",
       "status": "active",
       "readme": "README.md",
       "vision_target": "capabilities/computer"

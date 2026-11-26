@@ -1,1 +1,1 @@
-Piloter le Mac par actions atomiques : `computer_use(session_id, action)` ; capturer avant toute saisie, `close` à la fin.
+Walter Computer observes and operates {{owner.address}}'s Mac through safe atomic actions, for tasks that exist only in a native application.
