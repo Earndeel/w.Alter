@@ -86,10 +86,16 @@ def is_test_session(session_id: str, cwd: str = "") -> bool:
 
 def exchanges(conn, since: datetime, until: datetime | None = None) -> list[dict]:
     """Owner exchanges (message + last visible answer of the turn), cloud_allowed only, in time order."""
+    # a session the Run Plane ran on the test channel only (a test account, X-Walter-Channel: test, a scenario) is
+    # never the owner's activity, whatever its runtime marks (owner 26/11: on 12–13/11 the DSH scenarios, unmarked,
+    # had made 109 subjects that then stood among the candidates of the owner's own messages)
     rows = conn.execute("""
+        with test_sessions as (select origin->>'session_id' sid from runs.runs group by 1
+                               having bool_and(coalesce(origin->>'channel', 'owner') = 'test'))
         select e.session_id, e.seq, e.type, e.occurred_at, e.text, e.privacy_class, s.runtime,
                coalesce(s.platform, '') platform, coalesce(s.model, '') model, s.privacy_class session_privacy,
-               coalesce(s.cwd, '') cwd, coalesce(s.profile, '') profile
+               coalesce(s.cwd, '') cwd, coalesce(s.profile, '') profile,
+               e.session_id in (select sid from test_sessions) test_run
         from walter_logs.events e join walter_logs.sessions s using (session_id)
         where e.occurred_at >= %s and e.occurred_at < %s
           and s.runtime in ('claude_code', 'codex', 'hermes', 'dsh', 'walter')
@@ -101,6 +107,7 @@ def exchanges(conn, since: datetime, until: datetime | None = None) -> list[dict
         if (r["model"] == "codex-auto-review" or r["session_privacy"] == "local_only" or is_test_session(sid, r.get("cwd") or "")
                 or (r["runtime"] == "claude_code" and ":" in sid)                       # subagent prompts
                 or r.get("profile") in ("test", "machine")          # Walter Engine: test accounts, delegations
+                or r.get("test_run")                                # the Run Plane's test channel, any runtime
                 or (r["runtime"] == "hermes" and r["platform"] not in ("telegram", "desktop", "tui", "cli"))):
             continue
         if r["privacy_class"] != "cloud_allowed":

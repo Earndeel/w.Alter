@@ -298,3 +298,24 @@ def test_the_quota_gate_defers_the_card_but_records_the_activity(monkeypatch):
                          embed=embed, llm=llm)
         row = c.execute("select last_at from views.view where view_key = %s", (a["view_key"],)).fetchone()
     assert llm.cards == 0 and row["last_at"] == T0 + timedelta(minutes=3000)
+
+
+def test_a_session_the_run_plane_ran_on_the_test_channel_makes_no_exchange():
+    """Owner 26/11: a test session never feeds the owner's subjects, whatever its runtime marks (the DSH scenarios of
+    12–13/11 carried none). Only sessions whose runs are all on the test channel are left out."""
+    sids = {"test": f"{SID}-chan-test", "owner": f"{SID}-chan-owner", "both": f"{SID}-chan-both"}
+    with connection() as c:
+        for kind, sid in sids.items():
+            c.execute("insert into walter_logs.sessions (session_id, runtime, native_id) values (%s, 'dsh', %s)", (sid, sid))
+            for seq, typ, text in ((1, "user/message", f"Prépare le plan de migration du serveur {kind}"),
+                                   (2, "assistant/message", "Voici le plan")):
+                c.execute("""insert into walter_logs.events (session_id, seq, type, occurred_at, text, privacy_class,
+                             source_ref) values (%s, %s, %s, %s, %s, 'cloud_allowed', %s)""",
+                          (sid, seq, typ, T0 + timedelta(days=30, minutes=seq), text, f"test:chan:{kind}:{seq}"))
+            for ch in {"test": ["test"], "owner": [None], "both": ["test", "owner"]}[kind]:
+                c.execute("insert into runs.runs (run_id, origin, started_at) values (%s, %s, %s)",
+                          (str(uuid.uuid4()), json.dumps({"session_id": sid, "runtime": "dsh",
+                                                         **({"channel": ch} if ch else {})}), T0 + timedelta(days=30)))
+        out = views.exchanges(c, T0 + timedelta(days=30) - timedelta(hours=1), T0 + timedelta(days=30, hours=1))
+    got = {e["session_id"] for e in out}
+    assert sids["owner"] in got and sids["both"] in got and sids["test"] not in got
