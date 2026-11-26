@@ -123,6 +123,21 @@ la télémétrie conservent des types d'erreur, jamais les messages bruts des ex
   reçoit un message Telegram par fenêtre. Lui seul valide un montant de plus :
   `walter-llm test-budget approve <EUR> [note]` (valable 24 h) ; `walter-llm test-budget` = état.
   Journal : `@instance/state/llm/test-spend.jsonl` (coût fournisseur, sinon estimé depuis l'usage ou la taille).
+- **Réserve de production (26/11/2026, Monsieur : « les tests ne doivent pas épuiser les quotas ou crédits nécessaires
+  à Walter en production »).** La production va jusqu'à la vraie limite de chaque abonnement et jusqu'au dernier cent
+  d'OpenRouter ; les essais s'arrêtent avant. Un appel du canal `test` (run de test, ou en-tête
+  `X-Walter-Channel: test`, que `walter_memory.llm` pose quand le processus tourne avec `WALTER_RUN_CHANNEL=test` :
+  bancs, juges, rejeux) :
+  - laisse un abonnement à la production dès que son compteur hebdomadaire atteint
+    `test_budget.subscription_stop_weekly_percent` (75 %) ou sa fenêtre de session
+    `subscription_stop_session_percent` (70 %), et pendant `limit_hold_minutes` (60) après qu'un essai a rencontré sa
+    vraie limite (429), les compteurs n'étant relus que toutes les 30 min (`skipped='test_reserve:…'`) ;
+  - laisse OpenRouter sous `openrouter_reserve_usd` (2 $, environ 8 jours de la production mesurée du 19 au 26/11) ;
+  - compte aussi ses appels structurés (décisions, rerank : Liquid, Nace, OpenRouter) dans le budget payant des
+    essais, et s'arrête avec lui (HTTP 429 `test_budget`).
+  L'étiquette ne fait que resserrer : aucune autre valeur n'est lue. Nuit du 25 au 26/11 : des bancs avaient vidé le
+  quota hebdomadaire Codex (la mémoire de production est passée sur Kie payant) et les derniers cents d'OpenRouter
+  (rerank sans route pendant 7 h). Retour arrière : valeurs à 100 % / 0 $ dans `test_budget` de `gateway.json`.
 
 ## Maintenance et validation
 

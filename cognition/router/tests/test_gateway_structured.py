@@ -416,3 +416,36 @@ def test_a_floor_held_route_after_the_one_that_answered_is_not_booked_as_a_faile
                                                  client=client, key=key, log=logged.append, balance=low,
                                                  chain=["liquid/d1-ultra", "inception/mercury-decide:free"]))
     assert code == 200 and [c["skipped"] for c in out["calls"] if c.get("skipped")] == ["balance_below_floor"]
+
+
+def test_a_declared_test_spends_its_decisions_on_the_test_budget_and_keeps_the_openrouter_reserve(tmp_path, monkeypatch):
+    # owner 2026-11-26: tests never use up what production needs; their structured calls count and stop like chat calls
+    ns, logs = app_ns(tmp_path, monkeypatch, chain=("liquidai/d-fixture",))
+    source = LLM / "gateway.py"
+    extra = {"test_gate", "test_budget", "_price_usd", "_ledger", "_ledger_add"}
+    tree = ast.parse(source.read_text())
+    from datetime import datetime, timezone
+    ns.update(datetime=datetime, timezone=timezone, Path=Path)
+    exec(compile(ast.Module(body=[n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in extra],
+                            type_ignores=[]), str(source), "exec"), ns)
+    ns.update(_telegram=lambda *a: None,
+              _instance_path=lambda v: Path(v), STRUCTURED_PAID={"liquid", "openrouter"},
+              TEST_BUDGET={"accounts": ["e2e"], "paid_limit_eur": 1.0, "usd_per_eur": 1.0, "window_hours": 24,
+                           "ledger": str(tmp_path / "spend.jsonl"), "openrouter_reserve_usd": 5.0})
+    seen = []
+
+    async def decisions(body, **kw):
+        seen.append(body.get("paid_floor_usd"))
+        kw["log"]({"provider": "liquid", "model": "liquidai/d-fixture", "ok": True, "cost_usd": 0.6,
+                   "cost_status": "reported"})
+        return 200, {"answers": {}, "route": "liquid/liquidai/d-fixture"}
+    monkeypatch.setattr(structured, "decisions", decisions)
+    app = ns["build_app"]()
+    test = {"X-Walter-Channel": "test"}
+    assert post(app, "/v1/decisions", {"state": {}, "questions": Q, "paid_floor_usd": 1}, test).status_code == 200
+    assert seen == [5.0] and ns["test_budget"]()["spent_usd"] == 0.6 and logs[-1]["channel"] == "test"
+    assert post(app, "/v1/decisions", {"state": {}, "questions": Q}, test).status_code == 200      # 0.6 ≤ 1.0
+    refused = post(app, "/v1/decisions", {"state": {}, "questions": Q}, test)                        # 1.2 > 1.0: stop
+    assert refused.status_code == 429 and "test_budget" in refused.text and len(seen) == 2
+    assert post(app, "/v1/decisions", {"state": {}, "questions": Q}).status_code == 200            # owner: never
+    assert seen[-1] is None and ns["test_budget"]()["spent_usd"] == 1.2

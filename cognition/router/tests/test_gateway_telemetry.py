@@ -26,7 +26,7 @@ def gateway(tmp_path, monkeypatch):
     source=Path(__file__).resolve().parents[1]/'llm'/'gateway.py'
     tree=ast.parse(source.read_text())
     names={'_usage','_number','_telemetry','_uuid','_dsh_session','_correlation','_channel','_session_run','_run_metadata','_record_attempt','exact_call','log','build_app',
-           'start_completion','_rate_limited','_charge','_price_usd','_priced','test_budget','test_gate','_ledger','_ledger_add','approve_tests',
+           'start_completion','_rate_limited','_charge','_price_usd','_priced','test_budget','test_gate','_ledger','_ledger_add','approve_tests','test_reserve','test_hold','_sub_key',
            'planned_task','exact_task','owner_tasks','rule_answer','_text_parts','_rule_completion','_rule_stream','_rule_routing',
            'route_state','selection_plan','selection_check','log_selection','cost_headers','request_needs','decision_needs'}
     nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name in names]
@@ -44,9 +44,15 @@ def gateway(tmp_path, monkeypatch):
         '_run_metadata':lambda run:{'run_id':run,'status':'open','privacy_class':'cloud_allowed'},
         'litellm_target':lambda route:{'model':'fixture-model'},'as_json':lambda x:x,'json_instruction':lambda x:'JSON',
         'PAID':{'kie','openrouter','arnict'},'QUOTA_SWITCH':90.0,'RATE_LIMIT_WAITS':(0,0),'Path':Path,'os':os,'_telegram':lambda *a:None,
-        'TEST_BUDGET':{'paid_limit_eur':2.0,'usd_per_eur':1.10,'window_hours':24,'accounts':['e2e'],'ledger':str(tmp_path/'test-spend.jsonl')},
-        '_instance_path':lambda value:Path(value)}
+        'TEST_BUDGET':{'paid_limit_eur':2.0,'usd_per_eur':1.10,'window_hours':24,'accounts':['e2e'],'ledger':str(tmp_path/'test-spend.jsonl'),
+                       'subscription_stop_weekly_percent':75.0,'subscription_stop_session_percent':70.0,'limit_hold_minutes':60,'openrouter_reserve_usd':5.0},
+        '_instance_path':lambda value:Path(value),'_test_holds':{},'STRUCTURED_PAID':{'kie','openrouter','arnict','liquid'}}
     monkeypatch.setitem(sys.modules,'litellm',SimpleNamespace())
+    # the OpenRouter credit as the gateway reads it (structured.Balance); tests set ns['BALANCE_FIXTURE']['usd']
+    credit={'usd':50.0}
+    async def remaining():return credit['usd']
+    monkeypatch.setitem(sys.modules,'structured',SimpleNamespace(Balance=lambda client,key:remaining))
+    ns['BALANCE_FIXTURE']=credit;ns['structured_key']=None
     # Only local fixture lookups run here. Avoid the sandbox's executor-shutdown stall;
     # concurrent ASGI requests still interleave at the provider's awaited barrier.
     async def inline(fn,*args,**kwargs):return fn(*args,**kwargs)
@@ -565,3 +571,69 @@ def test_a_model_named_for_the_run_is_executed_exactly_and_an_unknown_one_is_ref
     assert ns['planned_task']('coding',{'model':'claude-opus-5-5'})==('exact:claude-opus-5-5','model')
     assert ns['planned_task']('auto',{'model':'bad model; rm'})[0]!='exact:bad model; rm'
     assert ns['exact_task']({'model':'m','provider':'a b'}) is None
+
+
+def _sub_routes(weekly, session=None):
+    return {'model_id':'m','execution':[
+        {'provider':'claude-pro','model':'m','access':'subscription','subscription':{'quota_used_percent':weekly,'session_used_percent':session}},
+        {'provider':'openrouter','model':'m','access':'paid','host':{'price_in_1m':4.0,'price_out_1m':20.0}}]}
+
+
+def test_a_declared_test_leaves_production_its_subscription_reserve(tmp_path,monkeypatch):
+    # owner 2026-11-26: tests must not use up the quota production needs; production itself still runs to 100 %
+    ns=gateway(tmp_path,monkeypatch);logs=[];used=[]
+    async def complete(route,**kw):
+        used.append(route['provider'])
+        return SimpleNamespace(usage={'prompt_tokens':10,'completion_tokens':1,'cost':0.01},_hidden_params={},
+                               choices=[],model_dump=lambda:{'choices':[]})
+    ns.update(log=logs.append,provider_completion=complete)
+    app=ns['build_app']()
+    test={'X-Walter-Channel':'test'}
+    ns['decision']=lambda task:_sub_routes(60.0)
+    assert post(app,{'model':'coding','messages':[]},test).status_code==200 and used[-1]=='claude-pro'
+    ns['decision']=lambda task:_sub_routes(80.0)
+    assert post(app,{'model':'coding','messages':[]},test).status_code==200 and used[-1]=='openrouter'
+    assert any(e.get('skipped')=='test_reserve:weekly_quota' and e['channel']=='test' for e in logs)
+    ns['decision']=lambda task:_sub_routes(10.0,71.0)
+    assert post(app,{'model':'coding','messages':[]},test).status_code==200 and used[-1]=='openrouter'
+    assert logs[-2]['skipped']=='test_reserve:session_quota'
+    ns['decision']=lambda task:_sub_routes(99.0,99.0)
+    assert post(app,{'model':'coding','messages':[]}).status_code==200 and used[-1]=='claude-pro'   # owner: no reserve
+    assert 'channel' not in logs[-1]
+    # any other value of the label is not read
+    assert post(app,{'model':'coding','messages':[]},{'X-Walter-Channel':'owner'}).status_code==200 and used[-1]=='claude-pro'
+
+
+def test_a_test_that_meets_a_real_limit_leaves_the_subscription_for_a_while(tmp_path,monkeypatch):
+    ns=gateway(tmp_path,monkeypatch);logs=[];used=[]
+    class RateLimitError(Exception):status_code=429
+    async def complete(route,**kw):
+        used.append(route['provider'])
+        if route['provider']=='claude-pro':raise RateLimitError()
+        return SimpleNamespace(usage={'prompt_tokens':10,'completion_tokens':1,'cost':0.01},_hidden_params={},
+                               choices=[],model_dump=lambda:{'choices':[]})
+    ns.update(log=logs.append,provider_completion=complete)
+    ns['decision']=lambda task:_sub_routes(10.0)
+    app=ns['build_app']()
+    test={'X-Walter-Channel':'test'}
+    assert post(app,{'model':'coding','messages':[]},test).status_code==200
+    assert used==['claude-pro','claude-pro','claude-pro','openrouter']        # waited out (RATE_LIMIT_WAITS) then failed over
+    assert post(app,{'model':'coding','messages':[]},test).status_code==200
+    assert used[4:]==['openrouter'] and logs[-2]['skipped']=='test_reserve:limit_hold'
+    ns['_test_holds'].clear()
+    assert post(app,{'model':'coding','messages':[]},test).status_code==200 and used[5]=='claude-pro'
+
+
+def test_a_test_leaves_production_its_openrouter_reserve(tmp_path,monkeypatch):
+    ns=gateway(tmp_path,monkeypatch);logs=[];used=[]
+    async def complete(route,**kw):
+        used.append(route['provider'])
+        return SimpleNamespace(usage={'prompt_tokens':10,'completion_tokens':1,'cost':0.01},_hidden_params={},
+                               choices=[],model_dump=lambda:{'choices':[]})
+    ns.update(log=logs.append,provider_completion=complete);ns['BALANCE_FIXTURE']['usd']=3.0
+    ns['decision']=lambda task:{'model_id':'m','execution':[{'provider':'openrouter','model':'m','access':'paid',
+                                                                'host':{'price_in_1m':4.0,'price_out_1m':20.0}}]}
+    app=ns['build_app']()
+    refused=post(app,{'model':'coding','messages':[]},{'X-Walter-Channel':'test'})
+    assert refused.status_code==502 and 'balance_below_floor' in refused.text and used==[]
+    assert post(app,{'model':'coding','messages':[]}).status_code==200 and used==['openrouter']   # owner: last cent

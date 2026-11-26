@@ -86,8 +86,23 @@ RATE_LIMIT_WAITS = (4, 12)
 # account, on the owner's path (channel `owner`, so that what they prove is the path the owner uses): their runs,
 # and the sub-agents of those runs, spend on this budget all the same (2026-11-13: the validation passes of the
 # 12th and 13th spent about 14 $ on paid routes unseen by this cap, and emptied the OpenRouter credit).
+# Production reserve (owner, 2026-11-26: « les tests ne doivent pas épuiser les quotas ou crédits nécessaires à Walter
+# en production ; prévois une réserve ou un mécanisme d'arrêt préventif »). Production uses each subscription up to its
+# real limit (2026-11-20, no artificial reserve) and OpenRouter to the last cent (2026-11-21); tests stop before. The
+# night of 2026-11-25 → 26 benches emptied the Codex weekly quota (production memory fell over to paid Kie) and the
+# last OpenRouter cents (memory rerank had no route for 7 h). For a call of channel `test` only (see test_reserve):
+# `subscription_stop_weekly_percent` / `subscription_stop_session_percent`: a subscription route is left to production
+# once its weekly meter / its session window reads that much (meters read every 30 min and after agent turns);
+# `limit_hold_minutes`: and for that long after a test call met its real limit (429 / usage limit), the meters lag;
+# `openrouter_reserve_usd`: a paid OpenRouter route is left below that credit (production spent 0.02–0.25 $ a day on
+# it from 19 to 26/11, rerank and STT: 2 $ ≈ 8 days or more, while the Router's guardian warns at each credit step);
+# structured calls (decisions, rerank) count in the paid budget like chat calls and stop with it.
 TEST_BUDGET = {"paid_limit_eur": 2.0, "usd_per_eur": 1.10, "window_hours": 24, "accounts": ["e2e"],
-               "ledger": "@instance/state/llm/test-spend.jsonl", **(_CONF.get("test_budget") or {})}
+               "ledger": "@instance/state/llm/test-spend.jsonl", "subscription_stop_weekly_percent": 75.0,
+               "subscription_stop_session_percent": 70.0, "limit_hold_minutes": 60, "openrouter_reserve_usd": 2.0,
+               **(_CONF.get("test_budget") or {})}
+STRUCTURED_PAID = PAID | {"liquid", "nace"}          # structured routes billed per call (Workers AI is free)
+_test_holds: dict[str, float] = {}                    # subscription route -> until when tests leave it (this process)
 
 
 # ───────────────────────── secrets (Bitwarden through walter-secrets) ─────────────────────────
@@ -177,7 +192,10 @@ def test_budget() -> dict:
     limit = float(TEST_BUDGET["paid_limit_eur"]) * rate + approved
     return {"spent_usd": round(spent, 4), "limit_usd": round(limit, 4), "approved_usd": round(approved, 4),
             "spent_eur": round(spent / rate, 2), "limit_eur": round(limit / rate, 2),
-            "window_hours": TEST_BUDGET["window_hours"], "notified": notified}
+            "window_hours": TEST_BUDGET["window_hours"], "notified": notified,
+            "reserve": {k: TEST_BUDGET.get(k) for k in ("subscription_stop_weekly_percent",
+                                                         "subscription_stop_session_percent", "limit_hold_minutes",
+                                                         "openrouter_reserve_usd")}}
 
 
 def _price_usd(route: dict, usage: dict | None, body: dict) -> float:
@@ -216,6 +234,30 @@ def test_gate(route: dict, body: dict) -> str | None:
         threading.Thread(target=_telegram, args=(text,), daemon=True).start()
     return (f"test_budget: paid spend of tests {b['spent_eur']:.2f} EUR / {b['limit_eur']:.2f} EUR over "
             f"{b['window_hours']} h; the owner must approve more (walter-llm test-budget approve EUR)")
+
+
+def _sub_key(route: dict) -> str:
+    return f"{route.get('provider')}:{route.get('account') or ''}"
+
+
+def test_reserve(route: dict) -> str | None:
+    """Why a test call leaves this subscription route to production (see TEST_BUDGET), else None."""
+    if route.get("access") != "subscription":
+        return None
+    if _test_holds.get(_sub_key(route), 0) > time.time():
+        return "test_reserve:limit_hold"
+    sub = route.get("subscription") or {}
+    weekly, session = sub.get("quota_used_percent"), sub.get("session_used_percent")
+    if weekly is not None and float(weekly) >= float(TEST_BUDGET["subscription_stop_weekly_percent"]):
+        return "test_reserve:weekly_quota"
+    if session is not None and float(session) >= float(TEST_BUDGET["subscription_stop_session_percent"]):
+        return "test_reserve:session_quota"
+    return None
+
+
+def test_hold(route: dict) -> None:
+    """A test call met this subscription's real limit: tests leave it for `limit_hold_minutes`."""
+    _test_holds[_sub_key(route)] = time.time() + float(TEST_BUDGET["limit_hold_minutes"]) * 60
 
 
 def _charge(route: dict, entry: dict, telemetry: dict, body: dict) -> None:
@@ -1005,6 +1047,10 @@ async def _correlation(request, body: dict, agent: str) -> dict:
                            requested=row.get("requested"))
         if out["task_id"] and not out["run_id"]:
             raise HTTPException(409, "task correlation requires a resolved run")
+        # A caller may declare its calls tests (`X-Walter-Channel: test`: benches, judges, replays run with
+        # WALTER_RUN_CHANNEL=test, 2026-11-26). The label only ever tightens: no other value is read from it.
+        if (request.headers.get("X-Walter-Channel") or "").strip().lower() == "test":
+            out["channel"] = "test"
         return {k: v for k, v in out.items() if v is not None}
     except ValueError:
         raise HTTPException(400, "invalid correlation identifier") from None
@@ -1351,8 +1397,27 @@ def build_app():
         base = {"agent": agent, "task": task, "kind": task, **({"needs": needs} if needs else {}), **correlation,
                 **({"trace_run": trace} if trace else {})}   # payload plan lot 0 (2026-11-23): a label, no lookup
 
+        test = correlation.get("channel") == "test"
+        if test:     # the production reserve (TEST_BUDGET): the OpenRouter credit floor, the paid budget, its stop
+            refused = test_gate({}, {})
+            if refused:
+                log({**base, "ok": False, "seconds": 0, "skipped": "test_budget"})
+                return JSONResponse({"error": {"message": refused, "task": task}}, status_code=429)
+            try:
+                floor = float(body.get("paid_floor_usd") or 0)
+            except (TypeError, ValueError):
+                floor = 0.0
+            body["paid_floor_usd"] = max(floor, float(TEST_BUDGET["openrouter_reserve_usd"]))
+
         def attempt(entry: dict) -> None:
             log({**base, "model_id": entry.get("model"), **entry})
+            if test and entry.get("ok") and entry.get("cost_usd") and entry.get("provider") in STRUCTURED_PAID:
+                try:
+                    _ledger_add({"kind": "spend", "usd": round(float(entry["cost_usd"]), 6),
+                                 "estimated": entry.get("cost_status") != "reported", "provider": entry["provider"],
+                                 "model": entry.get("model"), "agent": agent, "task": task})
+                except (OSError, TypeError, ValueError):
+                    pass
         t0 = time.perf_counter()
         code, out = await run(body, attempt)
         out["gateway_ms"] = round((time.perf_counter() - t0) * 1000, 1)
@@ -1434,6 +1499,8 @@ def build_app():
             floor = float(request.headers["X-Walter-Paid-Floor-USD"]) if request.headers.get("X-Walter-Paid-Floor-USD") else None
         except ValueError:
             raise HTTPException(400, "invalid X-Walter-Paid-Floor-USD") from None
+        if correlation.get("channel") == "test":     # tests leave production its OpenRouter reserve (TEST_BUDGET)
+            floor = max(floor or 0.0, float(TEST_BUDGET["openrouter_reserve_usd"]))
         needs = request_needs(body)
         for index, route in enumerate(plan):
             t0 = time.perf_counter()
@@ -1450,6 +1517,12 @@ def build_app():
                     log({**base, "ok": False, "seconds": 0, "skipped": "balance_below_floor"})
                     passed.append({"position": index, "reason": "balance_below_floor"})
                     continue
+            reserved = test_reserve(route) if correlation.get("channel") == "test" else None
+            if reserved:
+                errors.append(f"{route['provider']}/{route['model']}: {reserved}")
+                log({**base, "ok": False, "seconds": 0, "skipped": reserved})
+                passed.append({"position": index, "reason": reserved})
+                continue
             if correlation.get("channel") == "test" and route["provider"] in PAID:
                 refused = test_gate(route, body)
                 if refused:
@@ -1500,6 +1573,8 @@ def build_app():
                      "stream": stream, "error": "CancelledError"})
                 raise
             except Exception as e:
+                if correlation.get("channel") == "test" and route.get("access") == "subscription" and _rate_limited(e):
+                    test_hold(route)                 # a real limit met by a test: tests leave this subscription
                 errors.append(f"{route['provider']}/{route['model']}: {type(e).__name__}")
                 log({**base, "ok": False, "seconds": round(time.perf_counter() - t0, 2), "error": type(e).__name__,
                      "params": sorted(k for k in body if k != "messages"),
