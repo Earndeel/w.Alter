@@ -46,6 +46,10 @@ class Doors:
         r.raise_for_status()
         return r.json()
 
+    async def owner_rules(self) -> dict:
+        """The owner's universal consignes in force (Memory, owner 2026-11-26): the stable block of the socle."""
+        return await self._mem("/v1/owner-rules", {}, timeout=2.5)
+
     async def run_start(self, body: dict) -> dict:
         return await self._mem("/v1/runs/start", body, timeout=6.0)
 

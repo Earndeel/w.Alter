@@ -112,6 +112,10 @@ class Settings:
     # lot 3b: the recipient's communication profile (core/interfaces/<name>/COMMUNICATION.md); a layout "…+comm" turns
     # it on for one test account
     communication: bool = False
+    # owner 2026-11-26: "socle" = the owner's universal consignes in force, read from Memory at each turn start, in the
+    # cached socle after the conduct at every level (L0 included); the preflight's pack then leaves them out. "pack" =
+    # before: they come in the per-message pack (L1-L4 only).
+    owner_rules: str = "pack"
     soul: str = ""
     conduct: str = ""
     operating: str = str(ENGINE_ROOT / "instructions" / "OPERATING.md")
@@ -179,6 +183,7 @@ def load(state: Path | None = None) -> Settings:
         prompt_layout_accounts={str(k): str(v) for k, v in dict(n.get("prompt_layout_accounts", {})).items()},
         doc_layer=str(n.get("doc_layer", "mcp")), skills_map=bool(n.get("skills_map", True)),
         communication=bool(n.get("communication", False)),
+        owner_rules=str(n.get("owner_rules", "pack")),
         soul=_resolve(n.get("soul", "")), conduct=_resolve(n.get("conduct", "")),
         operating=_module_path(n.get("operating", "instructions/OPERATING.md")),
         resume_interrupted=bool(n.get("resume_interrupted", True)), python=n.get("python", "full"),

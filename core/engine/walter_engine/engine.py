@@ -37,9 +37,62 @@ from .payload import Trace
 # the system text's parts, shared ones first (`[native] system_order = "socle_first"`; "legacy" = the order of 17/11)
 # lot 3a (2026-11-24): layout v2 adds the engine's operating rules and the owner's conduct after the Soul; layout v1
 # (one walter-soul profile in `soul`) keeps the same relative order
-SOCLE_FIRST = ("soul", "engine_rules", "conduct", "walter_doc", "skills_map", "mcp_instructions", "communication",
-               "environment", "journal_line")
-SOCLE_SHARED = frozenset(SOCLE_FIRST[:6])     # the same for every session: the cached socle (`_system_content`)
+# owner_rules (owner 2026-11-26): the universal consignes, shared by every session, at the end of the shared socle
+# (after the documentation and the skills map, still inside the cached block). Placement bench 26/11, 30 points × 3:
+# here (E) vs right after the conduct (B): quality and consignes equal (10/13/7 ties, broken 35/35), 0.37 s faster in
+# median (faster in 23 of 30, p 0.005); report /root/reports/2026-11-26-bloc-stable-activation.md
+SOCLE_FIRST = ("soul", "engine_rules", "conduct", "walter_doc", "skills_map", "mcp_instructions", "owner_rules",
+               "communication", "environment", "journal_line")
+SOCLE_SHARED = frozenset(SOCLE_FIRST[:7])     # the same for every session: the cached socle (`_system_content`)
+# rules sections of a pack (walter_memory.context titles): the formats that carried the universal consignes, and the
+# ones a pack has once they are in the socle (owner 2026-11-26)
+PACK_RULES_UNIVERSAL = ("## Règles durables de Monsieur", "## Consignes de Monsieur à Walter applicables",
+                        "## Consignes de Monsieur à Walter en vigueur")
+PACK_RULES_RELATED = ("## Consignes de Monsieur à Walter liées à ce message", "## Préférences et énoncés durables de Monsieur")
+PAST_RULES_NOTE = ("(Consignes de ce contexte antérieur retirées : celles en vigueur sont dans les instructions et dans le "
+                   "contexte du message actuel.)")
+
+
+def past_pack(text: str, at_ms: int | None, epoch_ms: int | None) -> str:
+    """An old turn's message as the model sees it again once the universal consignes are in the socle (owner
+    2026-11-26: « les anciens paquets conservés dans l'historique ne continuent pas à présenter des consignes devenues
+    obsolètes »): the sections in the former formats (they held the universal consignes, now given once by the socle)
+    always go; the related consignes and preferences go when the pack is older than the last change of the owner's
+    consignes (one in force ended or changed portée). Deterministic: the same history gives the same text, so the
+    provider cache breaks only when the format or the consignes change, never at each turn."""
+    i, j = text.find("<walter-context>"), text.find("</walter-context>")
+    if i < 0 or j < i:
+        return text
+    stale = epoch_ms is not None and at_ms is not None and at_ms < epoch_ms
+    secs = re.split(r"\n(?=## )", text[i + len("<walter-context>"):j])
+    kept = [s for s in secs if not s.lstrip().startswith(PACK_RULES_UNIVERSAL)
+            and not (stale and s.lstrip().startswith(PACK_RULES_RELATED))]
+    if len(kept) == len(secs):
+        return text
+    body = "\n".join(kept).rstrip() + "\n" + PAST_RULES_NOTE
+    return text[:i] + "<walter-context>" + body + "\n" + text[j:]
+
+
+
+def socle_block(answer: dict, parts: dict) -> dict | None:
+    """The stable block from Memory's answer (/v1/owner-rules) and the socle parts this turn sends: a consigne is left
+    out only while every quote of its covered_by marks is in the named part (owner 2026-11-26: a marking never makes a
+    consigne unreachable once the instruction that covered it changes or goes)."""
+    items = answer.get("items") or []
+    lines = [i["line"] for i in items if not (i.get("covered_by") and all(
+        m.get("quote") and m["quote"] in (parts.get(m.get("part")) or "") for m in i["covered_by"]))]
+    if not lines:
+        return None
+    text = f"## {answer.get('title') or 'Consignes universelles de Monsieur à Walter'}\n" + "\n".join(lines)
+    return {"text": text, "sha": hashlib.sha256(text.encode()).hexdigest()[:16], "epoch": answer.get("epoch"),
+            "left_out": len(items) - len(lines)}
+
+def _epoch_ms(iso: str | None) -> int | None:
+    from datetime import datetime
+    try:
+        return int(datetime.fromisoformat(iso).timestamp() * 1000) if iso else None
+    except ValueError:
+        return None
 # lot 3b: the recipient's communication profile, the same for every session of that recipient — its own cache block
 INTERFACES = config.ENGINE_ROOT.parent / "interfaces"
 DOOR_PROFILE = {"web": "web", "telegram": "telegram"}   # voice / desktop: no door renders them yet (inactive)
@@ -172,6 +225,7 @@ class Agent:
         self._sys_parts: list[tuple[str, str]] = []   # the same, part by part (payload trace)
         self._skills0: str | None = None
         self._doc: str = ""                       # lot 3c: W.Alter's documentation part (D1), read at each turn start
+        self._rules: dict | None = None            # owner 2026-11-26: this turn's stable block {text, sha, epoch}, memory only
         self.turn_no: int | None = None
         self.step_no: int | None = None
         self.title_asked = bool(session.title())
@@ -456,7 +510,8 @@ class Engine:
         a.turn_no, a.step_no = turn, 0
         a.fails, a.joined = {}, []
         # lot 3a: an edited Soul, conduct or operating rule reaches an open session at its next turn (one cache write),
-        # never in the middle of a turn
+        # never in the middle of a turn — and so does a changed universal consigne (owner 2026-11-26)
+        await self._owner_rules(a)
         a._sys_sig = self._sys_sources_sig(a)
         kinds = sorted({(i["source"] or {}).get("kind") for i in items})
         a.pending_trigger = None if requests else (
@@ -931,6 +986,7 @@ class Engine:
                     "turn_id": f"{a.key}:{journal.now_ms()}", "message": message[:6000], "previous": previous,
                     "runtime": config.RUNTIME, "session_id": a.key, "privacy_class": "cloud_allowed",
                     "run_id": (run or {}).get("run_id"), "exclude_blocks": ["capabilities"], "answer_within_ms": 7000,
+                    **({"socle_rules": a._rules["sha"]} if a._rules else {}),   # its pack leaves them out (26/11)
                     **({"channel": "machine"} if channel == "machine" else {})}, timeout_s=8.0)
                 if out.get("error") or not out.get("plan"):
                     raise RuntimeError(out.get("error") or "no plan")
@@ -1163,7 +1219,32 @@ class Engine:
         a._doc = _doc_layer(doc) if doc in DOC_FORMS else ""
         if a._doc:
             out.append(("walter_doc", hashlib.sha256(a._doc.encode()).hexdigest()[:16], doc))
+        if a._rules:
+            out.append(("owner_rules", a._rules["sha"]))
         return tuple(out)
+
+    async def _owner_rules(self, a: Agent) -> None:
+        """[native] owner_rules = "socle" (owner 2026-11-26): the owner's universal consignes in force, read from Memory
+        (their only source) at each turn start and kept in memory only — never written to a file. A consigne the socle
+        already says is left out while every quote of its `covered_by` marks is still in that instruction: when the
+        instruction changes, the consigne comes back by itself. Memory unreachable: this engine's last good answer;
+        none: no block this turn, and the preflight is not told, so its pack carries them as before."""
+        a._rules = None
+        if self.s.owner_rules != "socle" or self._layout_spec(a)[0] != "v2":
+            return
+        last = getattr(self, "_rules_last", None)
+        try:
+            out = await asyncio.wait_for(self.doors.owner_rules(), 3.0)
+            if isinstance(out, dict) and isinstance(out.get("items"), list):
+                last = self._rules_last = out
+        except Exception as e:  # noqa: BLE001
+            log.warning("owner rules: Memory unreachable (%s): %s", type(e).__name__,
+                        "this engine's last block" if last else "no block this turn")
+        if not last or not last.get("items"):
+            return
+        parts = {k: self._read_part(p) for k, p in (("soul", self.s.soul), ("engine_rules", self.s.operating),
+                                                    ("conduct", self.s.conduct)) if p}
+        a._rules = socle_block(last, parts)
 
     @staticmethod
     def _read_part(path: str) -> str:
@@ -1185,6 +1266,8 @@ class Engine:
             named = [(k, t) for k, t in (("soul", self._read_part(self.s.soul)),
                                          ("engine_rules", self._read_part(self.s.operating)),
                                          ("conduct", self._read_part(self.s.conduct))) if t]
+            if a._rules and any(k == "soul" for k, _ in named):
+                named.append(("owner_rules", a._rules["text"]))      # owner 2026-11-26: the stable block
             if not any(k == "soul" for k, _ in named):   # no Soul file: the v1 profile rather than no identity
                 log.warning("prompt layout v2: Soul unreadable (%s), v1 profile used", self.s.soul)
                 named, v2 = [], False
@@ -1287,7 +1370,11 @@ class Engine:
                     f"rend l'original] …\n{c[-tail:]}")
 
         out = [{"role": "system", "content": self._system_content(a)}]
+        epoch = _epoch_ms((a._rules or {}).get("epoch"))
+        times = {e["seq"]: e.get("time") for e in a.session.events} if a._rules else {}
         for seq, m in journal.surface(a.session, prune=prune):
+            if a._rules and seq < live_from and m.get("role") == "user" and isinstance(m.get("content"), str):
+                m["content"] = past_pack(m["content"], times.get(seq), epoch)
             imgs = m.pop("_images", None)
             if imgs and seq >= live_from:
                 parts = [{"type": "text", "text": m.get("content") or ""}]
