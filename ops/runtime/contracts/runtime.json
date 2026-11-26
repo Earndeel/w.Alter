@@ -106,7 +106,7 @@
     {
       "id": "python",
       "path": "bin/walter-python",
-      "role": "Interpréteur Python partagé des modules",
+      "role": "Shared Python interpreter of the modules",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -117,5 +117,13 @@
       ],
       "vision_target": "ops/runtime"
     }
-  ]
+  ],
+  "presentation": {
+    "audience": "agent",
+    "title": "Shared Python runtime",
+    "order": 87,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "tools": []
+  }
 }
