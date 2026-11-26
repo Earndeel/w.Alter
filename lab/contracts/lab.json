@@ -168,7 +168,7 @@
     {
       "id": "library",
       "path": "walter_lab",
-      "role": "Lab : bancs, comparaisons, propositions (jamais de déploiement)",
+      "role": "Lab: benches, comparisons, proposals (never a deployment)",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -182,7 +182,7 @@
     {
       "id": "experiments",
       "path": "experiments",
-      "role": "Expériences et résultats",
+      "role": "Experiments and results",
       "status": "active",
       "readme": "README.md",
       "vision_target": "lab/experiments"
@@ -190,7 +190,7 @@
     {
       "id": "computer-use-v2",
       "path": "computer-use-v2",
-      "role": "Étude Computer Use V2 (Adaptive Universal Operator) : architecture, prototype en observation, banc ; à l'arrêt",
+      "role": "Computer Use V2 study (Adaptive Universal Operator): architecture, observed prototype, bench; stopped",
       "owner": "lab",
       "status": "experimental",
       "readme": "computer-use-v2/README.md",

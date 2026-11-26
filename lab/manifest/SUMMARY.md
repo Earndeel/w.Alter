@@ -1,1 +1,1 @@
-Expériences mesurées : `walter-lab run <expérience>` compare et propose ; `sandbox run|probe` isole explicitement une source approuvée dans Docker sans réseau, limites dans le README.
+Walter Lab measures before changing: it compares a variant with the current behaviour on the same end-to-end scenarios and proposes, without ever modifying W.Alter itself.
