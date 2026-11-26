@@ -152,7 +152,31 @@
     "guide": "manifest/GUIDE.md",
     "tools": [
       "computer_use"
-    ]
+    ],
+    "capabilities": {
+      "computer_use": {
+        "effects": [
+          "external_state"
+        ],
+        "concurrency": {
+          "resource": "computer-device"
+        },
+        "consumes": [
+          "device_session"
+        ],
+        "produces": [
+          "device_session",
+          "file"
+        ],
+        "idempotency": "none",
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "outcome_unknown"
+        ]
+      }
+    }
   },
   "components": [
     {
