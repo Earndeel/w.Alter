@@ -86,9 +86,10 @@ relevance_only_subjects = ["project:"]
 # restitution : "rules" = couche « Règles durables » choisie par genre (avant) ; "applicable" = seules les consignes
 # applicables au message sont des instructions, les préférences viennent à part et seulement si le message s'y
 # rapporte, opinions et faits seulement par la mémoire pertinente (M3). Retour arrière : remettre "v3" / "rules".
-# Rien n'est activé avant que Monsieur ait vu les bancs.
+# 2026-11-26 (Monsieur : « je valide M1 à M5 et le reclassement réversible du stock ») : stock retypé sous l'étiquette
+# retype-2026-11-26 (765 éléments, 3 incertains gardés tels quels ; knowledge.revert l'annule), restitution active.
 extraction = "v3"
-restitution = "rules"
+restitution = "applicable"
 
 [consolidation]
 # P1.2: g1 subject views rebuilt from current V1 knowledge and evidence (status 'shadow': built, not served).
