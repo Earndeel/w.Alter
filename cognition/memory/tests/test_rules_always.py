@@ -53,5 +53,6 @@ def test_a_repeated_rule_is_shown_with_its_newest_date():
             "content": json.dumps({"summary": "", "items": [item]}), "cost_usd": 0, "model": "scripted",
             "usage": {"prompt_tokens": 10}})
     r = working.owner_rules(f"quand part le compte rendu du chantier {tag} ?", budget=2000)
-    line = next(x for x in r["text"].splitlines() if tag in x)
+    shown = r["text"] + "\n" + ((r.get("preferences") or {}).get("text") or "")   # M3: a preference has its own part
+    line = next(x for x in shown.splitlines() if tag in x)
     assert f"({now:%d/%m/%Y})" in line, line
