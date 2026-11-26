@@ -1,1 +1,1 @@
-Coffre Bitwarden sans jamais voir une valeur. `secret_search`, `secret_reference`, puis `walter-secret exec --bind VAR=<réf> -- <commande>` en local.
+Walter Secrets gives agents the use of {{owner.address}}'s whole Bitwarden vault without any secret value ever entering a model, a log, a prompt or a URL.

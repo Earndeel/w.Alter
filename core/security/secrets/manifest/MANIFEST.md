@@ -1,12 +1,17 @@
-# Walter Secrets — coffre Bitwarden
+# Walter Secrets
 
-L'usage de tout le coffre de {{owner.address}} sans qu'aucune valeur secrète n'entre dans un modèle, un journal, un prompt ou une URL.
+**Role.** Use of {{owner.address}}'s whole Bitwarden vault — logins, API keys, cards, codes received by e-mail or
+Beeper — while no secret value enters a model, a journal, a prompt or a URL.
 
-**Organisation** : accès Bitwarden avec session partagée (`walter-secrets-sync`), API sûre pour les modèles (métadonnées, références), exécution locale, codes reçus par e-mail ou Beeper, autorisations de W.Alter (`walter-secret grants`).
+**Organisation.** Bitwarden access with a shared session (`walter-secrets-sync`), a model-safe API (metadata,
+references), local execution, received codes, and W.Alter's grants per account (`walter-secret grants`: which
+component may read which key).
 
-**Utilisation**
-1. `secret_search(query, kind)` : trouver l'entrée (métadonnées seulement).
-2. `secret_reference(item, field)` : référence sans valeur.
-3. En local : `walter-secret exec --bind VAR=<référence> -- <commande>` ; la valeur n'existe que dans le processus lancé. Code reçu : `walter-secret otp <site>`.
+**Use**
+1. `secret_search(query, kind)`: find the entry (metadata only).
+2. `secret_reference(item, field)`: a reference, without the value.
+3. Locally: `walter-secret exec --bind VAR=<reference> -- <command>`; the value exists only inside the launched
+   process. Received code: `walter-secret otp <site>`.
 
-**Règles** : jamais `bw unlock` direct ; jamais de secret dans un prompt, une réponse, une URL, un argument ou une unité systemd.
+**Rules**: never run `bw unlock` directly; never put a secret in a prompt, an answer, a URL, a command argument or a
+systemd unit; API keys are read through grants, never written to a file.

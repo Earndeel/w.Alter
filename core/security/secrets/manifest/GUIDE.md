@@ -1,44 +1,39 @@
-# Walter Secrets — guide détaillé
+# Walter Secrets — detailed guide
 
-## Objectif
+## Purpose
+Give agents the use of {{owner.address}}'s complete Bitwarden vault without any secret value entering a model, a
+journal, a prompt or a URL. An agent uses it to find a login, key or card and use it in a local command, or to
+retrieve a code received by e-mail or Beeper.
 
-Donner aux agents l'usage du coffre Bitwarden complet de {{owner.address}} sans qu'aucune valeur secrète n'entre dans un
-modèle, un journal, un prompt ou une URL. Un agent s'en sert pour trouver un identifiant, une clé ou une carte et
-l'utiliser dans une commande locale, ou pour récupérer un code reçu par e-mail ou Beeper.
-
-## Comment l'utiliser
-
-1. `secret_search(query, kind)` : métadonnées et identifiants d'entrées, jamais de mot de passe, token, OTP ou cookie.
+## How to use it
+1. `secret_search(query, kind)`: metadata and identifiers of entries, never a password, token, OTP or cookie.
    `kind` = login, card, identity, note, ssh_key.
-2. `secret_reference(item, field)` : référence `walter-secret://bitwarden/<uuid>/<champ>` sans valeur. Une
-   référence est un pointeur, pas une autorisation.
-3. Exécution locale : `walter-secret exec --bind VAR=<référence> -- <commande>` ; la valeur n'existe que dans
-   l'environnement du processus lancé, qui hérite des permissions du harness. Sa sortie est jetée.
+2. `secret_reference(item, field)`: a `walter-secret://bitwarden/<uuid>/<field>` reference without value. A reference
+   is a pointer, not an authorisation.
+3. Local execution: `walter-secret exec --bind VAR=<reference> -- <command>`; the value exists only in the
+   environment of the launched process, which inherits the harness's permissions. Its output is discarded.
+4. Components read their API keys through grants (`@instance/accounts/<id>.toml`: `allow` = readers, `[env]` =
+   variable name): `walter-secret grant env|exec --as <consumer>`.
 
 ## Organisation
-
-| Partie | Rôle |
+| Part | Role |
 |---|---|
-| `walter_secrets/vault.py` | Accès Bitwarden, métadonnées, pièces jointes, audit |
-| `walter_secrets/service.py` | API v1 sûre pour les modèles (search, reference) et exécution locale |
-| `walter_secrets/masking.py` | Masquage partagé, erreurs publiques sans texte d'exception |
-| `walter_secrets/unlock.py` | Déverrouillage depuis le coffre local chiffré age (session partagée) |
-| `walter_secrets/otp.py` | Codes reçus : Gmail (connecteur Walter Memory), Beeper |
-| `secrets_sync.py`, `vault_react.py` | Surveillance du coffre, application aux cibles, sauvegarde chiffrée |
-| `ports/hermes/` | Outils `secret_*`, crochets et remplissage de formulaires dans le navigateur Hermes |
-| `walter-secret grants` | Autorisations de W.Alter sur les comptes et services |
+| `walter_secrets/vault.py` | Bitwarden access, metadata, attachments, audit |
+| `walter_secrets/service.py` | Model-safe v1 API (search, reference) and local execution |
+| `walter_secrets/masking.py` | Shared masking, public errors without exception text |
+| `walter_secrets/unlock.py` | Unlock from the local age-encrypted store (shared session) |
+| `walter_secrets/otp.py` | Received codes: Gmail (Walter Memory connector), Beeper |
+| `secrets_sync.py`, `vault_react.py` | Vault watching, application to targets, encrypted backup |
+| `walter-secret grants` | W.Alter's authorisations per account and service |
 
 ## Interfaces
+| Need | MCP | Local CLI |
+|---|---|---|
+| Find | `secret_search` | `walter-secret search` |
+| Reference | `secret_reference` | `walter-secret ref` |
+| Use | — | `walter-secret exec --bind …` |
+| Grants | — | `walter-secret grants`, `walter-secret grant env|exec --as` |
 
-| Besoin | MCP | Hermes | CLI locale |
-|---|---|---|---|
-| Trouver | `secret_search` | `secret_*` | `walter-secret search` |
-| Référencer | `secret_reference` | `secret_*` | `walter-secret ref` |
-| Utiliser | — | substitution de l'adaptateur Hermes | `walter-secret exec --bind …` |
-
-## Règles et limites
-
-- Ne jamais lancer `bw unlock` directement : la session est partagée par `walter-secrets-sync`.
-- Jamais de secret dans une unité systemd, une URL, un argument de commande ou une réponse.
-- La substitution Hermes ne fonctionne que dans Hermes ; ailleurs, `walter-secret exec`.
-- Rotation du mot de passe maître en attente (fuite du 2026-10-22).
+## Rules and limits
+- Never run `bw unlock` directly: the session is shared by `walter-secrets-sync`.
+- Never a secret in a systemd unit, a URL, a command argument or an answer.
