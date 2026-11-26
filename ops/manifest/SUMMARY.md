@@ -1,1 +1,1 @@
-Installer, déployer, sauvegarder, restaurer Walter : `walter-ops backup status` (santé, restaurabilité), `walter-ops backup checkpoint` avant une modification risquée.
+Walter Ops installs, deploys, versions, backs up and restores the W.Alter software and its instances, and runs the guardians that keep each module healthy.

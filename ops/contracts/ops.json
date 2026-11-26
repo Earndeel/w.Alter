@@ -179,7 +179,7 @@
     {
       "id": "backup",
       "path": "backup",
-      "role": "Sauvegardes (pg, state.db, restic, publication git)",
+      "role": "Backups (PostgreSQL, restic offsite, git publication)",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -193,7 +193,7 @@
     {
       "id": "ops",
       "path": "walter_ops",
-      "role": "Installation, déploiement, récupération",
+      "role": "Installation, deployment, recovery",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -207,70 +207,70 @@
     {
       "id": "services",
       "path": "/services",
-      "role": "Dépendances opérationnelles de Walter (bases, bureaux distants, environnements Python partagés, passerelles) : installations, définitions de déploiement et données techniques ; jamais de code de Walter",
+      "role": "W.Alter's operational dependencies (databases, remote desktops, shared Python environments, gateways): installations, deployment definitions and technical data; never W.Alter code",
       "status": "active",
       "readme": "/services/README.md"
     },
     {
       "id": "postgres",
       "path": "/services/postgres",
-      "role": "PostgreSQL de Walter en service depuis le 2026-11-10 (E9.2b) : données dans /services/postgres/data, configuration dans config/, compose verrouillé par empreinte ; conteneur walter-pg (hindsight-pg jusqu’au 2026-11-21), 127.0.0.1:5433. Déplacement et retour arrière : walter-pg-relocate (ops/backup/scripts)",
+      "role": "W.Alter's PostgreSQL: container walter-pg (127.0.0.1:5433), data in /services/postgres/data, settings in config/, compose locked by fingerprint",
       "status": "active",
       "readme": "/services/postgres/README.md"
     },
     {
       "id": "python",
       "path": "/services/python",
-      "role": "Environnements Python installés des modules (runtime de walter-python, core, router, llm, raw-vault), déplacés le 2026-11-10 (E9.2a) ; chaque module garde un lien venv ; exclus de restic, reconstruits depuis les verrous des modules",
+      "role": "Installed Python environments of the modules (walter-python runtime, core, router, llm, raw-vault); excluded from restic, rebuilt from the modules' locks",
       "status": "active",
       "readme": "/services/python/README.md"
     },
     {
       "id": "webtop",
       "path": "/services/webtop",
-      "role": "Bureau XFCE en conteneur (Browse, Computer), rangé le 2026-11-11 (ancien dossier = lien de compatibilité) ; compose verrouillé par empreinte ; config/.cache exclu de restic",
+      "role": "XFCE desktop in a container (Browse, Computer); compose locked by fingerprint",
       "status": "active",
       "readme": "/services/webtop/README.md"
     },
     {
       "id": "browse-display",
       "path": "/services/browse-display",
-      "role": "Écran Selkies (X :101) du navigateur de Walter, rangé le 2026-11-11 ; compose + config/, démarré par walter-browse-display.service",
+      "role": "Selkies display (X :101) of W.Alter's browser, started by walter-browse-display.service",
       "status": "active",
       "readme": "/services/browse-display/README.md"
     },
     {
       "id": "flaresolverr",
       "path": "/services/flaresolverr",
-      "role": "FlareSolverr (127.0.0.1:8191) pour la recherche web, rangé le 2026-11-11 ; sans données",
+      "role": "FlareSolverr (127.0.0.1:8191) for web search; no data",
       "status": "active",
       "readme": "/services/flaresolverr/README.md"
     },
     {
       "id": "nordvpn-proxy",
       "path": "/services/nordvpn-proxy",
-      "role": "Proxy NordVPN de Browse, rangé le 2026-11-11 ; CASSÉ (sleep infinity, rien ne sert :1080) : à réparer ou retirer",
+      "role": "Settings of Browse's NordVPN per-country exits, opened on demand by walter-wg-exit",
       "status": "active",
       "readme": "/services/nordvpn-proxy/README.md"
     },
     {
       "id": "raw-vault-s3",
       "path": "/services/raw-vault-s3",
-      "role": "Raw Vault en S3 (127.0.0.1:8899, rclone) ; source de l'unité, clés lues dans @instance/bootstrap/raw-vault",
+      "role": "Raw Vault as S3 (127.0.0.1:8899, rclone); keys read from the instance's bootstrap",
       "status": "active",
       "readme": "/services/raw-vault-s3/README.md"
     },
     {
       "id": "cloudflared",
       "path": "/services/cloudflared",
-      "role": "Tunnel Cloudflare (entrée publique de l'instance) ; réglages et identifiants (0600) dans config/, rangés le 2026-11-11 depuis le dossier d'intégrations de Hermes",
+      "role": "Cloudflare tunnel (the instance's public ingress); settings and credentials (0600) in config/",
       "status": "active",
       "readme": "/services/cloudflared/README.md"
     },
     {
       "id": "devboard",
       "path": "devboard",
-      "role": "Tableau de développement de Walter : chantiers, accords attendus, décisions remplacées, documents, activité des agents en direct (page tailnet, lecture seule)",
+      "role": "W.Alter's development board: projects, pending agreements, replaced decisions, documents, agents' live activity (tailnet page, read-only)",
       "status": "experimental",
       "readme": "devboard/README.md",
       "interfaces": [

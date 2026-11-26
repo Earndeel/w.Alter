@@ -9,6 +9,12 @@ S = "claude_code/vm/abc"
 MODULES = {"context", "memory", "ops", "core"}
 
 
+@pytest.fixture(autouse=True)
+def no_memory_cli(monkeypatch):
+    """The brief's readings of walter-memory (logs, tasks) never reach the real one in tests."""
+    monkeypatch.setattr(actions, "_cli", lambda *a, **k: None)
+
+
 class FakeEngine:
     def __init__(self):
         self.ops, self.results = [], {}
@@ -64,6 +70,37 @@ def test_brief_carries_card_note_evidence_and_outcome_rule(c):
     assert "ÉTAT: done" in text and "relit avant l'envoi" in text
 
 
+def test_brief_carries_the_last_known_point_and_the_linked_tasks_without_repeats(c, monkeypatch):
+    card(c)
+    c.execute("""insert into devboard.card_evidence (card_id, kind, source_ref, seq, quote, at)
+                 select 1, 'task', 'task:0000aaaa-0000-0000-0000-000000000000', 1, quote, at from devboard.card_evidence
+                 where card_id = 1 limit 1""")
+    calls = []
+
+    def cli(*args, timeout=12):
+        calls.append(args)
+        if args[:2] == ("logs", "timeline"):
+            seq = int(args[args.index("--seq") + 1])
+            return {"session": {"title": "Vocaux", "cwd": "/srv/work"},
+                    "events": [{"seq": seq - 2, "type": "user/message", "text": "et les vocaux ?"},
+                               {"seq": seq, "type": "assistant/message", "text": "Les vocaux sont rangés en vidéo."},
+                               {"seq": seq + 5, "type": "assistant/message", "text": "autre sujet"}]}
+        if args[:2] == ("tasks", "show"):
+            return {"task": {"status": "suspended", "thread_id": "subject:x", "goal": "Vocaux Instagram",
+                             "progress": {"done": ["backfill lancé"], "next": ["vérifier les doublons"]}}}
+    monkeypatch.setattr(actions, "_cli", cli)
+    text = actions.brief(c, "W-1", owner="Camille")
+    assert "Dernier point connu du chantier" in text and "demande de Camille juste avant" in text
+    assert "demandée par Camille" in text and "« et les vocaux ? »" in text
+    assert "Les vocaux sont rangés en vidéo." in text and "autre sujet" not in text, "never what followed"
+    assert "suite prévue : vérifier les doublons" in text and "fil subject:x" in text
+    assert "logs_timeline(session, seq)" in text
+    quotes = [l for l in text.splitlines() if l.startswith("- ") and " : « " in l and ("session " in l or "task " in l)]
+    assert len(quotes) == len({l.split(" : « ", 1)[1] for l in quotes}), "the same words shown once"
+    monkeypatch.setattr(actions, "_cli", lambda *a, **k: None)
+    assert "Dernier point connu" not in actions.brief(c, "W-1"), "walter-memory silent: the brief goes without"
+
+
 def test_resume_opens_the_card_conversation_and_records_it(c):
     card(c, status="waiting_owner")
     eng = FakeEngine()
@@ -72,6 +109,7 @@ def test_resume_opens_the_card_conversation_and_records_it(c):
     assert [o["op"] for o in eng.ops] == ["session.open", "turn.submit"]
     assert eng.ops[0]["interface"] == "web" and eng.ops[0]["conversation"] == "devboard-w-1"
     assert eng.ops[0]["principal"] == {"kind": "owner", "id": "owner"}
+    assert "level" not in eng.ops[0], "no tier pinned: the plan's own"
     assert eng.ops[1]["idempotency_key"] == out["request_id"] and "vas-y" in eng.ops[1]["message"]["text"]
     assert status(c, "W-1") == "in_progress"
     row = c.execute("select * from devboard.resumes").fetchone()
@@ -164,6 +202,14 @@ def test_buttons_only_on_the_loopback_listener(web, c):
     assert local.post("/api/actions/abandon", json={"ref": "W-1"}).status_code == 400      # no action header
     r = local.post("/api/actions/abandon", json={"ref": "W-1", "reason": "fait ailleurs"}, headers=H)
     assert r.status_code == 200 and status(c, "W-1") == "abandoned"
+
+
+def test_resume_runs_on_the_tier_the_instance_pins(c):
+    card(c, status="waiting_owner")
+    eng = FakeEngine()
+    with c.transaction():
+        actions.resume(c, cfg(resume_level="L3"), eng, "W-1")
+    assert eng.ops[0]["level"] == "L3"
 
 
 def test_resume_over_http_and_card_detail_shows_it(web, c):

@@ -19,6 +19,7 @@ engine_url = "http://127.0.0.1:8895"            # Engine API (core/interfaces/ap
 engine_token_file = "@instance/bootstrap/engine/api.token"
 engine_interface = "web"                        # door of a resume = the owner's own
 engine_account = "owner"
+resume_level = ""                               # the instance may pin a Router text tier (L1–L3) on its resumes
 notify_command = []                             # the instance names how the end of a resume is told to its owner
 follow_seconds = 20
 resume_lost_hours = 8

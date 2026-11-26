@@ -1,20 +1,18 @@
-### Walter Ops — installer, déployer, protéger et restaurer
+# Walter Ops
 
-Ancien walter-backup (renommé le 2026-10-29 ; `walter-backup` reste un alias exact). Façade unique sur les mécanismes de sauvegarde existants (PostgreSQL, state.db, offsite chiffré, tests de restauration) et sur git. Fonctionne sans les autres modules ni modèle.
+**Role.** One facade over the backup mechanisms (PostgreSQL dumps, encrypted offsite restic repository, monthly
+restore tests), git publication and the guardians. It works without the other modules and without any model, and
+owns no other module's code, contracts or migrations. (Formerly walter-backup; `walter-backup` remains an exact alias.)
 
-**Utilisation**
-- `walter-ops backup status` : trois réponses séparées — conformité du code, santé de chaque sauvegarde, dernière restauration prouvée.
-- Avant une modification risquée : `walter-ops backup checkpoint --level git --scope <dépôt>` (code, recette), `--level files --scope <module>`, `--level db --schema <schéma>` (migration). La commande rend la marche à suivre pour revenir en arrière ; elle ne restaure jamais elle-même.
-- `walter-ops git` : dépôts Walter, travail non commité et son âge.
-- `walter-ops check` : surveille aussi les caches déjà suivis et le travail non suivi ancien ; archives et
-  rapports conservés sont comptés séparément. Alertes G0 seulement, aucun nettoyage automatique. Âge fondé sur mtime.
+**Use**
+- `walter-ops backup status`: three separate answers — code compliance, health of each backup, last proven restore.
+- Before a risky change: `walter-ops backup checkpoint --level git --scope <repo>` (code), `--level files --scope
+  <module>`, `--level db --schema <schema>` (migration). It returns the rollback steps; it never restores by itself.
+- `walter-ops git`: W.Alter repositories, uncommitted work and its age. `walter-ops check`: caches and old untracked
+  work (alerts only, no automatic cleanup).
+- Guardians (`walter-guardians`): per-module detection and authorised repairs; Telegram only when the owner is needed.
+- Development board (`devboard`, tailnet page): projects, pending agreements, replaced decisions, agents' live work.
+  Read-only; a wrong card is corrected with the MCP tool `devboard_correct`, only at {{owner.address}}'s request.
 
-Les compatibilités déclarées et les preuves historiques ne sont pas des résidus à supprimer. Voir `git.preserved_paths`
-et `git.generated_patterns` dans la configuration ; détail et limites dans le README.
-- Tableau de développement (`devboard`, page tailnet :3093) : chantiers de Walter, accords attendus, décisions
-  remplacées, documents, travail des agents en direct. Lecture seule ; `walter-devboard status` dit ce qu'il attend ;
-  une carte fausse se corrige par l'outil MCP `devboard_correct`, seulement à la demande de {{owner.address}}.
-
-Une restauration réelle se fait seulement avec l'accord de {{owner.address}}.
-
-À venir (conçu, pas encore construit) : installation propre d'un nouveau Walter, onboarding, restauration intégrale d'une instance (`walter-ops install|onboard` répondent « planned »).
+A real restore happens only with {{owner.address}}'s agreement. Planned, not built: clean install of a new W.Alter,
+onboarding, full restore of an instance (`walter-ops install|onboard` answer "planned").

@@ -24,11 +24,19 @@ les actions ne répondent que sur l'écoute en boucle locale, derrière la conne
 - **Abandonner** (`POST api/actions/abandon {ref, reason}`) : correction `status = abandoned` par le propriétaire, avec
   sa raison ; une reprise en cours est interrompue (`turn.cancel`). Une lecture ne peut plus rouvrir la carte.
 - **Reprendre** (`POST api/actions/resume {ref, note}`, `actions.py`) :
-  1. le tableau rédige la fiche de reprise : titre, état, ce que ça change, consigne tapée avec le clic, preuves datées,
-     activité, corrections, décisions, fichiers, blocages, issue de la reprise précédente, règles d'arrêt ;
+  1. le tableau rédige la fiche de reprise : titre, état, ce que ça change, consigne tapée avec le clic, preuves datées
+     (sans doublon, avec l'outil pour ouvrir chaque source), activité, corrections, décisions, fichiers, blocages, issue
+     de la reprise précédente, règles d'arrêt ; et, lus par la CLI `walter-memory` (cloud-safe, sans réponse = fiche
+     sans eux) : le **dernier point connu** — le message entier de l'agent d'où vient la preuve de session la plus
+     récente et la demande du propriétaire juste avant, jamais ce qui suit (une longue session passe à autre chose) — et
+     les **tâches durables liées** (statut, fait, suite prévue, fil) ;
   2. il ouvre (ou retrouve) la conversation du chantier dans le moteur : `web/owner/devboard-w-<n>` (porte `web` = accès
      complet du propriétaire ; même conversation à chaque reprise de la carte, visible dans Walter Web), y soumet la
      fiche (clé d'idempotence = jamais deux fois), passe la carte « en cours » et la montre active (`devboard.live`) ;
+     si l'instance fixe `resume_level` (L1–L3), la conversation est ouverte avec ce niveau épinglé (`session.open`
+     `level`) : chaque appel de la reprise passe par ce niveau du Router (la tâche reste celle du plan), quel que soit
+     le niveau jugé par le préflight, et le budget d'étapes du tour est au moins celui de ce niveau ; vide = le niveau
+     du plan à chaque message ;
   3. le suivi (`follow_once`, toutes les `follow_seconds`) lit `turn.result` ; à la fin, la reprise est rangée dans
      `devboard.resumes` (statut, compte rendu), la carte prend l'état que le moteur écrit sur sa dernière ligne
      (`ÉTAT: done | waiting_owner | in_progress | abandoned`, correction signée `walter-reprise`) — jamais sur un tour

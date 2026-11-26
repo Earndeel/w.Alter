@@ -46,6 +46,7 @@ class Config:
     engine_token_file: Path | None = None             # @instance/bootstrap/engine/api.token
     engine_interface: str = "web"                     # door of the resumes: the owner's own (full access)
     engine_account: str = "owner"
+    resume_level: str = ""                            # Router text tier pinned on the resumes (L1–L3), "" = the plan's
     notify_command: list = field(default_factory=list)   # end of a resume told to the owner (text appended)
     follow_seconds: int = 20
     resume_lost_hours: float = 8.0

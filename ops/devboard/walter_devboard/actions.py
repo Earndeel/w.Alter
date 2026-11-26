@@ -23,7 +23,7 @@ RESUMABLE = ("waiting_owner", "in_progress", "paused", "done", "abandoned")
 OUTCOME_LINE = re.compile(r"^\W*(?:ÉTAT|ETAT|STATE)\s*[:=]\s*`?(done|waiting_owner|in_progress|abandoned)`?\W*$",
                           re.I | re.M)
 ENDED = {"ok", "cancelled", "budget_exhausted", "error", "interrupted", "unknown_outcome"}
-STATUS_FR = {"waiting_owner": "attend Monsieur", "in_progress": "en cours", "paused": "en pause", "done": "fini",
+STATUS_FR = {"waiting_owner": "attend {owner}", "in_progress": "en cours", "paused": "en pause", "done": "fini",
              "abandoned": "abandonné"}
 
 
@@ -72,8 +72,64 @@ def _line(text: str | None, n: int = 400) -> str:
     return t if len(t) <= n else t[: n - 1] + "…"
 
 
-def brief(conn, ref: str, note: str = "") -> str:
-    """The engine's instructions for resuming one card: everything the board knows of it, and how to end."""
+def _cli(*args: str, timeout: float = 12) -> dict | None:
+    """One walter-memory reading (its declared CLI, cloud-safe); None when it cannot answer: the brief goes without."""
+    try:
+        out = subprocess.run(["walter-memory", *args], capture_output=True, text=True, timeout=timeout)
+        return json.loads(out.stdout) if out.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
+def _status(status: str, owner: str) -> str:
+    return STATUS_FR.get(status, status).replace("{owner}", owner)
+
+
+def _where_it_stopped(ev: list[dict], owner: str) -> list[str]:
+    """The most recent session evidence in full: the agent's message it was read from and the owner's request before
+    it, read from walter-logs. Never what followed: a long session moves on to other work (16/11: the steps after a
+    card's last evidence were about something else entirely)."""
+    last = next((e for e in ev if e["kind"] == "session" and e["seq"] is not None), None)
+    if not last:
+        return []
+    d = _cli("logs", "timeline", last["source_ref"], "--seq", str(last["seq"]), "--before", "60", "--after", "0",
+             "--max-chars", "1500", "--cloud-safe", "--json")
+    if not d:
+        return []
+    s = d.get("session") or {}
+    events = [e for e in d.get("events") or [] if (e.get("seq") or 0) <= last["seq"]]
+    said = [e for e in events if e.get("type") == "assistant/message" and (e.get("text") or "").strip()]
+    asked = [e for e in events if e.get("type") == "user/message" and (e.get("text") or "").strip()]
+    out = ["", f"Dernier point connu du chantier (session {last['source_ref']}, « {_line(s.get('title'), 120) or '—'} », "
+               f"dossier {s.get('cwd') or '?'}, jusqu'à #{last['seq']}) :"]
+    if asked:
+        out.append(f"- demande de {owner} juste avant (#{asked[-1].get('seq')}) : « {_line(asked[-1]['text'], 400)} »")
+    if said:
+        out.append(f"- compte rendu de l'agent (#{said[-1].get('seq')}) : « {_line(said[-1]['text'], 1200)} »")
+    return out if len(out) > 2 else []
+
+
+def _tasks(ev: list[dict]) -> list[str]:
+    """The owner's durable tasks the card was read from (walter-memory tasks): status, progress, thread."""
+    out = []
+    for tid in dict.fromkeys(e["source_ref"].removeprefix("task:") for e in ev if e["kind"] == "task"):
+        t = _cli("tasks", "show", tid)
+        t = (t or {}).get("task", t) if isinstance(t, dict) else None
+        if not t:
+            continue
+        prog = t.get("progress") or {}
+        bits = [f"- tâche {tid[:8]} ({t.get('status')}, fil {t.get('thread_id') or '—'}) : {_line(t.get('goal'), 200)}"]
+        for key, label in (("done", "fait"), ("next", "suite prévue"), ("blocked", "bloqué")):
+            items = prog.get(key) if isinstance(prog, dict) else None
+            if items:
+                bits.append(f"  {label} : " + " ; ".join(_line(i, 200) for i in list(items)[-3:]))
+        out += bits
+    return (["", "Tâches durables liées dans la mémoire (walter-memory tasks) :"] + out) if out else []
+
+
+def brief(conn, ref: str, note: str = "", owner: str = "le propriétaire") -> str:
+    """The engine's instructions for resuming one card: everything the board knows of it, and how to end. `owner` =
+    how the instance names its owner (settings `owner_name`): the software itself never names a person."""
     c = _card(conn, ref)
     ev = conn.execute("""select kind, source_ref, seq, quote, at from devboard.card_evidence where card_id = %s
                          order by at desc, id desc limit 12""", (c["id"],)).fetchall()
@@ -92,45 +148,53 @@ def brief(conn, ref: str, note: str = "") -> str:
     prev = conn.execute("""select started_at, status, outcome, summary from devboard.resumes where card_id = %s
                            and status <> 'running' order by started_at desc limit 1""", (c["id"],)).fetchone()
     d = lambda t: t.astimezone(timezone.utc).strftime("%d/%m %H:%M") if t else "?"
-    out = [f"Reprise du chantier {ref} du tableau de développement de Walter, demandée par Monsieur (bouton « Reprendre », "
+    out = [f"Reprise du chantier {ref} du tableau de développement de Walter, demandée par {owner} (bouton « Reprendre », "
            f"{datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M')} UTC).", "",
            f"Titre : {c['title']}",
            f"Module : {c['module'] or '—'}",
-           f"État sur le tableau avant la reprise : {STATUS_FR.get(c['status'], c['status'])}",
+           f"État sur le tableau avant la reprise : {_status(c['status'], owner)}",
            f"Porteur : {c['owner'] or '—'}" + (f" · échéance {c['deadline']}" if c["deadline"] else ""),
            f"Ce que ça change : {_line(c['change'], 1200) or '—'}", "",
-           "Consigne de Monsieur avec ce clic : " + (note.strip() or "(aucune, reprends là où le travail s'est arrêté)")]
+           f"Consigne de {owner} avec ce clic : " + (note.strip() or "(aucune, reprends là où le travail s'est arrêté)")]
     if prev:
         out += ["", f"Reprise précédente ({d(prev['started_at'])}, {prev['status']}, issue {prev['outcome'] or '—'}) : "
                     + _line(prev["summary"], 800)]
     if corr:
-        out += ["", "Corrections de Monsieur ou des reprises (la plus récente d'abord) :"]
+        out += ["", f"Corrections de {owner} ou des reprises (la plus récente d'abord) :"]
         out += [f"- {d(k['at'])} {k['field']} → {json.dumps(k['value'], ensure_ascii=False)}"
                 + (f" ({_line(k['reason'], 300)})" if k["reason"] else "") + f" [par {k['by']}]" for k in corr]
     if decs:
         out += ["", "Décisions liées :"] + [f"- {k['date']} {k['title']} ({k['doc_path']}#{k['anchor']})" for k in decs]
     files = [l["target"] for l in links if l["kind"] == "file"]
     if files:
-        out += ["", "Fichiers : " + ", ".join(files[:20])]
+        out += ["", "Fichiers (un chemin relatif part du dossier de sa session d'origine ; un module a pu changer de "
+                    "place depuis : `walter path <module>`) : " + ", ".join(files[:20])]
     if blocks or blocked_by:
         out += ["", "Bloque : " + (", ".join(blocks) or "—") + " · bloqué par : "
-                + (", ".join(f"{b['ref']} ({STATUS_FR.get(b['status'], b['status'])})" for b in blocked_by) or "—")]
+                + (", ".join(f"{b['ref']} ({_status(b['status'], owner)})" for b in blocked_by) or "—")]
+    out += _where_it_stopped(ev, owner) + _tasks(ev)
     if ev:
-        out += ["", "Preuves (souvenirs datés : vérifie avant d'affirmer) :"]
+        seen, uniq = set(), []
+        for e in ev:                                   # the same words read in several sessions: shown once
+            if _line(e["quote"], 300) not in seen:
+                seen.add(_line(e["quote"], 300))
+                uniq.append(e)
+        out += ["", "Preuves (souvenirs datés : vérifie avant d'affirmer ; ouvre une session avec l'outil "
+                    "logs_timeline(session, seq), une tâche avec tasks_list) :"]
         out += [f"- {d(e['at'])} {e['kind']} {e['source_ref']}{'#' + str(e['seq']) if e['seq'] is not None else ''} : "
-                f"« {_line(e['quote'], 300)} »" for e in ev]
+                f"« {_line(e['quote'], 300)} »" for e in uniq]
     if act:
         out += ["", "Activité récente sur la carte :"] + [f"- {d(a['at'])} {_line(a['text'], 300)}" for a in act]
     out += ["", "Comment travailler :",
             "1. Vérifie d'abord l'état réel (fichiers, services, git, journaux) : le travail est peut-être déjà fait, "
             "à moitié fait, ou devenu inutile. Les preuves ci-dessus sont des souvenirs datés, pas l'état présent.",
             "2. Fais ce qui reste, avec les règles habituelles (sauvegarde avant de modifier, pas de secret affiché).",
-            "3. Arrête-toi et demande à Monsieur au lieu d'agir pour : un lot du moteur (son accord explicite), un choix "
+            f"3. Arrête-toi et demande à {owner} au lieu d'agir pour : un lot du moteur (son accord explicite), un choix "
             "d'architecture, de données, de budget ou de vie privée, une suppression irréversible, tout message envoyé "
             "en son nom (il le relit avant l'envoi).",
             "4. Termine par un compte rendu court en français simple : ce qui est fait et vérifié, ce qui reste, ce que "
-            "Monsieur doit décider. Puis, seule sur la dernière ligne, l'état de la carte :",
-            "ÉTAT: done (fini et vérifié) | waiting_owner (il faut une décision ou une action de Monsieur) | "
+            f"{owner} doit décider. Puis, seule sur la dernière ligne, l'état de la carte :",
+            f"ÉTAT: done (fini et vérifié) | waiting_owner (il faut une décision ou une action de {owner}) | "
             "in_progress (reste du travail pour Walter) | abandoned (plus d'actualité, dis pourquoi)"]
     return "\n".join(out)
 
@@ -148,9 +212,10 @@ def resume(conn, cfg, engine: Engine, ref: str, note: str = "") -> dict:
         raise ActionError(409, f"statut {c['status']}")
     if running(conn, c["id"]):
         raise ActionError(409, f"{ref} est déjà en cours de reprise")
-    text = brief(conn, ref, note)
+    text = brief(conn, ref, note, cfg.owner_name)
     opened = engine.op({"op": "session.open", "interface": cfg.engine_interface, "conversation": conversation(ref),
-                        "principal": {"kind": "owner", "id": cfg.engine_account}, "mode": "interactive"})
+                        "principal": {"kind": "owner", "id": cfg.engine_account}, "mode": "interactive",
+                        **({"level": cfg.resume_level} if cfg.resume_level else {})})
     sid = opened["session_id"]
     n = conn.execute("select count(*) n from devboard.resumes where card_id = %s", (c["id"],)).fetchone()["n"] + 1
     request_id = f"devboard-{ref.lower()}-r{n}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
@@ -163,9 +228,9 @@ def resume(conn, cfg, engine: Engine, ref: str, note: str = "") -> dict:
                        (c["id"], sid, walter_session, request_id, note or None, c["status"])).fetchone()["id"]
     if c["status"] != "in_progress":
         correct.correct(conn, {"ref": ref, "field": "status", "value": "in_progress", "by": "owner",
-                               "reason": "repris par Monsieur (bouton « Reprendre »)" + (f" : {note}" if note else "")})
+                               "reason": f"repris par {cfg.owner_name} (bouton « Reprendre »)" + (f" : {note}" if note else "")})
     conn.execute("""insert into devboard.activity (kind, source_ref, card_id, text) values ('resume', %s, %s, %s)""",
-                 (f"resume:{rid}", c["id"], f"{ref} repris par Walter à la demande de Monsieur"
+                 (f"resume:{rid}", c["id"], f"{ref} repris par Walter à la demande de {cfg.owner_name}"
                   + (f" (« {_line(note, 200)} »)" if note else "")))
     conn.execute("""insert into devboard.live (session_id, runtime, title, card_id, at) values (%s, 'engine', %s, %s, now())
                     on conflict (session_id) do update set at = now(), card_id = excluded.card_id, title = excluded.title""",
@@ -182,11 +247,11 @@ def abandon(conn, engine: Engine | None, ref: str, reason: str = "") -> dict:
     r = running(conn, c["id"])
     if r and engine is not None:
         try:
-            engine.op({"op": "turn.cancel", "session_id": r["session_id"], "reason": "chantier abandonné par Monsieur"})
+            engine.op({"op": "turn.cancel", "session_id": r["session_id"], "reason": "chantier abandonné par le propriétaire"})
         except ActionError:
             pass                       # the turn may already have ended; the follower records what it became
     out = correct.correct(conn, {"ref": ref, "field": "status", "value": "abandoned", "by": "owner",
-                                 "reason": reason or "abandonné par Monsieur (bouton « Abandonner »)"})
+                                 "reason": reason or "abandonné par le propriétaire (bouton « Abandonner »)"})
     return {**out, "cancelled_resume": r["id"] if r else None}
 
 
@@ -232,12 +297,12 @@ def finish(conn, cfg, row: dict, result: dict) -> dict:
     conn.execute("""insert into devboard.activity (kind, source_ref, card_id, text) values ('resume', %s, %s, %s)
                     on conflict do nothing""",
                  (f"resume-end:{row['id']}", card["id"], f"{ref} : reprise {label}"
-                  + (f", carte → {STATUS_FR[outcome]}" if outcome else "")
+                  + (f", carte → {_status(outcome, cfg.owner_name)}" if outcome else "")
                   + (f" — {_line(_summary(text), 240)}" if text else "")))
     db.notify(conn, "cards", refs=[ref])
     if not abandoned_meanwhile:
         head = f"Tableau · {ref} « {_line(card['title'], 80)} » : reprise {label}"
-        head += f", carte {STATUS_FR[outcome]}." if outcome else "."
+        head += f", carte {_status(outcome, cfg.owner_name)}." if outcome else "."
         _notify(cfg, head + ("\n\n" + _line(_summary(text), 900) if text else ""))
     return {"ref": ref, "status": status, "outcome": outcome}
 
