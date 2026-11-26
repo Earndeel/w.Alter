@@ -111,6 +111,26 @@ def secret_value(name: str) -> str | None:
         return None
 
 
+def codex_session() -> tuple[str, str] | None:
+    """W.Alter's own Codex subscription session (grant `codex-subscription`, renewed by the Codex CLI through
+    walter-secrets; the session walter-llm's Codex routes use): (access token, account id), or None. Used by the
+    media executor for images at no marginal cost (2026-11-24). Never logged, never in a URL."""
+    try:
+        secrets = subprocess.run(["walter", "path", "secrets"], capture_output=True, text=True, timeout=30).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if not secrets:
+        return None
+    import sys
+    if secrets not in sys.path:
+        sys.path.insert(0, secrets)
+    try:
+        from walter_secrets import grants
+        return grants.access("codex-subscription"), grants.attribute("codex-subscription", "account_id")
+    except Exception:  # noqa: BLE001 — no session: the caller reports the route as unavailable
+        return None
+
+
 def state_file(name: str) -> Path:
     """A file the Router generates for the instance (state/router/<name>), e.g. the agents' brief."""
     root = _walter("path")

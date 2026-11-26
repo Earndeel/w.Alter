@@ -155,6 +155,8 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--resolution")
     g.add_argument("--paid-fallback", action="store_true", help="UI-only role (Flow): generate via Kie instead")
     g.add_argument("--no-craft", action="store_true", help="send the request as the prompt")
+    g.add_argument("--provider", choices=("kie", "openrouter", "codex"),
+                   help="that provider only; codex = image tool of the Codex subscription (no cost, model not chosen)")
     lg = sub.add_parser("log-exec", help="record one routed execution attempt (JSON)")
     lg.add_argument("entry")
     fb = sub.add_parser("feedback", help="the owner's verdict on a model (rating -2..2)")
@@ -406,7 +408,7 @@ def main(argv: list[str] | None = None) -> int:
             elif args.cmd == "generate":
                 out = media_exec.generate(conn, args.request, args.task, args.role, args.image_urls, args.aspect_ratio,
                                           args.duration, args.resolution, args.paid_fallback, not args.no_craft,
-                                          voice=args.voice, style=args.style)
+                                          voice=args.voice, style=args.style, provider=args.provider)
             elif args.cmd == "postes":
                 from walter_router.analysis import postes as postes_mod
                 out = {"ranking": postes_mod.rank(conn, args.poste)}

@@ -9,13 +9,22 @@ fallback is allowed) -> submit, poll, download -> models.exec_log.
 APIs: Kie market `POST /api/v1/jobs/createTask` + `GET /api/v1/jobs/recordInfo?taskId=` (docs.kie.ai, schemas in
 config/kie_media_schemas.json); OpenRouter `POST /api/v1/videos` + polling URL + content URL, and
 `POST /api/v1/images` (b64_json) (openrouter.ai/docs, 2026-10-02).
+
+Codex (2026-11-24): images through the image tool of W.Alter's Codex subscription (Responses API, `image_generation`
+tool), at no marginal cost. Used for every image of a test run (WALTER_RUN_CHANNEL=test: tests never pay for media;
+video, music and voice are not generated there) and when the owner names provider "codex". Measured the same day: the
+backend ignores the tool's `model` and `quality` (any model name is accepted, quality comes back "low"), so the image
+model is not the routed one and is not disclosed; results say so.
 """
 from __future__ import annotations
 
 import base64
 import json
+import mimetypes
+import os
 import re
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -284,6 +293,72 @@ def run_openrouter(or_id: str, kind: str, params: dict) -> dict:
     raise TimeoutError("openrouter video still running")
 
 
+CODEX_RESPONSES = "https://chatgpt.com/backend-api/codex/responses"
+CODEX_IMAGE_MODEL = "codex-image"      # what the executions journal records as model: the backend names none
+
+
+def test_run() -> bool:
+    """A test run: the engine sets WALTER_RUN_CHANNEL=test for its test principals (benches, scenarios)."""
+    return os.environ.get("WALTER_RUN_CHANNEL") == "test"
+
+
+def _image_ref(u: str) -> str:
+    """An input image for the Responses API: a URL as is, a local file as a data URL."""
+    if re.match(r"^(https?|data):", u):
+        return u
+    p = Path(u)
+    mime = mimetypes.guess_type(p.name)[0] or "image/png"
+    return f"data:{mime};base64," + base64.b64encode(p.read_bytes()).decode()
+
+
+def codex_driver(conn) -> str | None:
+    """The text model that calls the image tool: the Router's own general L1 pick, on its Codex execution entry."""
+    from walter_router.serve import choose
+    from walter_router.serve.routes import with_execution
+    out = with_execution(conn, choose.pick(conn, "general", "L1"))
+    return next((e.get("model") for e in out.get("execution") or [] if e.get("provider") == "codex"), None)
+
+
+def run_codex_image(conn, prompt: str, image_urls: list[str] | None = None) -> dict:
+    """One image through the Codex subscription's image tool. Returns {"b64": [...], "cost_usd": 0.0, ...}."""
+    import httpx
+    session = instance.codex_session()
+    if not session:
+        raise RuntimeError("codex: no subscription session (grant codex-subscription)")
+    driver = codex_driver(conn)
+    if not driver:
+        raise RuntimeError("codex: the general L1 pick has no Codex execution entry")
+    token, account = session
+    content = [{"type": "input_text", "text": "Generate exactly one image for this prompt, without asking anything:\n\n"
+                + prompt}] + [{"type": "input_image", "image_url": _image_ref(u)} for u in image_urls or []]
+    body = {"model": driver, "instructions": "You create images with the image_generation tool.", "store": False,
+            "stream": True, "input": [{"role": "user", "content": content}], "tools": [{"type": "image_generation"}],
+            "tool_choice": "required"}
+    headers = {"Authorization": f"Bearer {token}", "ChatGPT-Account-Id": account, "content-type": "application/json",
+               "accept": "text/event-stream", "originator": "codex_cli_rs", "session_id": str(uuid.uuid4())}
+    images, meta = [], {}
+    with httpx.stream("POST", CODEX_RESPONSES, headers=headers, json=body, timeout=TIMEOUTS["image"]) as r:
+        if r.status_code != 200:
+            raise RuntimeError(f"codex: HTTP {r.status_code} {r.read()[:200].decode(errors='replace')}")
+        for line in r.iter_lines():
+            if not line.startswith("data: "):
+                continue
+            try:
+                ev = json.loads(line[6:])
+            except ValueError:
+                continue
+            item = ev.get("item") or {}
+            if ev.get("type") == "response.output_item.done" and item.get("type") == "image_generation_call" \
+                    and item.get("result"):
+                images.append(item["result"])
+                meta = {k: item.get(k) for k in ("size", "quality", "output_format", "revised_prompt")}
+            elif ev.get("type") in ("response.failed", "error"):
+                raise RuntimeError("codex: " + json.dumps(ev.get("response", {}).get("error") or ev)[:300])
+    if not images:
+        raise RuntimeError("codex: the response carried no image")
+    return {"b64": images, "cost_usd": 0.0, "driver": driver, **meta}
+
+
 def _download(urls: list[str], b64: list[str], folder: Path, stem: str, auth: dict | None) -> list[str]:
     folder.mkdir(parents=True, exist_ok=True)
     paths = []
@@ -335,6 +410,11 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
     prof = knowledge.profile(conn, model_id) or {}
     prompt = craft_prompt(conn, request, cfg.get("prompt_style")) if craft else request
     steps = [{"step": "prompt", "prompt": prompt}]
+    testing = test_run()
+    if testing and kind != "image":   # tests never pay for media: no free route for video, music or voice
+        return {"mode": "test_no_spend", "model_id": model_id, "task": task, "prompt": prompt, "steps": steps,
+                "note": "Test run: video, music and voice are not generated (no route without cost). The prompt "
+                        "above is what would have been sent."}
     references = None
     if cfg.get("workflow") == "reference_first" and kind == "video" and not image_urls and _depth == 0:
         ref = generate(conn, f"Image de référence (planche visuelle, même personnage/décor/produit) pour : {request}",
@@ -345,8 +425,11 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
     resolution = resolution or (cfg.get("defaults") or {}).get("resolution")
     kie_path = (cfg.get("kie") or {}).get(mode)
     or_id = openrouter_id(conn, model_id)
-    order = choose_provider(conn, model_id, t["interface"], resolution, bool(kie_path), or_id)
-    if provider:   # named by the owner: that provider only
+    if testing or (provider == "codex" and kind == "image"):   # Codex subscription (routed model not selectable)
+        order, _fallback = ["codex"], False
+    else:
+        order = choose_provider(conn, model_id, t["interface"], resolution, bool(kie_path), or_id)
+    if provider and not testing:   # named by the owner: that provider only
         order = [p for p in order if p == provider]
         if not order:
             return {"error": f"{model_id} ne s'exécute pas chez {provider} ici", "model_id": model_id}
@@ -356,6 +439,18 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
     for provider in order:
         t0 = time.monotonic()
         try:
+            if provider == "codex":
+                res = run_codex_image(conn, prompt, image_urls)
+                files = _download([], res["b64"], folder, CODEX_IMAGE_MODEL, None)
+                execution.log(conn, {"task": task, "role": d.get("role"), "model_id": model_id, "provider": "codex",
+                                     "model": CODEX_IMAGE_MODEL, "ok": True, "kind": kind, "cost_usd": 0.0,
+                                     "seconds": round(time.monotonic() - t0, 1)})
+                conn.commit()
+                return {"model_id": CODEX_IMAGE_MODEL, "planned_model": model_id, "role": d.get("role"), "task": task,
+                        "provider": "codex", "mode": mode, "prompt": prompt, "files": files, "cost_usd": 0.0,
+                        "steps": steps, "errors": errors, "quality": res.get("quality"), "size": res.get("size"),
+                        "note": "Generated by the Codex subscription's image tool: its model is not disclosed and "
+                                "is not " + model_id + "; quality is set by the subscription."}
             if provider == "kie":
                 params = {"prompt": prompt, "aspect_ratio": aspect_ratio, "duration": duration, "resolution": resolution}
                 if kind == "music":
@@ -391,7 +486,8 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
         except Exception as exc:  # noqa: BLE001 — next provider
             errors.append(f"{provider}: {type(exc).__name__}: {exc}"[:300])
             execution.log(conn, {"task": task, "role": d.get("role"), "model_id": model_id, "provider": provider,
-                                 "model": kie_path if provider == "kie" else or_id, "ok": False, "kind": kind,
+                                 "model": kie_path if provider == "kie" else CODEX_IMAGE_MODEL if provider == "codex"
+                                 else or_id, "ok": False, "kind": kind,
                                  "seconds": round(time.monotonic() - t0, 1)})
             conn.commit()
     if _fallback and _depth == 0:

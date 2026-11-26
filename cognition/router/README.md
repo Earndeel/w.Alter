@@ -76,6 +76,12 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
    below the model's native precision, ≥ 95 % uptime over 24 h; flex tier only for background postes). Text execution stays on the selected model: only its ordered providers are tried, with an explicit
    `user_notice` on failover. Exhaustion is an error, never an implicit subscription/model substitution.
    A media model falls back to its next provider (another model only when declared). Providers: OpenRouter, Kie, Codex, Arnict.
+   **Images through the Codex subscription** (2026-11-24): the Codex Responses backend's `image_generation` tool, on
+   W.Alter's own Codex session (grant `codex-subscription`), at no marginal cost. It is used only for a test run
+   (`WALTER_RUN_CHANNEL=test`: images go there, video / music / voice are never generated, `mode: test_no_spend`) or
+   when the caller names it (`generate --provider codex`). It never replaces the routed model on its own: the backend
+   does not disclose its model and sets the quality itself (low, 1536x1024 when measured), so the result says
+   `model_id: codex-image` next to the `planned_model`.
 
 ## Who uses it
 
@@ -112,7 +118,8 @@ walter-router route "<request>" --model M [--provider P]  # a model named by the
 walter-router run < spec.json        # do the job: native text/tool loop | media = generation
 walter-router ask "<question>" --option a="…" --option b="…" [--context …]   # the decision model, any choice
 walter-router classify "<request>" [--context …] | decide TASK "<request>" | dossier TASK | tasks | library
-walter-router generate "<request>" [--task …] [--role …]      # costs money: on request only
+walter-router generate "<request>" [--task …] [--role …] [--provider kie|openrouter|codex]   # costs money: on request
+                                     # only (codex = the subscription's image tool, no cost, model not chosen)
 walter-router prefer TASK [--pin MODEL[/VARIANT]] … | verdict ALERT adopted|dismissed | feedback MODEL RATING
 walter-router plans list | consumption | set ID [--vendor --plan --price --models --since --until --note] | retire ID
                                      # consumption: this week per plan (used, API value recovered, left before the

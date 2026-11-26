@@ -173,6 +173,7 @@ walter-router generate
   --resolution :  ; défaut=—
   --paid-fallback : UI-only role (Flow): generate via Kie instead ; défaut=false
   --no-craft : send the request as the prompt ; défaut=false
+  --provider : that provider only; codex = image tool of the Codex subscription (no cost, model not chosen) ; défaut=— ; valeurs=["kie", "openrouter", "codex"]
 walter-router health
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
 walter-router instance-env

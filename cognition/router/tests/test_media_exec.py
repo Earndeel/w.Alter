@@ -58,3 +58,48 @@ def test_fallback_and_kie_health():
         conn.execute("update models.provider_status set ok = false where provider = 'kie-media'")
         assert media_exec.choose_provider(conn, "minimax-h3", "video", None, True, or_id)[0] == "openrouter"
         conn.rollback()
+
+
+def test_a_test_run_never_pays_for_media(conn, monkeypatch):
+    """2026-11-24: in a test run (WALTER_RUN_CHANNEL=test) images go through the Codex subscription's image tool and
+    nothing else is generated; Kie and OpenRouter are never called."""
+    monkeypatch.setenv("WALTER_RUN_CHANNEL", "test")
+    paid = lambda *a, **k: (_ for _ in ()).throw(AssertionError("paid provider called in a test run"))
+    monkeypatch.setattr(media_exec, "run_kie", paid)
+    monkeypatch.setattr(media_exec, "run_openrouter", paid)
+    seen = {}
+
+    def fake_codex(c, prompt, image_urls=None):
+        seen["prompt"] = prompt
+        return {"b64": ["iVBORw0KGgo="], "cost_usd": 0.0, "quality": "low", "size": "1024x1024"}
+    monkeypatch.setattr(media_exec, "run_codex_image", fake_codex)
+    monkeypatch.setattr(media_exec, "_download", lambda urls, b64, folder, stem, auth: [f"/tmp/{stem}-1.png"])
+    monkeypatch.setattr(media_exec.execution, "log", lambda c, e: 0)
+    out = media_exec.generate(conn, "a red apple on a table", task="text_to_image", role="default", craft=False)
+    assert out["provider"] == "codex" and out["model_id"] == media_exec.CODEX_IMAGE_MODEL and out["cost_usd"] == 0.0
+    assert out["planned_model"] != media_exec.CODEX_IMAGE_MODEL and "not disclosed" in out["note"]
+    assert seen["prompt"] == "a red apple on a table"
+    video = media_exec.generate(conn, "a short clip of waves", task="text_to_video", role="action", craft=False)
+    assert video["mode"] in ("test_no_spend", "manual_ui") and not video.get("files")
+    if video["mode"] == "test_no_spend":
+        assert video["prompt"] == "a short clip of waves"
+
+
+def test_codex_is_never_the_route_outside_a_test_unless_named(conn, monkeypatch):
+    monkeypatch.delenv("WALTER_RUN_CHANNEL", raising=False)
+    assert not media_exec.test_run()
+    called = {}
+    monkeypatch.setattr(media_exec, "run_codex_image", lambda *a, **k: called.setdefault("codex", True) or {})
+    monkeypatch.setattr(media_exec, "run_kie", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("kie stub")))
+    monkeypatch.setattr(media_exec, "run_openrouter", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("or stub")))
+    monkeypatch.setattr(media_exec.execution, "log", lambda c, e: 0)
+    out = media_exec.generate(conn, "a red apple", task="text_to_image", role="default", craft=False, _fallback=False)
+    assert "codex" not in called and out.get("error") == "every provider failed"
+    assert all(not e.startswith("codex") for e in out["errors"])
+
+
+def test_image_inputs_become_data_urls(tmp_path):
+    f = tmp_path / "in.png"
+    f.write_bytes(b"\x89PNG\r\n")
+    assert media_exec._image_ref(str(f)).startswith("data:image/png;base64,")
+    assert media_exec._image_ref("https://x.test/a.png") == "https://x.test/a.png"
