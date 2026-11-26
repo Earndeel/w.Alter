@@ -1,11 +1,20 @@
-# Walter Browse — le web
+# Walter Browse
 
-Obtenir des données du web vite et de façon fiable, et agir sur un site connecté comme {{owner.address}} quand c'est nécessaire. Le moteur choisit sa profondeur (requête directe, HTML, Scrapling, Camoufox, Webtop) ; l'agent décrit ce qu'il veut, pas comment l'obtenir.
+**Role.** Web access for every agent: search, read and extract with the right depth chosen by the engine (direct
+request, static HTML, Scrapling, Camoufox, Webtop), and act on a signed-in site as {{owner.address}}. The agent
+describes what it wants, not how to get it.
 
-**Organisation** : moteur commun avec profils appris par domaine et cache ; navigateur persistant Camoufox (`:9377`), et Chromium (CloakBrowser, `:9378`) quand un site l'exige, visible et pilotable par {{owner.address}} ; sortie réseau par sa machine avec son identité.
+**Organisation.** A common engine with profiles learned per domain and a result cache; a persistent Camoufox browser
+(`:9377`) and Chromium (CloakBrowser, `:9378`) when a site requires it, both visible and controllable by
+{{owner.address}}; network exits chosen by the engine (the owner's machine, a France exit, per-country exits on
+demand).
 
-**Utilisation**
-- Chercher, lire, extraire : `walter_browse(query=… | url=…)` (`content_only=true` pour lire une page ; `expected_fields` pour extraire).
-- Agir connecté : `browser_session(site)` (cookies injectés côté serveur ; `browser_sites` liste les sites), puis `walter-browser -s <session> new|nav|snap|click|ktype|shot|close`. Rappeler `browser_session` si une page de connexion apparaît.
+**Tools**
+- Search, read, extract: `walter_browse(query=… | url=…)` (`content_only=true` to read a page; `objective`,
+  `expected_fields` to extract).
+- Act signed in: `browser_session(site)` (cookies injected server-side, metadata only returned; `browser_sites` lists
+  the sites), then the local CLI `walter-browser -s <session> new|nav|snap|click|clickxy|ktype|shot|eval|upload|fetch|close`;
+  call `browser_session` again when a login page appears. `engine="chromium"` when a site needs Chromium.
 
-**Règles** : lire le web uniquement par `walter_browse` (il choisit la sortie réseau), jamais `curl`/`wget` depuis le shell ; ne jamais extraire de cookies soi-même ; frappe humaine, jamais de remplissage programmatique.
+**Rules**: read the web only through `walter_browse` (it chooses the network exit), never `curl`/`wget` from the
+shell; never extract cookies yourself; human keystrokes, never programmatic form filling.

@@ -180,7 +180,7 @@
     {
       "id": "library",
       "path": "walter_browse",
-      "role": "Recherche web et lecture de pages",
+      "role": "Web search and page reading (the walter_browse facade)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "capabilities/browse"
@@ -188,7 +188,7 @@
     {
       "id": "engine",
       "path": "engine",
-      "role": "Moteurs Camoufox / CloakBrowser (ex ~/.hermes/camoufox-max)",
+      "role": "Browser engines: Camoufox and CloakBrowser Chromium",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -206,7 +206,7 @@
     {
       "id": "network",
       "path": "network",
-      "role": "Sorties réseau (Freebox, Mac, défaut, NordVPN par pays à la demande)",
+      "role": "Network exits (the owner's machine, the France exit, default exit, NordVPN per country on demand)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "capabilities/browse/network"
@@ -214,7 +214,7 @@
     {
       "id": "runtime",
       "path": "runtime",
-      "role": "Exécution et extracteurs",
+      "role": "Execution paths and extractors",
       "status": "active",
       "readme": "runtime/README.md",
       "vision_target": "capabilities/browse/runtime"

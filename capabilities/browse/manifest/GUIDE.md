@@ -1,54 +1,45 @@
-# Walter Browse — guide détaillé
+# Walter Browse — detailed guide
 
-## Objectif
+## Purpose
+Get data from the web as quickly and reliably as possible, and act on a signed-in site as {{owner.address}} when
+needed. The engine chooses its depth (direct request, static HTML, Scrapling, Camoufox, Webtop) according to the
+request and the site; the agent describes what it wants, not how to get it.
 
-Obtenir des données du web le plus vite et le plus fiablement possible, et agir sur un site connecté comme
-{{owner.address}} quand c'est nécessaire. Le moteur choisit sa profondeur (requête directe, HTML statique, Scrapling,
-Camoufox, Webtop) selon la demande et le site ; l'agent décrit ce qu'il veut, pas comment l'obtenir.
-
-## Comment l'utiliser
-
-1. **Chercher / lire / extraire** : `walter_browse(query=… | url=…)`. Lecture d'une page : `content_only=true`.
-   Extraction structurée : `objective`, `expected_fields`, `required_fields`, `min_records`.
-2. **Agir connecté comme {{owner.address}}** : `browser_session(site, session)` ouvre ou rafraîchit une session Camoufox
-   avec ses cookies, injectés côté serveur (seules des métadonnées reviennent) ; `browser_sites` liste les sites.
-   Piloter ensuite avec `walter-browser -s <session> new|nav|snap|click|clickxy|ktype|shot|eval|upload|fetch|close`.
-   Si le site a besoin de Chromium : `browser_session(..., engine="chromium")` / `walter-browser -e chromium …` au
-   premier appel de la session (CloakBrowser, même API, mêmes règles) ; la session garde ensuite son moteur.
-3. Rappeler `browser_session` dès que le site affiche une page de connexion.
-4. **Converser avec une interface de chat** (service web conversationnel) : via le Walter Router (passerelle
-   `POST /v1/web/converse`, commande Telegram `/gpt`), qui choisit la recette ; en code, `walter_browse.converse(host,
-   capability, message, conversation=…, request_id=…, model=None, files=None)` : `model` facultatif (absent = modèle
-   déjà sélectionné, rien n'est cliqué), `files` = fichiers joints ; fichiers produits rendus dans `files`. Recette
-   apprise au premier passage, rejouée ensuite sans LLM.
+## How to use it
+1. **Search / read / extract**: `walter_browse(query=… | url=…)`. Read a page: `content_only=true`. Structured
+   extraction: `objective`, `expected_fields`, `required_fields`, `min_records`.
+2. **Act signed in as {{owner.address}}**: `browser_session(site, session)` opens or refreshes a Camoufox session with
+   their cookies, injected server-side (only metadata comes back); `browser_sites` lists the sites. Then drive it with
+   `walter-browser -s <session> new|nav|snap|click|clickxy|ktype|shot|eval|upload|fetch|close`. If the site needs
+   Chromium: `browser_session(..., engine="chromium")` / `walter-browser -e chromium …` on the session's first call
+   (CloakBrowser, same API, same rules); the session then keeps its engine.
+3. Call `browser_session` again as soon as the site shows a login page.
+4. **Talk to a chat web service**: through the Router (`walter_web`), which picks the recipe; in code,
+   `walter_browse.converse(host, capability, message, conversation=…, request_id=…, model=None, files=None)`. The
+   recipe is learned on the first pass and replayed without a model afterwards.
 
 ## Organisation
-
-| Partie | Rôle |
+| Part | Role |
 |---|---|
-| `walter_browse/` (façade), `runtime/universal_router.py` | Moteur commun : choix du chemin, contrat sémantique d'extraction identique sur tous les chemins |
-| `runtime/profile_index.py`, `result_cache.py` | Profils appris par domaine, cache de résultats ; état dans l'instance (`state/browse`) |
-| Camoufox `:9377` (écran X `:101`) | Navigateur persistant de W.Alter ; {{owner.address}} le voit et le pilote via Selkies (Tailscale :3011) |
-| Chromium `:9378` (CloakBrowser, même écran) | Second moteur, à la demande d'un site qui exige Chromium ; même API et mêmes règles |
-| Sortie réseau `walter-exit-default` | Par défaut : la machine de {{owner.address}} tant que son VPN France est connecté, sinon la sortie WireGuard France, automatiquement ; `network/wg-exit` pour d'autres sorties |
-| `runtime/conversation.py`, `walter_browse/converse.py` | Capacités conversationnelles : recette `kind=conversation` du registre, onglet et conversation réutilisés, collage clavier réel, fin détectée par événements DOM |
-| `ports/hermes` | Adaptateur Hermes (outil `walter_browse`) |
+| `walter_browse/` (facade), `runtime/universal_router.py` | Common engine: path choice, identical semantic extraction contract on every path |
+| `runtime/profile_index.py`, `result_cache.py` | Profiles learned per domain, result cache; state in the instance (`state/browse`) |
+| Camoufox `:9377` (X display `:101`) | W.Alter's persistent browser; {{owner.address}} sees and drives it through Selkies (tailnet) |
+| Chromium `:9378` (CloakBrowser, same display) | Second engine, for sites that require Chromium; same API and rules |
+| Network exit `walter-exit-default` | By default the owner's machine while its connection is up, else the France WireGuard exit, automatically; `walter-wg-exit use <exit>` for per-country exits |
+| `runtime/conversation.py`, `walter_browse/converse.py` | Conversational capabilities: `kind=conversation` recipes, tab and conversation reused, real keyboard paste |
 
 ## Interfaces
+| Need | MCP | CLI |
+|---|---|---|
+| Search / extraction | `walter_browse` | — |
+| Signed-in session | `browser_session`, `browser_sites` | `walter-browser login SITE` |
+| Driving | — | `walter-browser -s <session> …` |
+| Chat web service | `walter_web` (Router) | `runtime/conversation.py MESSAGE --host … --capability …` |
 
-| Besoin | MCP | Hermes | CLI |
-|---|---|---|---|
-| Recherche / extraction | `walter_browse` | `walter_browse` | — |
-| Session connectée | `browser_session`, `browser_sites` | navigateur Hermes | `walter-browser login SITE` |
-| Pilotage | — | — | `walter-browser -s <session> …` |
-| Conversation web | — (Router : `/v1/web/converse`) | commande `/gpt` (plugin Router) | `runtime/conversation.py MESSAGE --host … --capability …` |
-
-## Règles et limites
-
-- Ne jamais extraire de cookies soi-même ; un nouveau site se déclare dans `browser_sites.json` (sans secret).
-- Les cookies de {{owner.address}} ne sont acceptés que par une session qui sort par sa sortie réseau.
-- Vraies touches, jamais de remplissage programmatique ; un message se colle par un vrai Ctrl+V (presse-papiers
-  verrouillé puis restauré) ; empreinte d'appareil figée.
-- Un service conversationnel n'est activé que par {{owner.address}} (table `web_services` du Router), dans le respect
-  de ses conditions d'utilisation ; aucun contournement de restriction d'accès.
-- Si aucune sortie France n'est disponible, les connexions sont refusées (jamais l'IP du serveur).
+## Rules and limits
+- Never extract cookies yourself; a new site is declared in `browser_sites.json` (no secret).
+- {{owner.address}}'s cookies are accepted only by a session that leaves through their network exit; if no such exit
+  is available, signed-in connections are refused (never the server's IP).
+- Real keystrokes, never programmatic filling; a message is pasted with a real Ctrl+V; frozen device fingerprint.
+- A chat web service is enabled only by {{owner.address}} (Router `web_services` table), within its terms of use; no
+  circumvention of access restrictions.
