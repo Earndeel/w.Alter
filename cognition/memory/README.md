@@ -40,3 +40,7 @@ Walter Memory core (spec and decisions: `/walter/docs/` — ARCHITECTURE, DECISI
   place it falls in and the probable home (Memory V1 flows). Read only when the reader may read `local_only` (the
   cloud ceiling of organic.toml), else `withheld`. Consumer: walter-context's `position` block, when the preflight
   says the answer depends on where the owner is.
+
+## Beeper Server natif (16/11/2026)
+
+Le connecteur Beeper utilise le client public `walter_beeper.BeeperClient` de core et le grant Secrets nommé. Aucun accès Mac dans la configuration active. `walter-memory-beeper-watch` reçoit les événements WS et les remet dans `ingestion.jobs` ; les événements canoniques, médias et curseurs sont transactionnels et dédupliqués. La bascule reprend au dernier ordre connu du connecteur Mac, sans backfill historique. Les IDs API locaux sont rapprochés des IDs canoniques par conversation/ordre/date/sens/expéditeur ; les alias restent dans les checkpoints existants. La reconnexion programme un rattrapage HTTP ; le timer existant récupère les messages récents depuis la bascule (un jour maximum) et les médias. Le WS amont est sans replay : une modification ancienne absente de cette fenêtre ne peut être garantie pendant une coupure. Les points de reprise Mac sont conservés ; les curseurs du nouveau profil sont dans `endpoints.oracle-server`. Tests : `tests/test_beeper_gap.py`, `tests/test_beeper_native.py` (base jetable 5440). Le transport ne peut pas envoyer en tant que lecteur Memory ; les envois appartiennent au canal du moteur.

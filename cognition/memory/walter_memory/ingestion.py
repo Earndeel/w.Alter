@@ -68,9 +68,13 @@ def resolve_failures(connector: str, stream: str | None = None) -> int:
 
 # ───────────── job queue ─────────────
 def enqueue(queue: str, payload: dict, *, dedupe_key: str | None = None, priority: int = 100,
-            delay: timedelta | None = None, max_attempts: int = 5) -> int | None:
-    """Add a job; returns its id, or None when a job with the same dedupe_key already exists."""
-    with connection() as conn:
+            delay: timedelta | None = None, max_attempts: int = 5, conn=None) -> int | None:
+    """Add a job; returns its id, or None for a duplicate. Pass conn to commit with canonical events/cursors."""
+    if conn is None:
+        with connection() as c:
+            return enqueue(queue, payload, dedupe_key=dedupe_key, priority=priority, delay=delay,
+                           max_attempts=max_attempts, conn=c)
+    else:
         row = conn.execute("""insert into ingestion.jobs (queue, payload, dedupe_key, priority, run_after, max_attempts)
                               values (%s,%s,%s,%s, now() + coalesce(%s, interval '0'), %s)
                               on conflict (dedupe_key) do nothing returning job_id""",
@@ -104,12 +108,13 @@ def fail(job: dict, error: str) -> None:
                         where job_id = %s""", ("dead" if dead else "queued", error[:2000], dead, job["job_id"]))
 
 
-def requeue_stale(minutes: int = 30) -> int:
+def requeue_stale(minutes: int = 30, *, queue: str | None = None) -> int:
     """Jobs left 'running' by a crashed worker go back to the queue."""
     with connection() as conn:
         return conn.execute("""update ingestion.jobs set status = 'queued', locked_by = null
-                               where status = 'running' and locked_at < now() - make_interval(mins => %s)""",
-                            (minutes,)).rowcount
+                               where status = 'running' and locked_at <= now() - make_interval(mins => %s)
+                                 and (%s::text is null or queue = %s)""",
+                            (minutes, queue, queue)).rowcount
 
 
 def work(queue: str, handler: Callable[[dict], None], *, batch: int = 10) -> int:

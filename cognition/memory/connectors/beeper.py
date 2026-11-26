@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Beeper connector (P2.1): every chat of Beeper Desktop (WhatsApp, Instagram, Messenger, Telegram, LINE, Signal…)
+"""Beeper connector (P2.1): every chat of native Beeper Server (WhatsApp, Instagram, Messenger, Telegram, LINE…)
 → core.events, read-only. Replaces the Mac → webhook path (which lost 85 % of the text, then jammed on HTTP 413).
 
-API: Beeper Client API on Monsieur's Mac (Tailscale), token from `vault get beeper/token`. Only GET endpoints are
+API: native Server through core's public BeeperClient; token from Walter Secrets' named grant. Only GET endpoints are
 used, plus /v1/assets/download + /v1/assets/serve to fetch media bytes. Never sends, edits or marks anything.
 
 Per chat (stream = chatID) the checkpoint keeps the newest sortKey seen and the backfill cursor:
@@ -17,12 +17,11 @@ Usage: beeper.py [--backfill-pages N] [--media N] [--chats N]
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
-import subprocess
 import sys
 import tempfile
-import time
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -32,43 +31,14 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from walter_memory import events, ingestion, objects  # noqa: E402
 from walter_memory.db import connection  # noqa: E402
+from walter_beeper import BeeperClient  # noqa: E402
 
-API = os.environ.get("BEEPER_API", "http://100.127.150.1:23373")
 CONNECTOR = "beeper"
 MEDIA_QUEUE = "beeper_media"
 MAX_MEDIA_BYTES = int(os.environ.get("BEEPER_MAX_MEDIA_MB", "200")) * 1024 * 1024
 
 
-class Beeper:
-    def __init__(self):
-        token = subprocess.run(["vault", "get", "beeper/token"], capture_output=True, text=True, check=True).stdout.strip()
-        self.http = httpx.Client(base_url=API, headers={"Authorization": f"Bearer {token}"}, timeout=60)
-
-    def get(self, path: str, **params) -> dict:
-        for attempt in range(4):
-            try:
-                r = self.http.get(path, params={k: v for k, v in params.items() if v is not None})
-                if r.status_code == 429 or r.status_code >= 500:
-                    raise httpx.HTTPStatusError(str(r.status_code), request=r.request, response=r)
-                r.raise_for_status()
-                return r.json()
-            except (httpx.TransportError, httpx.HTTPStatusError):
-                if attempt == 3:
-                    raise
-                time.sleep(2 * (attempt + 1))
-
-    def chats(self) -> list[dict]:
-        out, cursor = [], None
-        while True:
-            d = self.get("/v1/chats", limit=200, cursor=cursor, direction="before" if cursor else None)
-            out += d["items"]
-            if not d.get("hasMore") or not d.get("oldestCursor"):
-                return out
-            cursor = d["oldestCursor"]
-
-    def messages(self, chat_id: str, cursor: str | None = None, direction: str | None = None) -> dict:
-        return self.get(f"/v1/chats/{urllib.parse.quote(chat_id, safe='')}/messages", cursor=cursor, direction=direction)
-
+class Beeper(BeeperClient):
     def fetch_asset(self, url: str, dest: Path) -> Path:
         src = url
         if not url.startswith("file://"):          # mxc:// / localmxc:// must first be cached by Beeper Desktop
@@ -98,8 +68,9 @@ def to_events(chat: dict, msgs: list[dict], people: dict) -> tuple[list[dict], l
     out, media = [], []
     account = chat.get("accountID") or ""
     chat_info = {"id": chat["id"], "title": chat.get("title"), "type": chat.get("type"), "network": chat.get("network")}
+    selves = owner_ids(chat, msgs)
     for m in msgs:
-        sid = f"{chat['id']}|{m['id']}"
+        sid = m.get("_canonical_source_id") or f"{chat['id']}|{m['id']}"
         is_self = bool(m.get("isSender"))
         actor = identity(people.get(m.get("senderID")), m.get("senderID") or "unknown", m.get("senderName"), account, is_self)
         atts = []
@@ -113,14 +84,16 @@ def to_events(chat: dict, msgs: list[dict], people: dict) -> tuple[list[dict], l
                 media.append({"chat_id": chat["id"], "message_id": m["id"], "source_id": sid, "url": a["srcURL"],
                               "name": a.get("fileName"), "mime": a.get("mimeType"), "ts": m.get("timestamp"),
                               "account": account})
-        text = m.get("text") or None
+        # the native Server returns text HTML-escaped (« & » → « &amp; »): history keeps what was written
+        text = html.unescape(m["text"]) if m.get("text") else None
         if not text and atts and atts[0].get("transcription"):
             text = atts[0]["transcription"]           # voice note: Beeper's own transcription is the content
         base = {"source": "beeper", "source_account": account, "thread_id": chat["id"], "occurred_at": m["timestamp"]}
         out.append({**base, "event_type": "message.sent" if is_self else "message.received", "source_id": sid,
                     "content": text, "actor": actor,
-                    "reply_to": f"{chat['id']}|{m['linkedMessageID']}" if m.get("linkedMessageID") else None,
-                    "payload": {"chat": chat_info, "sender_name": m.get("senderName"), "message_type": m.get("type"),
+                    "reply_to": m.get('_canonical_reply_to') if m.get('_canonical_source_id') else
+                        (f"{chat['id']}|{m['linkedMessageID']}" if m.get("linkedMessageID") else None),
+                    "payload": {"chat": chat_info, "native_message_id": m['id'], "sender_name": m.get("senderName"), "message_type": m.get("type"),
                                 "attachments": atts, "mentions": m.get("mentions") or [], "links": m.get("links") or [],
                                 "edited_at": m.get("editedTimestamp"), "is_deleted": bool(m.get("isDeleted")),
                                 "sort_key": m.get("sortKey")}})
@@ -133,9 +106,9 @@ def to_events(chat: dict, msgs: list[dict], people: dict) -> tuple[list[dict], l
                         "payload": {"target_source_id": sid}})
         for r in m.get("reactions") or []:
             who = r.get("participantID") or "unknown"
-            out.append({**base, "event_type": "reaction.added", "source_id": f"{sid}|react|{r.get('id') or who + r.get('reactionKey', '')}",
+            out.append({**base, "event_type": "reaction.added", "source_id": r.get('_canonical_source_id') or f"{sid}|react|{r.get('id') or who + r.get('reactionKey', '')}",
                         "content": r.get("reactionKey"),
-                        "actor": identity(people.get(who), who, None, account, who == m.get("senderID") and is_self),
+                        "actor": identity(people.get(who), who, None, account, who in selves),
                         "payload": {"target_source_id": sid, "emoji": r.get("reactionKey")}})
     return out, media
 
@@ -163,25 +136,151 @@ def attach_known_objects(conn, evs: list[dict]) -> int:
     return n
 
 
+class SyncBusy(RuntimeError):
+    pass
+
+
+def owner_ids(chat: dict, msgs: list[dict]) -> set[str]:
+    """IDs under which the account owner appears in this chat: participants flagged isSelf + senders of own messages."""
+    ids={p['id'] for p in ((chat.get('participants') or {}).get('items') or []) if p.get('isSelf') and p.get('id')}
+    return ids|{m['senderID'] for m in msgs if m.get('isSender') and m.get('senderID')}
+
+
+def canonical_messages(chat: dict, msgs: list[dict], scope: str, *, conn) -> list[dict]:
+    """API message IDs are LOCAL. Resolve by chat + server sortKey, validated against time/sender/side.
+
+    Reuse checkpoint metadata for the small identity projection, no second event store or schema. Existing
+    canonical source IDs win (including the old Mac's IDs); new ones use the unique server order key.
+    Projection + canonical event + media + page cursor commit in the same transaction.
+    """
+    if not scope or not msgs:
+        return msgs
+    def stamp(m):return datetime.fromisoformat(m['timestamp'].replace('Z','+00:00'))
+    for m in msgs:
+        if not str(m.get('sortKey') or '').isdigit() or int(m['sortKey']) <= 0:
+            raise ValueError('No positive server message order key; retain job for retry')
+    streams = ['@identity:'+chat['id']+'|'+str(m['sortKey']) for m in msgs]
+    known = {r['stream']:r['cursor'] for r in conn.execute(
+        "select stream,cursor from ingestion.checkpoints where connector=%s and stream=any(%s)",
+        (CONNECTOR,streams)).fetchall()}
+    old = conn.execute("""select e.source_id,e.event_type,e.occurred_at,e.payload->>'sort_key' sk,
+              i.external_id sender,i.is_self from core.events e left join core.source_identities i
+              on i.identity_id=e.actor_identity_id where e.source='beeper' and e.thread_id=%s
+              and e.event_type in ('message.sent','message.received') and e.payload->>'sort_key'=any(%s)
+              order by e.ingested_at,e.event_id""",(chat['id'],[str(m['sortKey']) for m in msgs])).fetchall()
+    out=[]
+    for m,stream in zip(msgs,streams):
+        kind='message.sent' if m.get('isSender') else 'message.received'
+        candidates=[r for r in old if r['sk']==str(m['sortKey'])]
+        # A sent-message WS snapshot can identify the owner by their bridge ID, while HTTP uses
+        # their Matrix ID. Both explicitly identify the owner; incoming senders must still match.
+        consistent=[r for r in candidates if r['occurred_at']==stamp(m) and r['event_type']==kind
+                    and (not r['sender'] or r['sender']==m.get('senderID')
+                         or (kind=='message.sent' and r['is_self']))]
+        if candidates and not consistent:
+            raise ValueError('Message order identity conflict; no merge performed')
+        previous=known.get(stream)
+        if previous and (previous['timestamp']!=m['timestamp'] or previous['sender']!=m.get('senderID') or previous['kind']!=kind):
+            # Compare instants as well (one API can format UTC with a different suffix).
+            if (datetime.fromisoformat(previous['timestamp'].replace('Z','+00:00'))!=stamp(m)
+                or previous['kind']!=kind
+                or (previous['sender']!=m.get('senderID') and kind!='message.sent')):
+                raise ValueError('Message identity projection conflict')
+        sid=(previous or {}).get('source_id') or (consistent[0]['source_id'] if consistent else chat['id']+'|sort:'+str(m['sortKey']))
+        projection={'source_id':sid,'sort_key':str(m['sortKey']),'timestamp':m['timestamp'],
+                    'sender':m.get('senderID'),'kind':kind}
+        ingestion.set_checkpoint(CONNECTOR,stream,projection,conn=conn)
+        ingestion.set_checkpoint(CONNECTOR,'@local:'+scope+':'+chat['id']+'|'+m['id'],projection,conn=conn)
+        out.append({**m,'_canonical_source_id':sid})
+    by_local={m['id']:m['_canonical_source_id'] for m in out}
+    for m in out:
+        linked=m.get('linkedMessageID')
+        if linked:
+            sid=by_local.get(linked)
+            if not sid and m.get('_reply_message'):
+                sid=canonical_messages(chat,[m['_reply_message']],scope,conn=conn)[0]['_canonical_source_id']
+            if not sid:
+                sid=ingestion.get_checkpoint(CONNECTOR,'@local:'+scope+':'+chat['id']+'|'+linked).get('source_id')
+            m['_canonical_reply_to']=sid
+    # Reactions also have installation-local IDs. Preserve legacy keys by canonical target, sender and emoji.
+    # The owner reacts under several IDs (Matrix ID over HTTP, bridge ID in a WS snapshot): any owner ID is one sender.
+    selves=owner_ids(chat,out)
+    for m in out:
+        existing=conn.execute("""select e.source_id,e.content,i.external_id sender,i.is_self from core.events e
+            left join core.source_identities i on i.identity_id=e.actor_identity_id where e.source='beeper'
+            and e.event_type='reaction.added' and e.thread_id=%s and e.payload->>'target_source_id'=%s
+            order by e.ingested_at""",(chat['id'],m['_canonical_source_id'])).fetchall() if m.get('reactions') else []
+        for r in m.get('reactions') or []:
+            who=r.get('participantID') or 'unknown';emoji=r.get('reactionKey','')
+            mine=who in selves
+            match=next((x for x in existing if x['content']==emoji and (x['sender']==who or (mine and x['is_self']))),None)
+            r['_canonical_source_id']=match['source_id'] if match else m['_canonical_source_id']+'|react:'+who+':'+emoji
+    return out
+
+
+def prepare_replies(bp, chat: dict, msgs: list[dict]) -> list[dict]:
+    local={m['id'] for m in msgs}
+    out=[]
+    for message in msgs:
+        m=dict(message)
+        linked=m.get('linkedMessageID')
+        if linked and linked not in local and hasattr(bp,'message'):
+            m['_reply_message']=bp.message(chat['id'],linked)
+        out.append(m)
+    return out
+
+
+def store_messages(chat: dict, msgs: list[dict], *, conn, scope: str = "") -> tuple[int, int]:
+    msgs=canonical_messages(chat,msgs,scope,conn=conn)
+    people = {p["id"]: p for p in ((chat.get("participants") or {}).get("items") or [])}
+    evs, media = to_events(chat, msgs, people)
+    inserted = queued = 0
+    if evs:
+        attach_known_objects(conn, evs)
+        inserted = events.record_events(evs, conn=conn)["inserted"]
+    for job in media:
+        if ingestion.enqueue(MEDIA_QUEUE, job, dedupe_key=f"beeper_media:{job['source_id']}:{job['url']}",
+                             priority=200, conn=conn):
+            queued += 1
+    return inserted, queued
+
+
 def sync_chat(bp: Beeper, chat: dict, backfill_pages: int) -> tuple[int, int]:
-    cp = ingestion.get_checkpoint(CONNECTOR, chat["id"])
+    # Poll/reconciliation and the event worker may see the same chat together. Serialize its cursors only.
+    with connection() as lock:
+        key = "beeper.sync:" + chat["id"]
+        if not lock.execute("select pg_try_advisory_lock(hashtextextended(%s, 0)) ok", (key,)).fetchone()["ok"]:
+            raise SyncBusy("Beeper chat is being synchronized")
+        try:
+            return _sync_chat(bp, chat, backfill_pages)
+        finally:
+            lock.execute("select pg_advisory_unlock(hashtextextended(%s, 0))", (key,))
+
+
+def _sync_chat(bp: Beeper, chat: dict, backfill_pages: int) -> tuple[int, int]:
+    raw = ingestion.get_checkpoint(CONNECTOR, chat["id"])
+    scope = getattr(bp, "checkpoint_scope", "")
+    # Opaque API cursors belong to a client profile. Keep ALL old Mac checkpoint fields; canonical IDs stay beeper.
+    cp = dict((raw.get("endpoints") or {}).get(scope) or {}) if scope else dict(raw)
+    if scope and cp.get('mode')!='incremental_cutover':
+        # Switch the source, not Memory's history. Server order keys are shared; opaque page cursors are not.
+        cp={'mode':'incremental_cutover','newest_sort_key':int(raw.get('newest_sort_key') or 0),
+            'backfill_done':True,'previous_profile_cursor':cp}
     people = {p["id"]: p for p in ((chat.get("participants") or {}).get("items") or [])}
     newest_known = int(cp.get("newest_sort_key") or 0)
     inserted = media_n = 0
 
     def write(msgs, cursor_update):
         nonlocal inserted, media_n
-        evs, media = to_events(chat, msgs, people)
+        msgs=prepare_replies(bp,chat,msgs)
         with connection() as conn:
-            if evs:
-                attach_known_objects(conn, evs)
-                inserted += events.record_events(evs, conn=conn)["inserted"]
-            ingestion.set_checkpoint(CONNECTOR, chat["id"], {**cp, **cursor_update},
+            n, q = store_messages(chat, msgs, conn=conn, scope=scope)
+            inserted += n; media_n += q
+            next_cp = {**cp, **cursor_update}
+            cursor = {**raw, "endpoints": {**raw.get("endpoints", {}), scope: next_cp}} if scope else next_cp
+            ingestion.set_checkpoint(CONNECTOR, chat["id"], cursor,
                                      last_item_at=max((m["timestamp"] for m in msgs), default=None), conn=conn)
         cp.update(cursor_update)
-        for job in media:
-            if ingestion.enqueue(MEDIA_QUEUE, job, dedupe_key=f"beeper_media:{job['source_id']}:{job['url']}", priority=200):
-                media_n += 1
 
     # 1) newest pages until the known sortKey. newest_sort_key moves only once known history is reached: a run that
     #    stops in the middle of a burst (Mac asleep, timeout) re-reads it next time instead of skipping the pages it
@@ -191,7 +290,11 @@ def sync_chat(bp: Beeper, chat: dict, backfill_pages: int) -> tuple[int, int]:
     newest = max((int(m.get("sortKey") or 0) for m in page["items"]), default=newest_known)
     while page["items"]:
         fresh = [m for m in page["items"] if int(m.get("sortKey") or 0) > newest_known]
-        reached = len(fresh) < len(page["items"]) or not page.get("hasMore") or newest_known == 0
+        cutoff=getattr(bp,'cutover_at',None)
+        if cutoff and not newest_known:
+            fresh=[m for m in fresh if datetime.fromisoformat(m['timestamp'].replace('Z','+00:00'))>=
+                   datetime.fromisoformat(cutoff.replace('Z','+00:00'))]
+        reached = len(fresh) < len(page["items"]) or not page.get("hasMore") or (newest_known == 0 and not cutoff)
         upd = {"newest_sort_key": max(newest, newest_known)} if reached else {}
         if "backfill_cursor" not in cp:
             upd["backfill_cursor"] = page.get("oldestCursor")
@@ -215,15 +318,20 @@ def reconcile_chat(bp: Beeper, chat: dict, since: datetime) -> tuple[int, int]:
     """Re-read a chat back to `since` and write everything (idempotent): repairs messages a run missed and catches
     edits, deletions and reactions on recent messages, which the incremental pass (new sortKeys only) never sees.
     Returns (messages seen, events inserted)."""
+    # Routine outage recovery starts at the source switch, never at the start of Memory's history.
+    cutoff = getattr(bp, 'cutover_at', None)
+    if cutoff:
+        since = max(since, datetime.fromisoformat(cutoff.replace('Z', '+00:00')))
     people = {p["id"]: p for p in ((chat.get("participants") or {}).get("items") or [])}
     seen = inserted = 0
     page = bp.messages(chat["id"])
     while page["items"]:
         msgs = [m for m in page["items"] if datetime.fromisoformat(m["timestamp"].replace("Z", "+00:00")) >= since]
         seen += len(msgs)
-        evs, _ = to_events(chat, msgs, people)
-        if evs:
-            inserted += events.record_events(evs)["inserted"]
+        msgs=prepare_replies(bp,chat,msgs)
+        with connection() as conn:
+            n, _ = store_messages(chat, msgs, conn=conn, scope=getattr(bp,'checkpoint_scope',''))
+            inserted += n
         if len(msgs) < len(page["items"]) or not page.get("hasMore"):
             break
         page = bp.messages(chat["id"], cursor=page["oldestCursor"], direction="before")
@@ -292,7 +400,7 @@ def main() -> None:
     ap.add_argument("--reconcile-days", type=int, default=7,
                     help="once a day, re-read the last N days of every chat (missed messages, edits, reactions)")
     a = ap.parse_args()
-    ingestion.register_connector(CONNECTOR, "beeper", "pull", "Beeper Desktop API on Monsieur's Mac (read-only)",
+    ingestion.register_connector(CONNECTOR, "beeper", "push", "Native Beeper Server: events + polling reconciliation (read-only)",
                                  timedelta(minutes=10))
     try:
         bp = Beeper()
@@ -307,6 +415,8 @@ def main() -> None:
                 total_ins += ins; total_media += med
                 ingestion.resolve_failures(CONNECTOR, chat["id"])     # this chat is in sync again
                 unreachable = 0
+            except SyncBusy:
+                continue  # event worker holds this chat; its durable job or next reconciliation continues it
             except (httpx.ConnectError, httpx.ConnectTimeout) as e:
                 unreachable += 1
                 if unreachable >= 3:          # the Mac is gone: one failure for the run, not one per chat
@@ -325,8 +435,10 @@ def main() -> None:
         ingestion.mark_success(CONNECTOR)
         ingestion.resolve_failures(CONNECTOR, "")
         with connection() as conn:
-            pending = conn.execute("""select count(*) filter (where not coalesce((cursor->>'backfill_done')::boolean, false)) n
-                                      from ingestion.checkpoints where connector = %s""", (CONNECTOR,)).fetchone()["n"]
+            pending = conn.execute("""select count(*) filter (where not coalesce(
+                  (cursor->'endpoints'->%s->>'backfill_done')::boolean, false)) n
+                  from ingestion.checkpoints where connector = %s and stream like '!%%'""",
+                  (bp.checkpoint_scope, CONNECTOR)).fetchone()["n"]
         print(json.dumps({"chats": len(chats), "events_inserted": total_ins, "media_queued": total_media,
                           "media_stored": media_done, "chats_backfilling": pending, "reconciled": reconciled}))
     except Exception as e:
