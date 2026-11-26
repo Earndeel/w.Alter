@@ -294,3 +294,14 @@ reassess_timeout_s = 6.0
 enabled = true
 max_tokens = 250             # a ceiling, not a target
 timeout_ms = 300             # a late digest leaves the decision as before (journaled « late »)
+
+[thread_blocks]
+# Filet de sécurité P1 (Monsieur, 26/11, après les bancs du 25–26/11) : quand Decision rattache le message à un fil
+# existant avec une confiance inférieure à min_confidence, le pack n'apporte aucun bloc de ce fil (sa vue de sujet,
+# ses tâches et son expérience, sa place en tête du tableau des sujets). Le rattachement lui-même ne change pas (le
+# fil du plan et du run), ni la conversation visible, ni la récupération mémorielle, qui ne dépend pas du fil.
+# Banc (/user/Lucas/state/context/bench/rattachement-2026-11-25) : sur Walter, faux rattachements 2 → 0 à 0,8 sur
+# l'échantillon indépendant ; sur Claude Code les rattachements pertinents manqués doublent : non appliqué là.
+# Retour arrière : runtimes = [] (relu à chaque message, sans redémarrage).
+runtimes = ["walter"]
+min_confidence = 0.8

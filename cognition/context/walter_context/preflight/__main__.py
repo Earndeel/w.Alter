@@ -221,6 +221,28 @@ def _signal_degraded(d: dict, plan: dict) -> None:
         pass
 
 
+def _thread_blocks(plan_obj, runtime: str | None) -> dict | None:
+    """P1 ([thread_blocks], owner 26/11): for these runtimes, an existing thread chosen with less confidence than
+    min_confidence brings none of its blocks — the pack is read as for a new thread. Only the pack: the plan's thread
+    (what the run and Memory attach) is put back once the pack is made, and the visible conversation and the memory
+    retrieval do not depend on it. Returns the trace (and the chosen thread, to put back), or None."""
+    from ..config import thread_blocks_settings
+    try:
+        conf = thread_blocks_settings()
+    except (OSError, ValueError):
+        return None
+    t = plan_obj.thread
+    if runtime not in conf["runtimes"] or not t or not t.id or t.new:
+        return None
+    confidence = t.confidence if t.confidence is not None else 1.0
+    if confidence >= conf["min_confidence"]:
+        return None
+    from . import ThreadChoice
+    plan_obj.thread = ThreadChoice(id=None, new=True, confidence=t.confidence)
+    return {"withheld": t.id, "confidence": round(confidence, 3), "min_confidence": conf["min_confidence"],
+            "_chosen": t}
+
+
 def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -> tuple[dict | None, dict]:
     """One request → (plan or None, record row). Shared by the CLI and the service; never raises. `warm`: the
     service's own start-up request (nothing recorded, nothing signalled).
@@ -289,15 +311,24 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
             from ..assembly import pack
             from ..retrieval import gather
             g0 = time.monotonic()
-            blocks, notes = gather(plan_obj, req.message, session_key=key, deadline=due, prefetch=pre,
-                                   native_history=d.get("runtime") in ("claude_code", "codex", "dsh"))
-            skip = set(d.get("exclude_blocks") or [])      # what the host already shows natively (its profile)
-            blocks = [b for b in blocks if b.id not in skip]
-            row["mode"] = "inject" if want_pack else "shadow"
-            p = pack(plan_obj, blocks, notes)
+            withheld = _thread_blocks(plan_obj, d.get("runtime"))
+            if withheld:                     # in the journal, not in the plan: its thread stays the contract's
+                row["thread_blocks"] = {k: v for k, v in withheld.items() if k != "_chosen"}
+            try:
+                blocks, notes = gather(plan_obj, req.message, session_key=key, deadline=due, prefetch=pre,
+                                       native_history=d.get("runtime") in ("claude_code", "codex", "dsh"))
+                skip = set(d.get("exclude_blocks") or [])      # what the host already shows natively (its profile)
+                blocks = [b for b in blocks if b.id not in skip]
+                row["mode"] = "inject" if want_pack else "shadow"
+                p = pack(plan_obj, blocks, notes)
+            finally:
+                if withheld:
+                    plan_obj.thread = withheld.pop("_chosen")
             p.wall_ms = round((time.monotonic() - g0) * 1000, 1)
             cur = d.get("current_injection") or {}
             row["pack"] = p.summary()
+            if withheld:                     # the pack was read for no thread, whatever the plan now carries
+                row["pack"]["thread"] = None
             row["pack_text"] = p.text()
             row["current"] = {"tokens": len(cur.get("text") or "") // 4 + (1 if cur.get("text") else 0),
                               "parts": cur.get("parts"), "text": cur.get("text")}

@@ -200,3 +200,16 @@ def digest_settings(path: str | Path | None = None) -> dict:
 def media_settings(path: str | Path | None = None) -> dict:
     """[media] (18/11): the images and voice notes of a message read by the preflight's decision model."""
     return _optional("media", MEDIA_DEFAULTS, path)
+
+
+# P1 (owner 2026-11-26, after the benches of 25–26/11): an attachment Decision is unsure of brings none of the thread's
+# blocks. Defaults = the behaviour before (no runtime): every chosen thread brings its blocks.
+THREAD_BLOCKS_DEFAULTS = {"runtimes": [], "min_confidence": 0.0}
+
+
+def thread_blocks_settings(path: str | Path | None = None) -> dict:
+    """[thread_blocks]: for these runtimes, a thread chosen with less confidence brings no thread blocks."""
+    out = _optional("thread_blocks", THREAD_BLOCKS_DEFAULTS, path)
+    if out["min_confidence"] > 1:
+        raise ValueError("[thread_blocks].min_confidence: between 0 and 1")
+    return out
