@@ -31,6 +31,11 @@ record_budget_tokens = 6000  # whole record; past it oldest full entries go to o
 min_gain_cold_tokens = 1000  # cache cold (idle past the model's cache_ttl_s): a boundary must free at least this
                              # (cache warm: policy.min_gain_tokens; under pressure: any gain)
 frame_tokens = 60            # the host's own framing around a record, counted against the gain
+# Rattachement indépendant de la conversation visible (Monsieur, 26/11) : le détail des tours passés dépend de leur
+# récence seule, jamais du fil auquel Decision rattache le message. Mesure avant bascule (17–25/11) : 120 fenêtres
+# appliquées, 206 tours mis en registre, aucun de plus de 30 min : rien n'aurait changé. Retour arrière : true (lu à
+# chaque fenêtre, sans redémarrage).
+by_thread = false
 
 # Model profiles: first `match` (fnmatch on the lower-cased model id) wins; the last one is the default.
 # effective_budget = where quality starts to suffer (not the advertised window); hard_budget = never exceed.

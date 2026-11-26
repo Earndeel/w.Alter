@@ -106,4 +106,27 @@ def test_unknown_thread_and_unmarked_turns_fall_back_to_recency():
 
 
 def test_settings_come_from_the_configuration_file():
-    assert set(window.settings()) == set(window.RELEVANCE_KEYS)
+    assert set(window.settings()) == set(window.RELEVANCE_KEYS) | {"by_thread"}
+
+
+def test_by_thread_off_the_attachment_never_shapes_the_record(tmp_path):
+    """Owner 26/11: the visible conversation does not depend on the thread a message is attached to."""
+    messages = turn(1, NOW - 2 * DAY, thread="subject:a") + turn(2, NOW - DAY, thread="subject:b", tool_chars=40_000) \
+        + turn(3, NOW - DAY + HOUR, thread="subject:a", tool_chars=120_000) + turn(4, NOW - 5 * MIN, thread="subject:b")
+    rel = {**REL, "by_thread": False}
+    outs = [window.decide(messages, model="walter/auto", cfg=CFG, rel=rel, now_ms=NOW, plan=plan, live_turn=5,
+                          measured_tokens=48_000) for plan in ({"thread": "subject:a"}, {"thread": "subject:b"}, None)]
+    assert outs[0]["content"] == outs[1]["content"] == outs[2]["content"] and outs[0]["thread"] is None
+    assert outs[0]["turns"] == {"verbatim": 1, "full": 0, "brief": 3, "omitted": 0, "leaving": 3}  # recency alone
+    on = decide(messages, plan={"thread": "subject:a"}, live_turn=5, measured_tokens=48_000)
+    assert on["turns"]["full"] == 2 and on["thread"] == "subject:a"               # by_thread on: as before
+    p = tmp_path / "w.toml"
+    body = "[relevance]\n" + "".join(f"{k} = {v}\n" for k, v in REL.items())
+    p.write_text(body)
+    assert window.settings(p)["by_thread"] is True
+    p.write_text(body + "by_thread = false\n")
+    assert window.settings(p)["by_thread"] is False
+    p.write_text(body + 'by_thread = "no"\n')
+    import pytest
+    with pytest.raises(ValueError):
+        window.settings(p)

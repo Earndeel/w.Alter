@@ -50,7 +50,12 @@ def settings(path: str | Path | None = None) -> dict:
     for k, t in RELEVANCE_KEYS.items():
         if not isinstance(raw[k], t) or isinstance(raw[k], bool) or raw[k] < 0:
             raise ValueError(f"[relevance].{k}: invalid value")
-    return {k: raw[k] for k in RELEVANCE_KEYS}
+    out = {k: raw[k] for k in RELEVANCE_KEYS}
+    by_thread = raw.get("by_thread", True)      # optional: absent = the behaviour before 26/11
+    if not isinstance(by_thread, bool):
+        raise ValueError("[relevance].by_thread: true or false")
+    out["by_thread"] = by_thread
+    return out
 
 
 @dataclass
@@ -206,7 +211,8 @@ def decide(messages: list[Message], *, model: str = "", budget_tokens: int = 0, 
             keep.insert(0, t)
     recorded = done[:len(done) - len(keep)]
     leaving = recorded[first_visible:]
-    thread = (plan or {}).get("thread") or None
+    # by_thread = false (owner 26/11): the attachment never shapes the visible conversation, recency alone does
+    thread = ((plan or {}).get("thread") or None) if rel.get("by_thread", True) else None
     levels, content = levels_for(recorded, thread, now_ms, rel, cfg)
     before = checkpoint_tokens + sum(t.tok for t in leaving)
     after = tokens([{"role": "user", "content": content}]) + rel["frame_tokens"]
