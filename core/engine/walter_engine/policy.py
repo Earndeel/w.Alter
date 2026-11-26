@@ -76,9 +76,22 @@ class Policy:
                 return iface
         return None
 
+    @staticmethod
+    def test_interface(p: dict | None, door: str, principal: dict | None) -> str | None:
+        """A test account declared in policy `test_interfaces` (by id prefix: `bench-` = the payload bench,
+        2026-11-23) is judged under that interface instead of `test`: the bench measures the autonomous Walter."""
+        if not p or door != "test" or (principal or {}).get("kind") != "test":
+            return None
+        pid = str((principal or {}).get("id") or "")
+        for prefix, iface in (p.get("test_interfaces") or {}).items():
+            if not prefix.startswith("_") and pid.startswith(prefix) and iface in (p.get("interfaces") or {}):
+                return iface
+        return None
+
     async def judge(self, *, tool: str, args: dict, door: str, depth: int, principal: dict | None = None) -> dict:
         p = self._load()
-        iface = self.machine_interface(p, door, principal) or IFACE.get(door, "api")
+        iface = (self.machine_interface(p, door, principal) or self.test_interface(p, door, principal)
+                 or IFACE.get(door, "api"))
         if p is None:
             out = {**FALLBACK, "tool": tool}
         else:
