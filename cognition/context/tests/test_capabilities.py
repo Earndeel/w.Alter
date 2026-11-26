@@ -111,7 +111,7 @@ ALL=['memory_context','walter_run','skills_search','module_guide','module_index'
 def test_layer_composes_every_module_in_order_with_the_navigation_header(modules):
     out=capabilities.compose(ALL)
     assert out['status']=='ready' and out['injection_allowed']
-    assert out['content'].startswith('## Modules W.Alter\n') and 'module_guide(module)' in out['content']
+    assert out['content'].startswith('## W.Alter modules\n') and 'module_guide(path' in out['content']
     c=out['content']
     assert c.index('### Memory') < c.index('### Walter Router') < c.index('### Skills')  # router heading demoted
     assert out['sha256']==hashlib.sha256(c.encode()).hexdigest() and out['chars']==len(c)

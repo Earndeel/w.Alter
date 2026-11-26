@@ -217,7 +217,7 @@
     {
       "id": "preflight",
       "path": "walter_context/preflight",
-      "role": "Décision unique par message : ContextPlan (intention, niveau, capacités, voie rapide)",
+      "role": "One decision per owner message: the ContextPlan (intent, level, capabilities, fast path)",
       "status": "active",
       "readme": "README.md",
       "contracts": [
@@ -236,7 +236,7 @@
     {
       "id": "assembly",
       "path": "walter_context/assembly.py",
-      "role": "Assemblage du contexte selon le plan (pack)",
+      "role": "Context assembly according to the plan (the turn's pack)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/context"
@@ -244,7 +244,7 @@
     {
       "id": "child",
       "path": "walter_context/child.py",
-      "role": "ChildContextSpec : dossier de départ d'un sous-agent",
+      "role": "ChildContextSpec: the starting brief of a sub-agent",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -258,7 +258,7 @@
     {
       "id": "compress",
       "path": "walter_context/compress",
-      "role": "Moteur de compaction (projection head→record→compact→live)",
+      "role": "Compaction engine (projection head → record → compact → live)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/context/compress"
@@ -266,7 +266,7 @@
     {
       "id": "recover",
       "path": "walter_context/recover.py",
-      "role": "Retrouver l'original d'une sortie compactée (walter_logs)",
+      "role": "Retrieve the original of a compacted output (walter_logs)",
       "status": "active",
       "readme": "README.md",
       "interfaces": [
@@ -280,7 +280,7 @@
     {
       "id": "dsh-port",
       "path": "ports/dsh",
-      "role": "Retour arrière seulement depuis le 2026-11-18 (DSH désinstallé, archivé ; le moteur natif appelle Context par HTTP) : prise DSH : fenêtre du tour du propriétaire (frontière par pertinence, A1), point de contrôle sous pression, context_recover",
+      "role": "Rollback only since 2026-11-18 (DSH uninstalled): the former DSH port (owner-turn window, checkpoint under pressure, context_recover)",
       "status": "obsolete",
       "readme": "README.md",
       "vision_target": "core/engine/plugins",
@@ -294,7 +294,7 @@
     {
       "id": "bench",
       "path": "bench",
-      "role": "Bancs (levels, replay, quality, acceptance)",
+      "role": "Benches (levels, replay, quality, acceptance)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/context/bench"
@@ -302,10 +302,18 @@
     {
       "id": "session-state",
       "path": "contracts/schemas/session-state.v1.json",
-      "role": "État de travail par fil (SessionState v1)",
+      "role": "Working state per thread (SessionState v1)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/context/contracts"
     }
-  ]
+  ],
+  "presentation": {
+    "audience": "agent",
+    "title": "walter-context",
+    "order": 15,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "tools": []
+  }
 }

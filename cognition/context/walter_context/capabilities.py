@@ -82,18 +82,16 @@ class TurnNotes:
 
 LAYER_ID = "walter-modules.layer"
 LAYER_TOOLS = ("module_index", "module_guide")
-HEADER = ("## Modules W.Alter\n"
-          "Chaque module branché se présente ci-dessous (niveau 1 : ce que c'est, son organisation, comment s'en servir), "
-          "depuis le dossier manifest/ du module. Pour aller plus loin, seulement si la tâche le demande : "
-          "`module_index(module, section)` liste ce qu'il contient, tenu à jour par le module ; "
-          "`module_guide(module)` donne son guide détaillé (D3) ; puis l'outil de l'élément.")
-HEADER_M0 = ("## Modules W.Alter\n"
-             "Chaque module branché tient en une ligne (D1). Sa fiche d'utilisation (D2 : outils, paramètres, "
-             "conventions) accompagne un message quand elle est utile et se lit à tout moment avec "
-             "`module_guide(module, depth=\"D2\")` ; `depth=\"D3\"` donne sa documentation détaillée, "
-             "`module_index(module, section)` ce qu'il contient. Lire une documentation n'oblige pas à utiliser le "
-             "module.")
-HEADER_BARE = "## Modules W.Alter"
+HEADER = ("## W.Alter modules\n"
+          "Each connected module introduces itself below (what it is, how it is organised, how to use it), from its "
+          "manifest/ folder. Go further only when the task needs it: `module_index(module, section)` lists what it "
+          "contains, kept up to date by the module; `module_guide(path, depth=\"D3\")` gives its technical detail; "
+          "then the tool of the element.")
+HEADER_M0 = ("## W.Alter modules\n"
+             "Each connected module fits in one line (D1). Read any depth at any time with `module_guide(path, depth)`: "
+             "`D2` its role, organisation and tools, `D3` its technical detail; `module_index(module, section)` lists "
+             "what it contains. Reading documentation is not an order to use the module.")
+HEADER_BARE = "## W.Alter modules"
 
 
 def _valid_note(note: dict, max_chars: int) -> bool:
@@ -156,7 +154,7 @@ def module_notes(available_tools: list[str] | None, form: str = "full", m1: list
     return {**base, "status": "ready", "notes": notes, "problems": problems}
 
 
-M0_TITLE = "### Capacités (une ligne par module)"
+M0_TITLE = "### Capabilities (one line per module)"
 
 
 def compose(available_tools: list[str] | None, form: str = "full", m1: list[str] | None = None) -> dict:
