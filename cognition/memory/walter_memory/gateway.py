@@ -156,6 +156,14 @@ def post_context(body: ContextIn):
     return res
 
 
+@app.post("/v1/owner-rules", dependencies=[Depends(auth)])
+def post_owner_rules():
+    """The owner's universal consignes in force (owner 2026-11-26, stable block): the engine puts them in its cached
+    socle at every level. Read from Memory at each call; nothing is stored by the caller."""
+    from . import working
+    return working.universal_consignes("cloud_model")
+
+
 # ── Engine lot E2 (2026-11-10): the engine's intake and events speak HTTP to Walter's single sources ──────────────
 # The Run Plane stays the only source of runs and the bus the only source of events; these routes only transport the
 # same writes the hook makes through the library (walter_hook.run_start / run_end / emit), so a native engine plugin

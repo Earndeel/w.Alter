@@ -206,7 +206,13 @@ def stored():
               "sur": f"tableaux {tag}"},
              {"type": "preference", "text": s["upref"], "msgs": [1], "quote": s["upref"], "portee": "universelle"}]
     _store(tag, items, " ".join(s.values()))
-    return tag, s
+    yield tag, s
+    # the throwaway database is shared by the whole run: a test's consignes must not fill the next tests' layers
+    # (26/11: four runs' universal « phrases courtes » pushed test_working's rule out of its budget)
+    from walter_memory.db import connection
+    with connection() as conn:
+        conn.execute("update core.derived_items set valid_to = now() where content like %s and valid_to is null",
+                     (f"%{tag}%",))
 
 
 def _mode(monkeypatch, restitution):
@@ -293,3 +299,32 @@ def test_the_catchup_retypes_only_when_its_stage_is_active_and_no_provider_hold(
     assert extract2.catchup(1, relate=5)["retyped"] == {"changed": 0} and called == [5]
     hold.update(ok=False, reason="limite réelle")
     assert extract2.catchup(1, relate=5)["retyped"] == {"quota_stopped": "limite réelle"} and called == [5]
+
+
+# ───────────────────────────── stable block (owner 2026-11-26) ─────────────────────────────
+def test_exclude_universal_leaves_the_limited_consignes_and_the_preferences(monkeypatch, stored):
+    tag, s = stored
+    _mode(monkeypatch, "applicable")
+    q = f"on avance sur le projet zorg{tag}"
+    r = working.owner_rules(q, budget=5000, exclude_universal=True)
+    assert s["univ"] not in r["text"] and s["proj"] in r["text"]
+    assert s["upref"] in r["preferences"]["text"]                 # the preferences stay in the pack
+    assert s["univ"] in working.owner_rules(q, budget=5000)["text"]   # without the host's word: unchanged
+
+
+def test_universal_block_holds_every_universal_consigne_and_only_them(monkeypatch, stored):
+    tag, s = stored
+    _mode(monkeypatch, "applicable")
+    u = working.universal_consignes()
+    lines = [i["line"] for i in u["items"]]
+    assert any(s["univ"] in x for x in lines)
+    assert not any(s["proj"] in x or s["upref"] in x or s["opin"] in x for x in lines)
+    assert u["sha"] and u["title"].startswith("Consignes universelles") and all("covered_by" in i for i in u["items"])
+
+
+def test_pack_title_says_the_universal_consignes_are_in_the_instructions(monkeypatch, stored):
+    from walter_memory import context as ctx
+    tag, s = stored
+    _mode(monkeypatch, "applicable")
+    out = ctx.get_context(f"on avance sur le projet zorg{tag}", include_profile=False, exclude_universal=True)
+    assert "## Consignes de Monsieur à Walter liées à ce message" in out["text"] and s["univ"] not in out["text"]

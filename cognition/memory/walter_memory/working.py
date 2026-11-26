@@ -461,14 +461,15 @@ def _always_shown(r: dict) -> bool:
 
 
 def owner_rules(query: str = "", *, audience: str = "cloud_model", budget: int = RULES_BUDGET,
-                exclude: set[str] | None = None, limit: int = 40) -> dict:
+                exclude: set[str] | None = None, limit: int = 40, exclude_universal: bool = False) -> dict:
     """The stable layer (P1.1/P1.8): the owner's durable rules in force — constraints, preferences and corrections he
     stated himself (g1), from every thread and runtime — closest to the query first, then the most recent. A weak
     classification of the message must never lose a rule that always holds. Model-free (local embeddings).
     [nature] restitution = "applicable" (M3): _applicable_rules — only the consignes that apply to the message."""
     from . import nature
     if nature.restitution_on():
-        return _applicable_rules(query, audience=audience, budget=budget, exclude=exclude or set(), limit=limit)
+        return _applicable_rules(query, audience=audience, budget=budget, exclude=exclude or set(), limit=limit,
+                                 exclude_universal=exclude_universal)
     allowed = privacy.allowed_classes("local_only" if audience == "owner_local" else "cloud_allowed")
     exclude = exclude or set()
     qv = None
@@ -523,7 +524,8 @@ def owner_rules(query: str = "", *, audience: str = "cloud_model", budget: int =
     return {"text": text, "ids": shown, "privacy_class": cls, "tokens": _tok(text) if text else 0}
 
 
-def _applicable_rules(query: str, *, audience: str, budget: int, exclude: set[str], limit: int) -> dict:
+def _applicable_rules(query: str, *, audience: str, budget: int, exclude: set[str], limit: int,
+                      exclude_universal: bool = False) -> dict:
     """M3 (owner 2026-11-25): what the owner said durably, sorted by its nature and its portée (walter_memory.nature).
     - "text": the consignes (nature instruction) that APPLY to this message (nature.applicable: universal ones always;
       a project, domain, person or situation one only when the message is about it; a task one never — the thread's
@@ -533,7 +535,10 @@ def _applicable_rules(query: str, *, audience: str, budget: int, exclude: set[st
       RULE_SIM, or the message names what they are limited to): they orient, they do not oblige.
     - opinions, facts, decisions, goals: not here — they reach the model through the relevant memory, like any other
       knowledge (nothing is lost, the knowledge search still ranks them).
-    One budget, consignes first. Without a message only the universal consignes (no relevance signal)."""
+    One budget, consignes first. Without a message only the universal consignes (no relevance signal).
+    exclude_universal (owner 2026-11-26, stable block): the caller's socle already carries the universal consignes
+    (universal_consignes(), injected by the engine): only the ones limited to a project, domain, person or situation
+    are given here."""
     from . import nature
     from .search import embed, vec
     allowed = privacy.allowed_classes("local_only" if audience == "owner_local" else "cloud_allowed")
@@ -569,7 +574,7 @@ def _applicable_rules(query: str, *, audience: str, budget: int, exclude: set[st
                 projects = find_projects(query, conn)
             except Exception:
                 projects = []
-    consignes, related = [], []
+    consignes, related, elsewhere = [], [], []
     for r in rows:
         if r["id"] in exclude:
             continue
@@ -580,6 +585,9 @@ def _applicable_rules(query: str, *, audience: str, budget: int, exclude: set[st
         if act == "instruction":
             # a typed consigne always has a portée; an old one filed under a project keeps that project
             reach = r["reach"] or ("project" if r["domain"] == "project" else "universal")
+            if exclude_universal and reach == "universal":
+                elsewhere.append(r["id"])        # in the host's instructions: not shown again as knowledge either
+                continue
             if nature.applicable({"reach": reach, "reach_on": on}, query, sim=r["sim"], threshold=RULE_SIM,
                                  projects=projects):
                 consignes.append({**r, "reach": reach, "reach_on": on})
@@ -625,8 +633,42 @@ def _applicable_rules(query: str, *, audience: str, budget: int, exclude: set[st
     shown = c_shown + p_shown
     cls = privacy.strictest(*(i["privacy_class"] for i in shown)) if shown else "cloud_allowed"
     return {"text": c_text, "ids": [i["id"] for i in shown], "privacy_class": cls, "tokens": c_tok + p_tok,
-            "mode": "applicable", "consignes": [i["id"] for i in c_shown],
+            "mode": "applicable", "consignes": [i["id"] for i in c_shown], "elsewhere": elsewhere,
             "preferences": {"text": p_text, "ids": [i["id"] for i in p_shown], "tokens": p_tok}}
+
+
+UNIVERSAL_TITLE = ("Consignes universelles de Monsieur à Walter, en vigueur (tirées de sa mémoire ; chacune "
+                   "s'applique quand sa condition se présente)")
+
+
+def universal_consignes(audience: str = "cloud_model") -> dict:
+    """The stable block (owner 2026-11-26): every universal consigne in force, as the rules layer renders them without
+    a message (_applicable_rules("") — the same rows, order and lines), for a host that puts them in its cached
+    instructions (Walter Engine's socle) whatever the plan's level. Memory stays the only source: the host keeps the
+    answer in memory only and asks again at each turn start.
+    Each item carries its `covered_by` marks (an instruction of the host's socle that already says it: part + exact
+    quote): the host leaves such an item out only while that quote is still in its instruction, so a consigne is never
+    lost when the instruction that covered it changes. `sha` changes with the block; `epoch` is the last time a
+    consigne or preference stopped being in force or changed its portée (old packs older than it may be stale)."""
+    import hashlib
+    r = _applicable_rules("", audience=audience, budget=10 ** 6, exclude=set(), limit=10 ** 4)
+    lines = [x for x in (r.get("text") or "").splitlines() if x.startswith("- ")]
+    ids = r.get("consignes") or []
+    with connection() as conn:
+        marks = {x["id"]: x["covered_by"] for x in conn.execute(
+            "select item_id::text id, attributes->'covered_by' covered_by from core.derived_items "
+            "where item_id = any(%s::uuid[])", (ids,)).fetchall()} if ids else {}
+        ep = conn.execute("""
+            select greatest(
+              (select max(valid_to) from core.derived_items where derived_by = 'l3.extract' and generation = 'g1'
+                 and (kind = any(%s) or attributes->>'act' = any(%s)) and valid_to <= now()),
+              (select max((attributes->>'reach_changed_at')::timestamptz) from core.derived_items
+                 where derived_by = 'l3.extract' and generation = 'g1' and attributes ? 'reach_changed_at')) as epoch""",
+                          (list(RULE_KINDS), ["instruction", "preference"])).fetchone()["epoch"]
+    items = [{"id": i, "line": line, "covered_by": marks.get(i) or []} for i, line in zip(ids, lines)]
+    sha = hashlib.sha256("\n".join(x["line"] for x in items).encode()).hexdigest()[:16]
+    return {"title": UNIVERSAL_TITLE, "items": items, "sha": sha, "epoch": ep.isoformat() if ep else None,
+            "privacy_class": r.get("privacy_class") or "cloud_allowed"}
 
 
 def session_state(st: dict) -> dict:
