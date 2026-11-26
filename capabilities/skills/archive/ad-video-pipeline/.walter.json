@@ -1,5 +1,8 @@
 {
+ "archived_at": "2026-11-26T04:20:56+00:00",
+ "archived_reason": "not read for 30 days",
  "content_since": "2026-09-29T23:29:58Z",
+ "domain": "video",
  "hermes": {
   "path": "/root/.hermes/skills/productivity/ad-video-pipeline",
   "sha": "03f6d3b68f5fe1de42af53cd177ebd6d0cfbc92d89dced30b76ecc27dac7503a",
@@ -8,5 +11,6 @@
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
+ "reserve": true,
  "store_sha": "03f6d3b68f5fe1de42af53cd177ebd6d0cfbc92d89dced30b76ecc27dac7503a"
 }
