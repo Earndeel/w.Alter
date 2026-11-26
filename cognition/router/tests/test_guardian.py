@@ -80,6 +80,23 @@ def test_no_reference_in_this_version_is_no_incident(monkeypatch):
     assert checks.docs() == []
 
 
+def test_a_stale_reference_is_one_docs_incident_not_also_a_test_failure(monkeypatch, tmp_path):
+    """2026-11-25 (incident 691): the reference test failed beside the deferred `docs` incident (generated files
+    being someone's work in progress), and the repair agent was sent onto those files."""
+    file, name = checks.REFERENCE_TEST.split("::")
+    assert f"def {name}(" in (paths.ROOT / file).read_text()        # the skipped id is the real reference test
+    monkeypatch.setattr(checks, "run_tests", lambda root: {"ok": False, "failures": {
+        checks.REFERENCE_TEST: "AssertionError: stale", "tests/test_k.py::test_v": "AssertionError: x"}})
+    monkeypatch.setattr(checks, "dirty_paths", lambda root=None: {"docs/reference/CODE.md"})
+    for name in ("sources", "cycle", "providers", "credits", "padlocks"):
+        monkeypatch.setattr(checks, name, lambda conn: [])
+    monkeypatch.setattr(checks, "docs_check", lambda: {"ok": False, "stale": ["docs/reference/CODE.md"]})
+    keys = [p["key"] for p in checks.detect(None)]
+    assert keys == ["docs", "test:tests/test_k.py::test_v"]
+    monkeypatch.setattr(checks, "docs_check", lambda: {"ok": True, "stale": []})   # current reference: the test counts
+    assert f"test:{checks.REFERENCE_TEST}" in [p["key"] for p in checks.detect(None)]
+
+
 def test_parametrised_test_ids_with_spaces_are_kept_whole(monkeypatch, tmp_path):
     out = ("FAILED tests/test_k.py::test_v[20 variantes en brouillon-budget-grok] - AssertionError: x\n"
            "ERROR tests/test_c.py\n")

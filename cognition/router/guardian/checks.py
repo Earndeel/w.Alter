@@ -120,13 +120,20 @@ def run_tests(root, timeout: int = TEST_TIMEOUT) -> dict:
     return {"ok": proc.returncode == 0, "failures": failures, "tail": proc.stdout[-3000:]}
 
 
-def tests(root=None) -> list[dict]:
-    """Failing tests, except those whose test file is itself someone's uncommitted work (still being written)."""
+# The test that the generated reference is current: the same check as `docs()`. While the reference is stale, its
+# `docs_stale` incident owns the problem (regenerated mechanically, or deferred over someone's work in progress);
+# a second, test_failure incident sent the repair agent onto files it must not touch (2026-11-25, incident 691).
+REFERENCE_TEST = "tests/test_documentation.py::test_generated_reference_is_current_without_private_data_or_a_db_call"
+
+
+def tests(root=None, skip: frozenset[str] = frozenset()) -> list[dict]:
+    """Failing tests, except those whose test file is itself someone's uncommitted work (still being written) and
+    those in `skip` (followed by another incident)."""
     root = root or paths.ROOT
     res = run_tests(root)
     busy = dirty_paths(root)
     return [{"key": f"test:{node}", "kind": "test_failure", "subject": node, "detail": {"reason": why}}
-            for node, why in res["failures"].items() if node.split("::")[0] not in busy]
+            for node, why in res["failures"].items() if node.split("::")[0] not in busy and node not in skip]
 
 
 def docs_check() -> dict:
@@ -176,5 +183,6 @@ def padlocks(conn) -> list[dict]:
 
 
 def detect(conn, with_tests: bool = True) -> list[dict]:
-    found = sources(conn) + cycle(conn) + providers(conn) + credits(conn) + padlocks(conn) + docs()
-    return found + (tests() if with_tests else [])
+    stale_docs = docs()
+    found = sources(conn) + cycle(conn) + providers(conn) + credits(conn) + padlocks(conn) + stale_docs
+    return found + (tests(skip=frozenset({REFERENCE_TEST}) if stale_docs else frozenset()) if with_tests else [])
