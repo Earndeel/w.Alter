@@ -165,14 +165,21 @@ def test_each_claude_account_is_its_own_route_in_declaration_order(monkeypatch):
                       if any(r["provider"] == "claude-pro" for r in execution.routes(conn, m))), None)
         if model is None:
             pytest.skip("no claude-pro offer in this database")
-        monkeypatch.setattr(execution, "subscription_accounts", accounts(10.0))
-        rs = execution.routes(conn, model)
-        assert [r.get("account") for r in rs[:2]] == ["anthropic-pro", "anthropic-pro-2"]
-        assert rs[1]["subscription"]["account"] == "anthropic-pro-2"
-        monkeypatch.setattr(execution, "subscription_accounts", accounts(100.0))
-        rs = execution.routes(conn, model)
-        assert rs[0].get("account") == "anthropic-pro-2"
-        assert [r.get("account") for r in rs].index("anthropic-pro") > next(i for i, r in enumerate(rs) if r["access"] != "subscription")
+        # 2026-11-26: the live paid routes' health is not this test's subject (Kie and OpenRouter failing their recent
+        # Opus runs had put them behind the spent account): healthy paid providers, fixed in this transaction only
+        monkeypatch.setattr(execution, "reliability", lambda c, p, m: {"runs": 0, "failed": 0, "unreliable": False})
+        try:
+            conn.execute("update models.provider_status set ok = true")
+            monkeypatch.setattr(execution, "subscription_accounts", accounts(10.0))
+            rs = execution.routes(conn, model)
+            assert [r.get("account") for r in rs[:2]] == ["anthropic-pro", "anthropic-pro-2"]
+            assert rs[1]["subscription"]["account"] == "anthropic-pro-2"
+            monkeypatch.setattr(execution, "subscription_accounts", accounts(100.0))
+            rs = execution.routes(conn, model)
+            assert rs[0].get("account") == "anthropic-pro-2"
+            assert [r.get("account") for r in rs].index("anthropic-pro") > next(i for i, r in enumerate(rs) if r["access"] != "subscription")
+        finally:
+            conn.rollback()
 
 
 def test_bridge_usage_is_split_per_account(monkeypatch, tmp_path):
