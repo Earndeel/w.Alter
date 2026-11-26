@@ -28,9 +28,14 @@ ROOT = Path(__file__).resolve().parent.parent
 PARTS = {  # instance sources (identity, rules) + shipped runtime adapters, in order
     "claude-code": ["identity", "rules", "agent-cli", "claude-code"],
     "codex": ["identity", "rules", "agent-cli", "codex"],
-    "engine": ["identity", "rules", "engine"],  # 2026-11-17: Walter Engine native (core/engine/walter_engine)
+    # Walter Engine native (core/engine/walter_engine). 2026-11-24 (lot 3a): the Soul alone, then the owner's conduct
+    # (rules + the instance's engine additions) in its own file; the engine's operating rules belong to the engine
+    # (core/engine/instructions/) and the engine composes the three. Before: one AGENTS.md (identity + rules + engine).
+    "engine": ["identity"],
+    "engine-conduct": ["rules", "engine"],
     "agent": ["identity", "rules"],
 }
+BARE = {"engine", "engine-conduct"}  # parts of a composed prompt: no "# W.Alter" title (the comment line is stripped)
 INCLUDE = re.compile(r"^\{\{include (\S+)\}\}$", re.M)
 INSTANCE = "@instance"
 
@@ -73,9 +78,10 @@ class Soul:
     def _part(self, name: str) -> str:
         if name in ("identity", "rules"):
             return self.sources[name].read_text().strip()
-        text = (ROOT / "runtimes" / f"{name}.md").read_text().strip()
+        shipped = ROOT / "runtimes" / f"{name}.md"
+        text = shipped.read_text().strip() if shipped.is_file() else ""
         extra = self.sources["runtimes"] / f"{name}.md"
-        return text + ("\n" + extra.read_text().strip() if extra.is_file() else "")
+        return "\n".join(t for t in (text, extra.read_text().strip() if extra.is_file() else "") if t)
 
     def _include(self, m: re.Match) -> str:
         p = self.sources.get(m.group(1)) or self._path(m.group(1))
@@ -85,9 +91,10 @@ class Soul:
             return f"(indisponible : {e.strerror})"
 
     def render(self, target: str) -> str:
-        body = "\n\n".join(INCLUDE.sub(self._include, self._part(p)) for p in PARTS[target])
+        body = "\n\n".join(t for t in (INCLUDE.sub(self._include, self._part(p)) for p in PARTS[target]) if t)
+        title = "" if target in BARE else "# W.Alter\n\n"
         text = (f"<!-- GÉNÉRÉ par walter-soul ({target}) — ne pas éditer ici : sources dans "
-                f"{self.sources['identity'].parent} -->\n# W.Alter\n\n{body}\n")
+                f"{self.sources['identity'].parent} -->\n{title}{body}\n")
         return _walter("render", stdin=text)
 
     def status(self, target: str) -> tuple[str, str]:

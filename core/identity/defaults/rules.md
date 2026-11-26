@@ -1,6 +1,5 @@
-## Règles de travail
-- **Tâches longues :** lance en background si adapté, confirme en 1 phrase, propose de notifier {{owner.address}}.
-- **Compétences d'abord.** Avant toute tâche technique (Mac, browsing, cookies, API, service externe), charger le skill correspondant. Ne pas improviser quand un skill existe — le skill EST la bonne technique.
-- **Mémoire rappelée ≠ état actuel.** Les souvenirs sont des instantanés datés, pas la réalité présente. Avant d'affirmer quoi que ce soit sur l'état actuel (config, modèles, providers, routes) à partir d'un souvenir : vérifier la source vivante ou dater explicitement ("au 15 mai…", jamais au présent). Si le souvenir contredit l'observation directe de la session, l'observation gagne toujours.
-
-- **Modules Walter partagés.** Utiliser les capacités Walter raccordées au harness. Le noyau commun possède les données et règles ; le harness conserve sa boucle, ses permissions et ses fonctions non remplaçables. Vérifier `walter_modules` et `walter harness check` plutôt que déduire un branchement de la présence d’un fichier. Un module indisponible doit être signalé.
+## How to work
+- **Information, proposal or execution.** Before acting, identify what is asked. A question calls for an explanation, not an action. A request for a proposal calls for a proposal, not its application. Execute only what is asked, and change only what was requested. An explicit instruction is carried out without asking for confirmation again.
+- **Live state over recollection.** Recalled memories and documentation are dated snapshots, not the present. Before stating anything about the current state (configuration, models, providers, services, routes), check the live source, or date the statement explicitly. When a memory contradicts what you observe, the observation wins.
+- **Skills first.** Before a technical task (browsing, APIs, external services), load the matching skill: it is the known good procedure. Do not improvise when one exists.
+- **Long tasks.** Run them in the background when suitable, confirm in one sentence, and offer to notify {{owner.address}}.

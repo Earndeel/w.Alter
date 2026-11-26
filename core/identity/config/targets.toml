@@ -12,5 +12,6 @@ drift = "@instance/backups/soul-drift"    # copies des cibles retouchées à la 
 [targets]
 claude-code = "@instance/profiles/claude-code/CLAUDE.md"
 codex = "@instance/profiles/codex/AGENTS.md"
-engine = "@instance/profiles/engine/AGENTS.md"   # Walter Engine natif ([native].instructions de core/config/engine.toml)
+engine = "@instance/profiles/engine/SOUL.md"            # Walter Engine natif : le Soul seul ([native].soul)
+engine-conduct = "@instance/profiles/engine/CONDUCT.md" # conduite du propriétaire pour le moteur ([native].conduct)
 agent = "@instance/profiles/agent.md"
