@@ -176,6 +176,56 @@
         ],
         "settle_s": 6
       }
+    },
+    "similarweb": {
+      "domains": [
+        "similarweb.com",
+        "pro.similarweb.com",
+        "secure.similarweb.com",
+        "account.similarweb.com"
+      ],
+      "required_cookies": [],
+      "check": {
+        "url": "https://pro.similarweb.com/",
+        "signed_out_url": [
+          "/login",
+          "secure.similarweb.com",
+          "account.similarweb.com/login",
+          "/signin"
+        ],
+        "settle_s": 6
+      }
+    },
+    "openrouter": {
+      "domains": [
+        "openrouter.ai"
+      ],
+      "required_cookies": [],
+      "check": {
+        "url": "https://openrouter.ai/activity",
+        "signed_out_url": [
+          "/sign-in",
+          "/login"
+        ],
+        "settle_s": 6
+      }
+    },
+    "portal": {
+      "domains": [
+        "portal.walter-ai.cloud"
+      ],
+      "required_cookies": [],
+      "check": {
+        "url": "https://portal.walter-ai.cloud/",
+        "signed_out_url": [
+          "cloudflareaccess.com",
+          "/cdn-cgi/access/"
+        ],
+        "signed_in_text": [
+          "W.Alter"
+        ],
+        "settle_s": 4
+      }
     }
   }
 }
