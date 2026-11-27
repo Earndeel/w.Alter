@@ -317,6 +317,43 @@ def _dependent_versions(conn, since: dict, quotes: list[str], seen: set | None =
     return out
 
 
+def _prune_people(conn, actors: list, threads: list) -> dict:
+    """What only the purged messages justified (27/11/2026: a purge of 4 groups left 4 group entities and 2 109 empty
+    person entries): the group entity of a thread with no event left (its member_of rows go with it), then the person
+    entity whose identities are all senders of purged messages with no event left — and that holds nothing of its
+    own (no attribute, no Kardex card, no relationship, no view, no merge into it) — and those identities."""
+    out = {}
+    if threads:
+        out["group_entities"] = conn.execute(
+            """delete from core.entities g where g.entity_type = 'group' and g.attributes->>'thread_id' = any(%s)
+                 and not exists (select 1 from core.events e where e.thread_id = g.attributes->>'thread_id')""",
+            ([str(x) for x in threads],)).rowcount
+    if not actors:
+        return out
+    conn.execute("""create temp table if not exists purge_gone (identity_id uuid primary key) on commit drop""")
+    conn.execute("truncate purge_gone")
+    conn.execute("""insert into purge_gone select s.identity_id from core.source_identities s
+                    where s.identity_id = any(%s::uuid[]) and not s.is_self
+                      and not exists (select 1 from core.events e where e.actor_identity_id = s.identity_id)
+                      and not exists (select 1 from search.chunks c where c.actor_identity_id = s.identity_id)""",
+                 ([str(x) for x in actors],))
+    out["person_entities"] = conn.execute(
+        """delete from core.entities e where e.entity_type = 'person' and e.attributes = '{}'::jsonb
+             and e.kardex_contact_id is null
+             and exists (select 1 from core.identity_links l join purge_gone g using (identity_id) where l.entity_id = e.entity_id)
+             and not exists (select 1 from core.identity_links l where l.entity_id = e.entity_id
+                             and l.identity_id not in (select identity_id from purge_gone))
+             and not exists (select 1 from core.relationships r where e.entity_id in (r.subject_id, r.object_id))
+             and not exists (select 1 from core.entities m where m.merged_into = e.entity_id)
+             and not exists (select 1 from kardex.relationship_baselines b where b.entity_id = e.entity_id)
+             and not exists (select 1 from kardex.communication_deviations d where d.entity_id = e.entity_id)
+             and not exists (select 1 from views.view v where e.entity_id = any(v.entity_ids))""").rowcount
+    out["person_identities"] = conn.execute(
+        """delete from core.source_identities s where s.identity_id in (select identity_id from purge_gone)
+             and not exists (select 1 from core.identity_links l where l.identity_id = s.identity_id)""").rowcount
+    return out
+
+
 def _remove(conn, t: dict) -> dict:
     """Remove the targets everywhere in the active database. The caller holds the transaction."""
     conn.execute("set local walter.purge = 'on'")
@@ -331,7 +368,11 @@ def _remove(conn, t: dict) -> dict:
             "select source || ':' || source_id ref from core.events where event_id = any(%s::uuid[])", (ev,))]
         dv = sorted(set(dv) | {str(r["item_id"]) for r in conn.execute(
             "select item_id from core.derived_items where source_event_ids && %s::uuid[]", (ev,))})
+        seen = conn.execute("""select array_agg(distinct actor_identity_id) filter (where actor_identity_id is not null) a,
+                                      array_agg(distinct thread_id) filter (where thread_id is not null) t
+                               from core.events where event_id = any(%s::uuid[])""", (ev,)).fetchone()
         n["events"] = conn.execute("delete from core.events where event_id = any(%s::uuid[])", (ev,)).rowcount
+        n.update(_prune_people(conn, seen["a"] or [], seen["t"] or []))
         n["extraction_covered"] = conn.execute("delete from extraction.covered where event_id = any(%s::uuid[])",
                                                (ev,)).rowcount
         n["extraction_segments"] = conn.execute(
@@ -443,8 +484,11 @@ def purge(*, reason: str, requested_by: str, event_ids=None, object_refs=None, p
                             json.dumps({**counts, "removed": removed}))).fetchone()["purge_id"]
         _record_ledger(conn, pid, targets, reason)
     if targets["object"]:
-        # S3 deletes through rclone land in Drive's trash: empty it (drive.file scope = only W.Alter's own files)
-        subprocess.run(["rclone", "cleanup", "gdrive:"], check=False)
+        # S3 deletes through rclone land in Drive's trash. `rclone cleanup` (EmptyTrash) is refused under the drive.file
+        # scope (403, seen 27/11/2026), so the trashed files of the two vault roots are deleted one by one instead.
+        for remote in ("rawvault:", "rawvault-secure:"):
+            subprocess.run(["rclone", "delete", "--drive-trashed-only", "--drive-use-trash=false", "--checkers", "8",
+                            "--tpslimit", "8", remote], check=False)
     out = {"status": "executed", "purge_id": pid, "counts": counts, "removed": removed, "backups": exposure()}
     if rotate_local_dumps:
         out["rotated_local_dumps"] = _rotate_local_dumps()

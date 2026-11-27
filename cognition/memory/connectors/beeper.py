@@ -241,8 +241,47 @@ def excluded(chat: dict) -> str | None:
     return None
 
 
-def store_messages(chat: dict, msgs: list[dict], *, conn, scope: str = "") -> tuple[int, int]:
+# Group admission (Monsieur, 27/11/2026: « ces groupes ne rentrent même pas dans la mémoire sauf circonstances »).
+SMALL_GROUP_MAX = 5        # members, Monsieur included: a conversation between a few people, not an audience
+OWNER_WINDOW_DAYS = 365    # he wrote there, or was mentioned there, within this window
+
+
+def group_admission(chat: dict, msgs: list[dict], *, conn) -> str | None:
+    """Why a chat enters Walter's memory, or None when it does not (nothing is stored: no message, file, person or
+    triage decision). A group is Monsieur's when he takes part in it:
+      - he pinned it in Beeper;
+      - it is small (≤ SMALL_GROUP_MAX members): a conversation, not an audience;
+      - he writes there, or is mentioned there: in the messages being stored, or in stored history within
+        OWNER_WINDOW_DAYS.
+    Everything else (broadcast, business and neighbourhood groups he only reads) stays out. The circumstance that
+    lets one in is his own act: the first message he writes there or the first mention of him is stored, and the
+    daily reconciliation then brings the day before it as context. A Low-priority group stays out whatever happens
+    (excluded()). One-to-one chats are always admitted."""
+    if chat.get("type") != "group":
+        return "single"
     if excluded(chat):
+        return None
+    if chat.get("isPinned"):
+        return "pinned"
+    people = chat.get("participants")
+    total = people.get("total") if isinstance(people, dict) else None
+    if total is not None and total <= SMALL_GROUP_MAX:
+        return "small_group"
+    if any(m.get("isSender") for m in msgs):
+        return "owner_writes"
+    me = owner_ids(chat, msgs)
+    if me and any(set(m.get("mentions") or []) & me for m in msgs):
+        return "owner_mentioned"
+    row = conn.execute(
+        """select 1 from core.events where source = 'beeper' and thread_id = %s
+             and occurred_at > now() - make_interval(days => %s)
+             and (event_type = 'message.sent' or coalesce(payload->'mentions', '[]'::jsonb) ?| %s::text[])
+           limit 1""", (chat["id"], OWNER_WINDOW_DAYS, sorted(me))).fetchone()
+    return "owner_history" if row else None
+
+
+def store_messages(chat: dict, msgs: list[dict], *, conn, scope: str = "") -> tuple[int, int]:
+    if excluded(chat) or not group_admission(chat, msgs, conn=conn):
         return 0, 0
     msgs=canonical_messages(chat,msgs,scope,conn=conn)
     people = {p["id"]: p for p in ((chat.get("participants") or {}).get("items") or [])}

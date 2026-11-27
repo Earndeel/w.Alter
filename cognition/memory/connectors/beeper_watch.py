@@ -88,6 +88,9 @@ def apply_job(api: beeper.Beeper, payload: dict) -> dict:
     if beeper.excluded(chat):
         return {"skipped": beeper.excluded(chat)}
     if kind == "message.deleted":
+        with connection() as conn:
+            if not beeper.group_admission(chat, [], conn=conn):
+                return {"skipped": "group_not_admitted"}   # nothing of it was stored: no deletion to record
         stamp = frame.get("ts") or datetime.now(timezone.utc).isoformat()
         deleted=[]
         for mid in frame.get('ids',[]):
