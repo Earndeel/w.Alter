@@ -303,3 +303,43 @@ The connection returns mapping rows; numeric indexing caused `KeyError: 0`. `mod
 3. Regenerate the reference and run the suite: `cd /walter/cognition/router && ./bin/walter-router docs --write && timeout 900 venv/bin/python -m pytest -q -x tests`. Check the actual test exit status; piping through `tail` without `pipefail` can hide failures.
 4. Check `systemctl is-active walter-router-refresh.service walter-router-advisor.service` before the smoke test; exit 3 can mean the units are simply inactive. Back up the current `analysis-$(date -u +%Y%m%d).md` under `/user/Lucas/logs/walter-router/` if present. With no overlapping run and approval for a live test that may send Telegram advice, run `cd /walter/cognition/router && venv/bin/python -c "from walter_router.analysis import advisor; print(advisor.launch('cycle', {'manual': 'advisor smoke test'}))"`.
 5. Confirm the unit starts, then wait for it to finish within the configured budget. Check `journalctl -u walter-router-advisor.service --since '<UTC launch time>' --no-pager` and the new entry in `/user/Lucas/state/router/advisor/runs.jsonl`. Match `at` and `trigger` to your launch, then inspect `seconds`, `engine`, `summary_fr`, `proposals`, `notify`, and `cycle`. Inactivity alone is not success: require a closing verdict and a fresh cycle report. When the run should have sent advice, verify delivery separately; query `models.alerts` through `walter_router.store.db.connect()` using `last_seen`, not the nonexistent `created_at` column. A fresh report does not prove its advice was delivered.
+
+## Diagnose a Codex subscription quota drop on Monsieur’s VM
+
+1. If Codex Desktop cannot spawn the default shell or workspace (`CreateProcess … os error 2`), retry the exec tool with `cmd: "pwd"`, `workdir: "/tmp"`, `shell: "/bin/sh"`, `login: false`. If Walter MCP is unavailable, recover the local context with `walter-memory context --no-profile 'historique quota OpenAI Codex abonnement Walter Router'` and `walter-skills read walter-model-router`. Do not read or display auth files.
+
+2. Establish which account window moved before attributing it. Run `date -u` and `journalctl -u walter-router-quota --since '12 hours ago' --no-pager -o short-iso | rg -i 'openai-plus|401|error'`. Query the persisted readings read-only; extend the lookback for multiweek audits. Run:
+
+```sh
+walter-python - <<'PY'
+from walter_memory.db import connect
+from psycopg import sql
+with connect() as c:
+    c.read_only = True
+    cols = [r['column_name'] for r in c.execute("SELECT column_name FROM information_schema.columns WHERE table_schema='models' AND table_name='subscription_usage' AND column_name LIKE 'window%' ORDER BY ordinal_position")]
+    if not cols:
+        raise SystemExit('Inspect subscription_usage schema before comparing quota windows')
+    q = sql.SQL("""SELECT read_at, read_at AT TIME ZONE 'Asia/Bangkok' AS bangkok, used_percent, resets_at, {} FROM models.subscription_usage WHERE sub_id='openai-plus' AND source='codex_usage_api' AND read_at >= now() - interval '10 days' ORDER BY read_at""").format(sql.SQL(', ').join(map(sql.Identifier, cols)))
+    for r in c.execute(q):
+        print(dict(r))
+PY
+```
+
+   Separate the 5-hour and weekly windows. Within the selected window, use the previous reset deadline and the first reading with the new deadline to locate or bracket the reset. A VM reboot or the first poll after reset is not proof of the reset time. For a jump, record the two successive readings that bound it in UTC; convert to Bangkok time for Monsieur. State how fresh the last successful poll is. A flat meter during poll failures is not evidence of zero usage. Report differences in percentage points; compute daily changes within a reset cycle, not across it.
+
+3. Correlate the same UTC interval with Router and gateway activity. Replace the two arguments below with the actual UTC poll bounds. The execution timestamp is `at`, not `created_at`.
+
+```sh
+walter-python - '2026-11-26T07:18:11Z' '2026-11-26T08:49:14Z' <<'PY'
+import sys
+from walter_memory.db import connect
+with connect() as c:
+    c.read_only = True
+    for r in c.execute("""SELECT account, task, kind, model, ok, skipped, count(*) AS calls, count(usage) AS with_usage FROM models.exec_log WHERE provider='codex' AND at > %s::timestamptz AND at <= %s::timestamptz GROUP BY 1,2,3,4,5,6 ORDER BY calls DESC""", sys.argv[1:3]):
+        print(dict(r))
+PY
+```
+
+   Cross-check `/user/Lucas/logs/walter-llm.jsonl` (and rotations if the interval is missing). Inspect JSON field names before writing the parser; use timezone-aware timestamps, skip malformed lines, and aggregate only metadata. Group calls by workload tag or ID, task, model and account where recorded. Sum input, cached input and output separately where available; verify whether input already includes cache hits before subtracting. Do not add Router and gateway counts together: the same request can appear in both. Check local Codex session metadata under `/root/.codex/sessions` if the gateway leaves a spike unexplained, and do not count successive cumulative token snapshots as separate usage. Do not print prompts or memory contents. The OpenAI meter is account-wide: call shares, token totals and timing identify likely drivers, not exact quota shares. Leave unobserved account activity unattributed.
+
+4. Trace the dominant tag to the job that produced it. For payload benchmarks, map the logged bench IDs to `/user/Lucas/state/core/engine/bench/payload/scenarios`, `/walter/core/engine/bench/payload_scenarios.json` and `/walter/core/engine/bench/payload_bench.py`. Report which variants and scenario families were repeated; count model turns rather than assuming one call per scenario. For memory backfills, run `rg -n 'memory_extraction|retype|rerank' /walter/cognition/memory/walter_memory/{nature,extract2,llm}.py`, then inspect `journalctl -u walter-memory-pipeline -u walter-memory-extract --since '<UTC start>' --until '<UTC end>' --no-pager -o short-iso`. Confirm the actual model/account from the call records, not merely the configured default. The `retype` catch-up job uses `memory_extraction` to assign category and scope to each item in batches. A reranker orders results by relevance; a lighter classifier, not a reranker, is the comparable replacement. Keep the audit read-only unless Monsieur requests a routing or job change.
