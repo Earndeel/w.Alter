@@ -117,7 +117,7 @@ def register(mcp,client='unknown',*,local_control=True):
         except Exception as exc:return _error('registry',exc)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
-    def module_guide(path: str='',depth: str='D2') -> str:
+    def module_guide(path: str='',depth: str | int='D2') -> str:
         """W.Alter's documentation, at the depth the task needs. path: `walter` (the whole), a module (`memory`) or a
         component (`memory/events`). depth: 'D1' what it is (one line), 'D2' (default) its role, organisation, tools,
         where to check its live state and its children at D1, 'D3' its technical detail and sources. Reading
