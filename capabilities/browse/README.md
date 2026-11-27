@@ -187,3 +187,15 @@ découverte et la réparation) :
 - `last_attempt_s` donne la dernière tentative ;
 - chaque tentative a son `elapsed_s` ;
 - `probe.probe_s` donne la durée de la sonde.
+
+**Texte libre (27/11) :**
+- une demande dont tous les champs sont du texte libre (faits, conclusions, citations, résumé, liens, références…) est acquise comme une lecture, par la voie qui convient à la ressource, sans Scrapling ni attente JSON ;
+- l'appelant tire les champs du contenu (`records[0].content`) ; les liens demandés viennent des ancres de la page (`records[0].links`) ;
+- restent des extractions structurées : un champ de donnée (prix, note, sku…), une liste (`min_records` > 1), un profil, une capacité, un moteur explicite.
+
+**Recherches simultanées (27/11, `runtime/search_pace.py`) :**
+- une cadence par fournisseur, partagée par tous les appels (conversations, portes, sous-agents) au moyen d'un verrou de fichier dans `state/browse/search-pace/` ; pas de service ;
+- la cadence suit les limites déclarées par le fournisseur (`X-RateLimit-*`) ; le plan Brave actuel est d'une requête par seconde et de 2 000 par mois, et un quota mensuel épuisé ferme le fournisseur jusqu'à sa remise à zéro ;
+- les départs sont espacés, mais les requêtes restent en vol en parallèle ; au-delà de 20 s d'attente, la recherche prend le secours (DuckDuckGo, avec sa propre cadence) ;
+- les erreurs temporaires (429, 5xx, délai dépassé) donnent au plus 3 tentatives ; chaque nouvelle tentative reprend un tour dans la file, après la remise à zéro annoncée, donc jamais en rafale ;
+- `pacing` (`waited_s`, `retries`) figure dans le résultat.
