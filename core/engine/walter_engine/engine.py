@@ -1207,11 +1207,11 @@ class Engine:
     # ── what the model sees ──
     def _exposure(self, a: Agent) -> str:
         """lot 3e: "python" (the kernel is the only tool) or "hybrid". A test account may carry its own (bench arms);
-        a sub-agent follows its root's."""
+        a sub-agent follows its root's; `exposure_kinds` sets it per principal kind (the owner's doors first)."""
         p = (a.root().principal if a.parent_sid else a.principal) or {}
         if p.get("kind") == "test" and str(p.get("id")) in self.s.exposure_accounts:
             return self.s.exposure_accounts[str(p.get("id"))]
-        return self.s.exposure
+        return self.s.exposure_kinds.get(str(p.get("kind")), self.s.exposure)
 
     def _tool_schemas(self, a: Agent) -> list[dict]:
         """What the model is offered: every listed tool (hybrid) or the kernel alone (python); the kernel's text

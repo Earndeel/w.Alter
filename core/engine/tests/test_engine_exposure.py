@@ -86,3 +86,14 @@ def test_s1_is_off_by_default_and_python_sandbox_still_means_everyone(tmp_path):
     o = eng.create(cwd="/w", door="telegram", principal={"kind": "owner", "id": "monsieur"})
     assert eng.python.mode_for(o) == "sandbox"
     _close(eng)
+
+
+def test_exposure_per_principal_kind_owner_python_machines_hybrid(tmp_path):
+    eng = _engine(tmp_path, exposure="hybrid", exposure_kinds={"owner": "python"})
+    owner = eng.create(cwd="/w", door="telegram", principal={"kind": "owner", "id": "monsieur"})
+    machine = eng.create(cwd="/w", door="api", principal={"kind": "machine", "id": "guardian-core"})
+    assert _names(eng._tool_schemas(owner)) == ["python"]
+    assert "read" in _names(eng._tool_schemas(machine))
+    child = eng.create(cwd="/w", door="telegram", principal={"kind": "machine", "id": "x"}, depth=1, parent=owner.sid)
+    assert eng._exposure(child) == "python"                     # a sub-agent follows its root, whatever its own kind
+    _close(eng)

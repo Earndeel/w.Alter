@@ -109,6 +109,7 @@ class Settings:
     # "python" = 100 % Unharnessed, the python kernel is the model's only tool (every capability through tools.*)
     exposure: str = "hybrid"
     exposure_accounts: dict = field(default_factory=dict)        # test account id → exposure (A/B arms of the bench)
+    exposure_kinds: dict = field(default_factory=dict)           # principal kind (owner, machine…) → exposure
     # lot 3c: documentation layer of the v2 layout ("mcp" | "s1" | "s2"; a layout "v2+s2" overrides it) and the skills
     # map (a layout suffix "-skills" drops it)
     doc_layer: str = "mcp"
@@ -190,6 +191,7 @@ def load(state: Path | None = None) -> Settings:
         prompt_layout_accounts={str(k): str(v) for k, v in dict(n.get("prompt_layout_accounts", {})).items()},
         exposure=str(n.get("exposure", "hybrid")),
         exposure_accounts={str(k): str(v) for k, v in dict(n.get("exposure_accounts", {})).items()},
+        exposure_kinds={str(k): str(v) for k, v in dict(n.get("exposure_kinds", {})).items()},
         doc_layer=str(n.get("doc_layer", "mcp")), skills_map=bool(n.get("skills_map", True)),
         communication=bool(n.get("communication", False)),
         owner_rules=str(n.get("owner_rules", "pack")),
