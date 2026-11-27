@@ -153,7 +153,7 @@ def _built_from(conn, derived: list[str], events: list, pattern: str | None) -> 
                where e.ref_kind = 'derived' and e.ref_id = any(%s::text[]) and not (e2.ref_id = any(%s::text[]))
                  and cardinality(d.source_event_ids) = 0""",
             (sorted(frontier), sorted(set(derived) | found))).fetchall()
-        new = {r["id"] for r in rows if any(q in _norm(r["content"]) for q in quotes)}
+        new = {r["id"] for r in rows if _quoted(r["content"], quotes)}
         if not new:
             break
         found |= new
@@ -199,6 +199,47 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r'[\\"]', "", s or "")).strip().lower()
 
 
+class _Matcher:
+    """Exact « carries one of these quotes » test for many quotes at once (27/11/2026: a 45 000-event purge has
+    25 000 quotes against 82 000 view versions, 558 M characters; testing each quote in turn never finished).
+    Quotes of at least WINDOW characters are indexed by their first WINDOW characters: each text is read once,
+    window by window, and only the quotes sharing a window are compared. Shorter ones (people's names) are tested
+    directly. Same answers as `any(q in text for q in quotes)`."""
+    WINDOW = 12
+
+    def __init__(self, quotes: list[str]) -> None:
+        self.short = [q for q in quotes if len(q) < self.WINDOW]
+        self.by_head: dict[str, list[str]] = {}
+        for q in quotes:
+            if len(q) >= self.WINDOW:
+                self.by_head.setdefault(q[:self.WINDOW], []).append(q)
+
+    def __call__(self, text: str) -> bool:
+        if any(q in text for q in self.short):
+            return True
+        heads, w = self.by_head, self.WINDOW
+        if not heads:
+            return False
+        for i in range(len(text) - w + 1):
+            found = heads.get(text[i:i + w])
+            if found and any(text.startswith(q, i) for q in found):
+                return True
+        return False
+
+
+_MATCHERS: dict[int, tuple[list, _Matcher]] = {}
+
+
+def _quoted(text: str | None, quotes: list[str]) -> bool:
+    """Whether a text carries one of the quotes (normalised once; one matcher per quote list)."""
+    held = _MATCHERS.get(id(quotes))
+    if held is None or held[0] is not quotes:
+        if len(_MATCHERS) > 8:
+            _MATCHERS.clear()
+        held = _MATCHERS[id(quotes)] = (quotes, _Matcher(quotes))
+    return held[1](_norm(text))
+
+
 def _quotes(conn, derived: list, events: list | None = None, pattern: str | None = None) -> list[str] | None:
     """What a view would carry if it quoted the purged data: the pattern, the opening of each sentence of the purged
     knowledge and events, and the names of the people that knowledge is about (never the owner's). None when a purged
@@ -240,7 +281,7 @@ def _exposed_versions(conn, derived: list, quotes: list[str] | None = None) -> l
                  where e.ref_kind = 'derived' and e.ref_id = any(%s::text[]) group by e.view_key) s on s.view_key = x.view_key
            where x.built_at >= s.since and x.content is distinct from %s""", ([str(d) for d in derived], MARK)).fetchall()
     out = [(r["view_key"], r["depth"], r["version"]) for r in rows
-           if quotes is None or any(q in _norm(r["t"]) for q in quotes)]
+           if quotes is None or _quoted(r["t"], quotes)]
     if quotes:
         since = {}
         for r in conn.execute("""select view_key, min(built_at) b from views.version
@@ -267,7 +308,7 @@ def _dependent_versions(conn, since: dict, quotes: list[str], seen: set | None =
             (list(since), list(since.values()), MARK)).fetchall()
         nxt = {}
         for r in rows:
-            if r["view_key"] in seen or not any(q in _norm(r["t"]) for q in quotes):
+            if r["view_key"] in seen or not _quoted(r["t"], quotes):
                 continue
             out.append((r["view_key"], r["depth"], r["version"]))
             nxt[r["view_key"]] = min(nxt.get(r["view_key"], r["built_at"]), r["built_at"])

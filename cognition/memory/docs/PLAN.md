@@ -197,7 +197,7 @@ But : les bonnes données entrent et aucune ne se perd. Chaque connecteur a un *
   depuis le Mac.
 - Le Gmail et l'agenda (2.5) demandent une autorisation OAuth de Monsieur (portée `gmail.readonly` et
   `calendar.readonly`).
-- Les groupes de discussion entrent comme événements bruts, et leur enrichissement est décidé par le routeur (D4).
+- Les groupes de discussion entrent comme événements bruts, et leur enrichissement est décidé par le routeur (D4), sauf un groupe que Monsieur met en priorité basse dans Beeper, qui n'est pas ingéré (27/11/2026, DECISIONS.md).
 - Critère de fin : réconciliation à zéro trou sur 3 jours, et compteurs par source dans le tableau de bord
   autopilot.
 

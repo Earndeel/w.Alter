@@ -85,6 +85,8 @@ def apply_job(api: beeper.Beeper, payload: dict) -> dict:
         if exc.status != 404 or kind != "message.deleted":
             raise
         chat = {"id": chat_id, "accountID": ""}
+    if beeper.excluded(chat):
+        return {"skipped": beeper.excluded(chat)}
     if kind == "message.deleted":
         stamp = frame.get("ts") or datetime.now(timezone.utc).isoformat()
         deleted=[]

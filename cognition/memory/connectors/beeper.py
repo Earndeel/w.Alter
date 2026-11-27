@@ -9,7 +9,8 @@ Per chat (stream = chatID) the checkpoint keeps the newest sortKey seen and the 
   - incremental: newest pages until the known sortKey;
   - backfill: older pages (direction=before) until the beginning of the chat, a few pages per run.
 Messages → message.sent (isSender) / message.received; reactions → reaction.added; deletion flag → message.deleted;
-edits seen on refetch → message.edited. Groups are stored raw like everything else (D4).
+edits seen on refetch → message.edited. Groups are stored raw like everything else (D4), except a group Monsieur
+moved to Low priority in Beeper (27/11/2026, see `excluded`).
 Media are queued (ingestion.jobs 'beeper_media') and stored in the Raw Vault's encrypted zone (third-party media).
 
 Usage: beeper.py [--backfill-pages N] [--media N] [--chats N]
@@ -230,7 +231,19 @@ def prepare_replies(bp, chat: dict, msgs: list[dict]) -> list[dict]:
     return out
 
 
+def excluded(chat: dict) -> str | None:
+    """Chats Walter does not ingest at all (Monsieur, 27/11/2026, amends D4): a group he moved to Low priority in
+    Beeper (shuttle, school and business broadcast groups: thousands of messages, none from him). His own sorting in
+    Beeper is the rule, no list to keep: moving the group back to normal priority resumes it from its checkpoint.
+    One-to-one chats are never excluded here."""
+    if chat.get("type") == "group" and chat.get("isLowPriority"):
+        return "low_priority_group"
+    return None
+
+
 def store_messages(chat: dict, msgs: list[dict], *, conn, scope: str = "") -> tuple[int, int]:
+    if excluded(chat):
+        return 0, 0
     msgs=canonical_messages(chat,msgs,scope,conn=conn)
     people = {p["id"]: p for p in ((chat.get("participants") or {}).get("items") or [])}
     evs, media = to_events(chat, msgs, people)
@@ -246,6 +259,8 @@ def store_messages(chat: dict, msgs: list[dict], *, conn, scope: str = "") -> tu
 
 
 def sync_chat(bp: Beeper, chat: dict, backfill_pages: int) -> tuple[int, int]:
+    if excluded(chat):
+        return 0, 0
     # Poll/reconciliation and the event worker may see the same chat together. Serialize its cursors only.
     with connection() as lock:
         key = "beeper.sync:" + chat["id"]
@@ -318,6 +333,8 @@ def reconcile_chat(bp: Beeper, chat: dict, since: datetime) -> tuple[int, int]:
     """Re-read a chat back to `since` and write everything (idempotent): repairs messages a run missed and catches
     edits, deletions and reactions on recent messages, which the incremental pass (new sortKeys only) never sees.
     Returns (messages seen, events inserted)."""
+    if excluded(chat):
+        return 0, 0
     # Routine outage recovery starts at the source switch, never at the start of Memory's history.
     cutoff = getattr(bp, 'cutover_at', None)
     if cutoff:
