@@ -32,12 +32,23 @@ log = logging.getLogger("walter_engine.python")
 DENIED_NETWORKS = ["127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16",
                    "100.64.0.0/10", "fc00::/7", "fe80::/10"]
 
+FULL_RIGHTS = ("The kernel runs with the engine's rights: Walter's real directories, local services and databases, system "
+               "commands (`await bash(\"cmd\")` → .stdout .stderr .code .ok), `pip install`.")
+SANDBOX_RIGHTS = ("The kernel runs unprivileged in its own bubble: its working folder, the public internet, `pip install`, "
+                  "local commands (`await bash(\"cmd\")` → .stdout .stderr .code .ok). Walter's files, services, secrets "
+                  "and system administration are reached through tools: `await tools.read(file_path=…)`, "
+                  "`await tools.bash(command=…)` (administrator, under the same policy and journal as a direct call).")
+
+
+def description_for(mode: str, text: str) -> str:
+    """The python tool's text for this kernel's mode (S1): a bubbled kernel is never told it has the engine's rights."""
+    return text.replace(FULL_RIGHTS, SANDBOX_RIGHTS) if mode == "sandbox" else text
+
+
 DESCRIPTION = (
     "Run Python in your persistent kernel (one per conversation): variables, imports and functions persist across "
     "calls, turns, compactions and engine restarts. Top-level `await` works; the last expression's repr is returned, "
-    "print() output is shown. Keep large data in variables instead of printing it. The kernel runs with the engine's "
-    "rights: Walter's real directories, local services and databases, system commands (`await bash(\"cmd\")` → "
-    ".stdout .stderr .code .ok), `pip install`. Every engine tool is reachable: `await tools.search(\"mémoire\")` finds "
+    "print() output is shown. Keep large data in variables instead of printing it. " + FULL_RIGHTS + " Every engine tool is reachable: `await tools.search(\"mémoire\")` finds "
     "them, `await tools.describe(name)` gives their contract (parameters, owner, effects), `await tools.catalog()` lists them all by module, `await tools.<name>(**args)` runs one under the same "
     "policy as a direct call (Walter tools by their short name too, e.g. `await tools.memory_search(query=…)`); run "
     "independent calls together with `await asyncio.gather(...)`. Long work: `bash(\"cmd\", background=True)` or "
@@ -64,6 +75,7 @@ class Kernel:
         self.idle: asyncio.TimerHandle | None = None
         self.names: list[str] = []
         self.started_ms: int | None = None
+        self.mode = host.mode_for(agent)
 
     def log(self, event: str, **extra) -> None:
         try:
@@ -77,7 +89,7 @@ class Kernel:
     def argv_env(self) -> tuple[list[str], dict, str]:
         s = self.host.s
         py = s.python_interpreter
-        if s.python != "sandbox":
+        if self.mode != "sandbox":
             env = {**os.environ, "PYTHONPATH": str(config.KERNEL_RUNTIME_DIR), "PYTHONUNBUFFERED": "1",
                    "MPLBACKEND": "Agg", "WALTER_KERNEL_SNAPSHOT": str(self.snapshot_path), "WALTER_KERNEL_BIND_JOBS": "1",
                    "WALTER_SESSION_ID": self.agent.key, "PATH": f"{Path(py).parent}:{os.environ.get('PATH', '/usr/bin:/bin')}"}
@@ -102,7 +114,7 @@ class Kernel:
     async def start(self) -> None:
         t0 = time.monotonic()
         (self.dir / ".snapshot").mkdir(parents=True, exist_ok=True, mode=0o700)
-        if self.host.s.python == "sandbox":
+        if self.mode == "sandbox":
             import pwd
             pw = pwd.getpwnam("walter-sandbox")
             for p in (self.dir, self.dir / ".snapshot"):
@@ -125,7 +137,7 @@ class Kernel:
             except Exception as e:  # noqa: BLE001
                 self.restored = {"failed": {"snapshot": str(e)[:200]}}
         self.started_ms = int((time.monotonic() - t0) * 1000)
-        self.log("start", ms=self.started_ms, restored=(self.restored or {}).get("restored", 0), mode=self.host.s.python)
+        self.log("start", ms=self.started_ms, restored=(self.restored or {}).get("restored", 0), mode=self.mode)
         self.touch()
 
     def touch(self) -> None:
@@ -371,7 +383,7 @@ class Kernel:
 
     async def kill(self, reason: str) -> None:
         self.log("kill", reason=reason)
-        if self.host.s.python == "sandbox":
+        if self.mode == "sandbox":
             p = await asyncio.create_subprocess_exec("systemctl", "kill", "--signal=SIGKILL", f"walter-python-{self.key}.service")
             await p.wait()
         try:
@@ -405,6 +417,19 @@ class PythonHost:
         self.kernels: dict[str, Kernel] = {}
         self.starting: dict[str, asyncio.Future] = {}
         self.host_tasks: dict[str, asyncio.Task] = {}
+
+    def mode_for(self, agent) -> str:
+        """sandbox | full for this agent's kernel: `python` for everyone, `python_sandbox_for` for some (S1)."""
+        if self.s.python == "sandbox":
+            return "sandbox"
+        who = set(self.s.python_sandbox_for)
+        if not who:
+            return "full"
+        if "subagent" in who and getattr(agent, "depth", 0):
+            return "sandbox"
+        root = agent.root() if getattr(agent, "parent_sid", None) else agent
+        kind = ((getattr(root, "principal", None) or {}).get("kind")) or "owner"
+        return "sandbox" if kind in who else "full"
 
     async def kernel(self, agent) -> Kernel:
         k = self.kernels.get(agent.sid)

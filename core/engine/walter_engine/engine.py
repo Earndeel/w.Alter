@@ -1214,12 +1214,17 @@ class Engine:
         return self.s.exposure
 
     def _tool_schemas(self, a: Agent) -> list[dict]:
-        if self._exposure(a) != "python" or "python" not in self.registry.tools:
-            return self.registry.schemas()
-        sch = self.registry.tools["python"].schema()
-        fn = sch.get("function", sch)
-        fn["description"] = PYTHON_ONLY + " " + (fn.get("description") or "")
-        return [sch]
+        """What the model is offered: every listed tool (hybrid) or the kernel alone (python); the kernel's text
+        says the rights its mode really gives (S1: a bubbled kernel reaches Walter through tools)."""
+        from .tools.python import description_for
+        mode = self.python.mode_for(a) if getattr(self, "python", None) else "full"
+        only = self._exposure(a) == "python" and "python" in self.registry.tools
+        out = [self.registry.tools["python"].schema()] if only else self.registry.schemas()
+        for sch in out:
+            fn = sch.get("function", sch)
+            if fn.get("name") == "python":
+                fn["description"] = (PYTHON_ONLY + " " if only else "") + description_for(mode, fn.get("description") or "")
+        return out
 
     def _layout(self, a: Agent) -> str:
         p = a.principal or {}

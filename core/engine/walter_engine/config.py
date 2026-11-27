@@ -125,6 +125,9 @@ class Settings:
     operating: str = str(ENGINE_ROOT / "instructions" / "OPERATING.md")
     resume_interrupted: bool = True
     python: str = "full"
+    # Python security S1 (2026-11-27): who gets the unprivileged bubble while `python = "full"` — "subagent" (depth > 0),
+    # "machine" (guardians, API callers), "test" (bench accounts). Administration stays reachable through tools.bash.
+    python_sandbox_for: tuple = ()
     python_idle_s: float = 1800.0
     python_interpreter: str = "/services/python/engine-python/bin/python"
     web_cookie_days: int = 30
@@ -193,6 +196,7 @@ def load(state: Path | None = None) -> Settings:
         soul=_resolve(n.get("soul", "")), conduct=_resolve(n.get("conduct", "")),
         operating=_module_path(n.get("operating", "instructions/OPERATING.md")),
         resume_interrupted=bool(n.get("resume_interrupted", True)), python=n.get("python", "full"),
+        python_sandbox_for=tuple(str(x) for x in n.get("python_sandbox_for", ())),
         python_idle_s=float(n.get("python_idle_min", 30)) * 60,
         python_interpreter=n.get("python_interpreter", "/services/python/engine-python/bin/python"),
         web_cookie_days=int(n.get("web_cookie_days", web.get("cookie_max_age_days", 30))),

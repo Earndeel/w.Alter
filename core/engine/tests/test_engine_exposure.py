@@ -58,3 +58,31 @@ def test_bench_accounts_carry_their_arm_and_children_follow_the_root(tmp_path):
     child = eng.create(cwd="/w", door="test", principal={"kind": "agent", "id": "x"}, depth=1, parent=b.sid)
     assert eng._exposure(child) == "python"
     _close(eng)
+
+
+def test_s1_bubble_for_subagents_and_machines_only(tmp_path):
+    """Python security S1 (2026-11-27): the owner's kernel keeps the engine's rights, sub-agents and machine callers
+    get the unprivileged bubble, and each is told the rights it really has."""
+    from walter_engine.tools import python as P
+    eng = _engine(tmp_path, python_sandbox_for=("subagent", "machine"))
+    eng.registry.tools["python"].description = P.DESCRIPTION
+    owner = eng.create(cwd="/w", door="telegram", principal={"kind": "owner", "id": "monsieur"})
+    child = eng.create(cwd="/w", door="telegram", principal={"kind": "owner", "id": "monsieur"}, depth=1, parent=owner.sid)
+    guardian = eng.create(cwd="/w", door="api", principal={"kind": "machine", "id": "guardian-core"})
+    assert eng.python.mode_for(owner) == "full"
+    assert eng.python.mode_for(child) == "sandbox" and eng.python.mode_for(guardian) == "sandbox"
+    text = lambda a: next(s["function"]["description"] for s in eng._tool_schemas(a) if s["function"]["name"] == "python")  # noqa: E731
+    assert P.FULL_RIGHTS in text(owner) and P.SANDBOX_RIGHTS not in text(owner)
+    assert P.SANDBOX_RIGHTS in text(guardian) and P.FULL_RIGHTS not in text(guardian)
+    _close(eng)
+
+
+def test_s1_is_off_by_default_and_python_sandbox_still_means_everyone(tmp_path):
+    eng = _engine(tmp_path)
+    m = eng.create(cwd="/w", door="api", principal={"kind": "machine", "id": "guardian-core"})
+    assert eng.python.mode_for(m) == "full"
+    _close(eng)
+    eng = _engine(tmp_path, python="sandbox")
+    o = eng.create(cwd="/w", door="telegram", principal={"kind": "owner", "id": "monsieur"})
+    assert eng.python.mode_for(o) == "sandbox"
+    _close(eng)
