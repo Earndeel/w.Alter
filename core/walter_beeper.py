@@ -19,7 +19,13 @@ import httpx
 class BeeperAPIError(RuntimeError):
     def __init__(self, status: int):
         self.status = status
-        super().__init__(f"Beeper API HTTP {status}")  # never include headers, response bodies or message text
+        hint = ""
+        if status == 401:
+            # 27/11/2026: Beeper signed the VM's Server out of the owner's account; every read got a bare 401.
+            hint = (" — the Beeper Server refused Walter's key: it is most likely signed out of the owner's Beeper"
+                    " account. Not a fault of this call and retrying will not help: the Server must be reconnected"
+                    " (e-mail code + the owner approves the new device); tell the owner.")
+        super().__init__(f"Beeper API HTTP {status}{hint}")  # never include headers, response bodies or message text
 
 
 @lru_cache(maxsize=1)
