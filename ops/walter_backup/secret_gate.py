@@ -7,7 +7,14 @@ import json, re, subprocess, sys
 TOKEN_SHAPES = (r'sk-ant-api\d\d-[A-Za-z0-9_-]{20,}|sk-proj-[A-Za-z0-9_-]{20,}|sk-or-v1-[a-f0-9]{40,}|ghp_[A-Za-z0-9]{30,}'
                 r'|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}'
                 r'|AIza[0-9A-Za-z_-]{35}|\b\d{8,10}:AA[A-Za-z0-9_-]{33}\b|ya29\.[A-Za-z0-9_-]{20,}|[rs]k_live_[A-Za-z0-9]{20,}')
-PATTERNS = re.compile('(' + TOKEN_SHAPES + '|-----BEGIN [A-Z ]*PRIVATE KEY-----)')
+# A private key counts when its header is followed by key material (optional RFC 1421 header lines such as
+# Proc-Type/DEK-Info, then base64), with real or escaped line breaks (a key pasted into JSON or a .env). The bare
+# header alone (a detector's test fixture, a doc naming the format) holds no secret: refusing it blocked every
+# publication on 2026-11-27 (core/tests/test_exposure.py), and published history is never rewritten to remove it.
+_KEY_SEP = r'(?:\s|\\[rn])+'
+PRIVATE_KEY_BLOCK = (r'-----BEGIN [A-Z ]*PRIVATE KEY-----' + _KEY_SEP
+                     + r'(?:[A-Za-z][A-Za-z-]*: [^\n\\]*' + _KEY_SEP + r')*[A-Za-z0-9+/=]{40,}')
+PATTERNS = re.compile('(' + TOKEN_SHAPES + '|' + PRIVATE_KEY_BLOCK + ')')
 MAX_BLOB = 3_000_000
 
 
