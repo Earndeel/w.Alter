@@ -58,6 +58,22 @@ class Client:
     async def close(self) -> None:
         await self.http.aclose()
 
+    async def postes(self) -> set[str] | None:
+        """The Router postes the gateway serves (`/v1/models`), cached 10 min; None when it cannot say (never blocks a
+        call: the gateway stays the judge). Lot 3e: a sub-agent asked on an invented poste failed after ~9 s."""
+        hit = getattr(self, "_postes", None)
+        if hit and time.monotonic() - hit[0] < 600:
+            return hit[1]
+        try:
+            r = await self.http.get(f"{config.LLM_URL}/v1/models", headers={"Authorization": f"Bearer {self.token()}"},
+                                    timeout=5.0)
+            names = {str(m.get("id")) for m in (r.json().get("data") or [])} if r.status_code == 200 else None
+        except Exception:  # noqa: BLE001
+            names = None
+        if names:
+            self._postes = (time.monotonic(), names)
+        return names
+
     async def chat(self, *, messages: list[dict], tools: list[dict] | None, model: str, run_id: str | None,
                    task_id: str | None = None, on_delta=None, max_tokens: int | None = None,
                    cancel: asyncio.Event | None = None, extra: dict | None = None) -> Answer:

@@ -653,3 +653,24 @@ def test_the_system_message_marks_the_shared_socle_as_its_own_cache_block(engine
     engine.s.system_order = "legacy"                                  # the legacy order has no shared prefix to mark
     a._sys = None
     assert isinstance(engine._messages(a)[0]["content"], str)
+
+
+def test_subagent_on_an_invented_poste_is_refused_at_once_with_the_real_ones(engine, monkeypatch):
+    """Lot 3e (27/11): models calling `subagent` from Python guessed postes (« orchestrator », « redaction »); the
+    gateway refused them after ~9 s and the delegation was lost. The tool now answers at once with the valid ones."""
+    async def postes():
+        return {"auto", "general", "coding", "writing"}
+    monkeypatch.setattr(engine.llm, "postes", postes)
+    seen = {}
+
+    async def run_child(child, prompt, cancel=None):
+        seen.update(model=child.model)
+        return {"status": "ok", "text": "vu", "tools": 0}
+    monkeypatch.setattr(engine, "run_child", run_child)
+    a = engine.create(cwd="/w", door="telegram", principal={"kind": "owner", "id": "monsieur"})
+    from walter_engine.tools import Exec, agents
+    ex = Exec(engine=engine, agent=a, call_id="c1", name="subagent", cancel=asyncio.Event())
+    res = asyncio.run(agents.subagent({"description": "x", "prompt": "y", "model": "orchestrator"}, ex))
+    assert res.is_error and "coding, general, writing" in res.content and not seen
+    res = asyncio.run(agents.subagent({"description": "x", "prompt": "y", "model": "general/L2"}, ex))
+    assert not res.is_error and seen["model"] == "general/L2"

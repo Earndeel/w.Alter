@@ -72,6 +72,11 @@ async def subagent(args: dict, ex: Exec) -> Result:
     model = args.get("model")
     if model is not None and (not isinstance(model, str) or not POSTE.match(model)):
         return Result("model must be a Walter Router poste (coding, general, document, summarization, auto…)", True)
+    if model:
+        known = await ex.engine.llm.postes()
+        if known and model.split("/")[0] not in known:
+            return Result(f"model « {model} » is not a Walter Router poste. Omit it (Walter's choice) or use one of: "
+                          + ", ".join(sorted(known)), True)
     provider = args.get("provider")
     if provider not in (None, "", "walter"):
         return Result("provider must be walter (Walter Router chooses and executes every model)", True)
