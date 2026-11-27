@@ -176,6 +176,45 @@ def _normalize_expected_fields(raw_fields: Any) -> dict[str, list[str]]:
     return normalized
 
 
+# Free-text fields (2026-11-27): facts, conclusions, quotes or links *in an article* are not data the site serves as
+# fields — they are drawn from the page's text. Asking them as expected_fields used to start Scrapling and its JSON
+# wait (56 s on arXiv, then a failed browser, then the model re-read the page in 4 s). Such a request is acquired as
+# a read (the route that suits the resource: probe text, static HTML, rendered page), and the caller draws the
+# fields from the content; links come from the page's anchors. A request with any data field (price, rating, sku,
+# stock…), a profile, a capability or an explicit engine stays a structured extraction (recipes, Scrapling).
+_FREE_TEXT_WORDS = frozenset("""
+    fact facts finding findings conclusion conclusions quote quotes quotation quotations citation citations claim claims
+    summary summaries abstract detail details note notes keypoint keypoints point points takeaway takeaways insight
+    insights highlight highlights argument arguments statement statements evidence explanation explanations overview
+    analysis contribution contributions limitation limitations tldr excerpt excerpts lesson lessons idea ideas theme
+    themes topic topics main key content text body passage passages section sections paragraph paragraphs
+    link links url urls href hrefs reference references source sources
+""".split())
+_NEUTRAL_WORDS = frozenset("title titles headline author authors date dates published publication description".split())
+_LINK_WORDS = frozenset("link links url urls href hrefs reference references source sources".split())
+
+
+def _words(name: str) -> list[str]:
+    spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name)
+    return [w for w in re.split(r"[^a-z0-9]+", spaced.lower()) if w]
+
+
+def _free_text_fields(fields: Mapping[str, list[str]]) -> tuple[list[str], bool] | None:
+    """The requested names when every field is free text (titles/authors/dates allowed alongside), else None."""
+    names, free, links = list(fields), False, False
+    for name in names:
+        words = _words(name)
+        if not words:
+            return None
+        if all(w in _NEUTRAL_WORDS for w in words):
+            continue
+        if not all(w in _FREE_TEXT_WORDS or w in _NEUTRAL_WORDS for w in words):
+            return None
+        free = True
+        links = links or any(w in _LINK_WORDS for w in words)
+    return (names, links) if free else None
+
+
 def _validate_request(args: Any) -> dict[str, Any]:
     if not isinstance(args, Mapping):
         raise ValueError("walter_browse arguments must be an object")
@@ -258,7 +297,16 @@ def _validate_request(args: Any) -> dict[str, Any]:
     if len(objective) > _MAX_OBJECTIVE_LENGTH:
         raise ValueError(f"objective exceeds the {_MAX_OBJECTIVE_LENGTH}-character limit")
 
+    free_text = None
+    # min_records > 1 = a listing (products, results, offers…): records the site serves, kept structured.
+    if expected_fields is not None and not profile and not capability and mode == "auto" and min_records == 1:
+        free_text = _free_text_fields(expected_fields)
+    if free_text is not None:
+        content_only, expected_fields, required_fields, min_records = True, None, [], 1
+
     return {
+        "free_text_fields": free_text[0] if free_text else None,
+        "with_links": bool(free_text and free_text[1]),
         "query": query or None,
         "url": url or None,
         "objective": objective,
@@ -310,7 +358,8 @@ def _build_router_command(request: Mapping[str, Any]) -> list[str]:
             [
                 "--expected-fields",
                 json.dumps(
-                    {"content": ["content", "text", "description", "body"]},
+                    {"content": ["content", "text", "description", "body"],
+                     **({"links": ["links"]} if request.get("with_links") else {})},
                     ensure_ascii=False,
                     separators=(",", ":"),
                 ),
@@ -427,6 +476,11 @@ def _run_router(request: Mapping[str, Any]) -> dict[str, Any]:
     payload["success"] = bool(completed.returncode == 0 and usable)
     payload["objective"] = request["objective"]
     payload["router_exit_code"] = completed.returncode
+    if request.get("free_text_fields"):
+        payload["acquired_as"] = "read"
+        payload["free_text_fields"] = request["free_text_fields"]
+        payload["note"] = ("Free-text fields are drawn from the page's text: records[0].content"
+                           + (" (its links in records[0].links)" if request.get("with_links") else "") + ".")
     if not payload["success"] and not payload.get("error"):
         payload["error"] = "The extraction contract was not satisfied"
     return payload

@@ -164,6 +164,8 @@ _PAGE_EXPRESSION = r"""
     htmlBytes: (document.documentElement?.outerHTML || "").length,
     payload,
     visibleText: (document.body?.innerText || "").slice(0, 200000),
+    links: Array.from(document.querySelectorAll("a[href]")).slice(0, 600)
+      .map(a => [(a.innerText || a.textContent || "").trim().slice(0, 160), a.href]),
   };
 })()
 """
@@ -173,6 +175,55 @@ def _wants_content(spec: ExtractionSpec) -> bool:
     """A reading-mode contract: the spec asks for the page's free text."""
     from universal_extractor import normalize_token as _norm
     return any("content" in _norm(key) or "text" in _norm(key) for key in spec.expected_fields)
+
+
+_LINK_KEYS = frozenset({"links", "link", "urls", "hrefs", "references", "sources"})
+_MAX_LINKS = 200
+
+
+def _wants_links(spec: ExtractionSpec) -> bool:
+    """A read that also asks for the page's links (free-text request for links/references, 2026-11-27)."""
+    from universal_extractor import normalize_token as _norm
+    return _wants_content(spec) and any(_norm(key) in _LINK_KEYS for key in spec.expected_fields)
+
+
+def _clean_links(pairs, base: str) -> list[dict[str, str]]:
+    from urllib.parse import urldefrag, urljoin
+    out, seen = [], set()
+    for text, href in pairs:
+        href = (href or "").strip()
+        if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
+            continue
+        absolute = urldefrag(urljoin(base, href))[0]
+        if not absolute.startswith(("http://", "https://")) or absolute in seen:
+            continue
+        seen.add(absolute)
+        out.append({"text": re.sub(r"\s+", " ", text or "").strip()[:160], "url": absolute})
+        if len(out) >= _MAX_LINKS:
+            break
+    return out
+
+
+def _page_links(body: str, base: str, plain_text: bool = False) -> list[dict[str, str]]:
+    """The links of a page: its anchors (HTML) or its Markdown links / bare URLs (text)."""
+    if plain_text:
+        pairs = re.findall(r"\[([^\]]{0,200})\]\((https?://[^)\s]+)\)", body)
+        pairs += [("", u) for u in re.findall(r"(?<![(\[])\bhttps?://[^\s<>()\]\[\"']+", body)]
+        return _clean_links(pairs, base)
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        found = re.findall(r"<a[^>]+href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", body, re.S)
+        return _clean_links([(re.sub(r"<[^>]+>", "", text), href) for href, text in found], base)
+    soup = BeautifulSoup(body, "html.parser")
+    return _clean_links(((a.get_text(" ", strip=True), a.get("href")) for a in soup.find_all("a", href=True)), base)
+
+
+def _with_links(result: ExtractionResult, links: list[dict[str, str]] | None) -> ExtractionResult:
+    """Attach the page's links to the read record (after the projection, which would take them for records)."""
+    if links is not None and result.records:
+        result.records[0]["links"] = links
+    return result
 
 
 class CamoufoxMaxError(RuntimeError):
@@ -298,6 +349,7 @@ class CamoufoxMaxClient:
         html_bytes = 0
         error: str | None = None
         native_capture_supported: bool | None = None
+        page_links: list[dict[str, str]] | None = None
 
         def add_candidate(item: Mapping[str, Any]) -> None:
             candidate = self._candidate(item, spec, started, url)
@@ -398,6 +450,8 @@ class CamoufoxMaxClient:
                 if _wants_content(spec) and visible and not json_served and (
                         len(visible) >= 120 or direct_payload is not None):
                     candidates[:] = []   # the rendered text already holds what those responses displayed
+                    if _wants_links(spec):
+                        page_links = _clean_links(page_info.get("links") or [], str(page_info.get("url") or url))
                     candidates.append(
                         ResponseCandidate(
                             url=str(page_info.get("url") or url),
@@ -426,7 +480,7 @@ class CamoufoxMaxClient:
                     # Closing a crashed tab must not hide the extraction result.
                     pass
 
-        return finalize_extraction_result(
+        result = finalize_extraction_result(
             url,
             spec,
             started,
@@ -434,6 +488,7 @@ class CamoufoxMaxClient:
             html_bytes=html_bytes,
             error=error,
         )
+        return _with_links(result, page_links)
 
 
 # ---------------------------------------------------------------------------
@@ -1003,7 +1058,7 @@ class UniversalRouter:
         return routed
 
     def _content_result(self, url: str, spec: ExtractionSpec, text: str, content_type: str,
-                        raw_len: int) -> ExtractionResult:
+                        raw_len: int, body: str | None = None) -> ExtractionResult:
         """A page read served by the probe itself: its text is the content."""
         candidate = ResponseCandidate(
             url=url,
@@ -1017,7 +1072,9 @@ class UniversalRouter:
             record_count=1,
             score=100.0,
         )
-        return finalize_extraction_result(url, spec, time.perf_counter(), [candidate])
+        links = (_page_links(body if body is not None else text, url, plain_text="html" not in content_type)
+                 if _wants_links(spec) else None)
+        return _with_links(finalize_extraction_result(url, spec, time.perf_counter(), [candidate]), links)
 
     def _observe_route(self, url: str, reading: bool, route: str, ok: bool) -> None:
         if self.profile_index is not None and hasattr(self.profile_index, "observe_route"):
@@ -1163,7 +1220,7 @@ class UniversalRouter:
                             if len(visible_text) >= _READ_MIN_CHARS and not app_shell:
                                 content_result = self._content_result(
                                     url, spec, visible_text, "text/html",
-                                    len(body.encode("utf-8", errors="replace")))
+                                    len(body.encode("utf-8", errors="replace")), body=body)
                                 if self._usable(content_result) and content_result.records:
                                     if self.profile_index is not None and not authenticated_session:
                                         self.profile_index.observe(

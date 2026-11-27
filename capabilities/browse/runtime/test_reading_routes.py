@@ -165,5 +165,27 @@ class ReadingRoutesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.scrapling.calls, 0)
 
 
+    async def test_a_read_asking_for_links_gets_the_page_anchors(self) -> None:
+        spec = ExtractionSpec(expected_fields={"content": ("content",), "links": ("links",)})
+        body = ("<html><body><article><p>" + "We study sparse experts at scale. " * 10 + "</p>"
+                "<a href='/pdf/2501.00001'>PDF</a> <a href='https://github.com/x/y#readme'>Code</a>"
+                "<a href='#top'>top</a><a href='javascript:void(0)'>x</a></article></body></html>")
+        routed = await self._go("https://arxiv.test/abs/1", spec, body=body)
+        self.assertEqual(routed.route, "static-html")
+        links = routed.result.records[0]["links"]
+        self.assertEqual([l["url"] for l in links], ["https://arxiv.test/pdf/2501.00001", "https://github.com/x/y"])
+        self.assertEqual(self.scrapling.calls + self.camoufox.calls, 0)
+
+    async def test_markdown_links_are_returned_from_a_text_resource(self) -> None:
+        spec = ExtractionSpec(expected_fields={"content": ("content",), "links": ("links",)})
+        md = "# Model card\n\n" + "Weights and evaluation details follow. " * 5 + "\n[Paper](https://arxiv.org/abs/1)"
+        routed = await self._go("https://hf.test/README.md", spec, ctype="text/markdown", body=md)
+        self.assertEqual(routed.result.records[0]["links"], [{"text": "Paper", "url": "https://arxiv.org/abs/1"}])
+
+    async def test_a_plain_read_carries_no_links(self) -> None:
+        body = "<html><body><p>" + "Plain article text. " * 20 + "<a href='/a'>a</a></p></body></html>"
+        routed = await self._go("https://plain.test/a", READ, body=body)
+        self.assertNotIn("links", routed.result.records[0])
+
 if __name__ == "__main__":
     unittest.main()
