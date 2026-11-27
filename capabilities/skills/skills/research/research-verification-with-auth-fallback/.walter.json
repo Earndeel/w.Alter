@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-11-27T04:14:09.218163+00:00",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "research-evidence-verification",
+  "authenticated-session-fallbacks"
+ ]
+}
