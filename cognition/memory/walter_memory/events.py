@@ -294,7 +294,7 @@ _owner_label: str | None = None
 
 
 def compact(rows: list[dict], text: str | None = None, width: int = 500, budget: int = 16000, *,
-            max_privacy: str = "cloud_allowed") -> dict:
+            max_privacy: str = "cloud_allowed", limit: int | None = None) -> dict:
     """Events as an agent reads them: no payload, the content cut to a window around the searched text, the whole
     answer bounded. One full event = get_events(event_id=…). A 50-event answer used to be ~56K chars: spilled to a
     file, then grepped, then searched again (11 steps for « the first event about Sagora », 07/11).
@@ -319,7 +319,7 @@ def compact(rows: list[dict], text: str | None = None, width: int = 500, budget:
             if atts.get(str(r["event_id"])):
                 item["attachments"] = atts[str(r["event_id"])]
             size = len(json.dumps(item, ensure_ascii=False, default=str))
-            if out and used + size > budget:
+            if out and (used + size > budget or (limit and len(out) >= limit)):
                 break
             out.append(item); used += size
             continue
@@ -333,10 +333,10 @@ def compact(rows: list[dict], text: str | None = None, width: int = 500, budget:
         if atts.get(str(r["event_id"])):
             item["attachments"] = atts[str(r["event_id"])]
         size = len(json.dumps(item, ensure_ascii=False, default=str))
-        if out and used + size > budget:
+        if out and (used + size > budget or (limit and len(out) >= limit)):
             break
         out.append(item); used += size
-    more = len(rows) - len(out)
+    more = len(rows) - len(out)   # with `limit`, the caller fetched one row more: « more » then means « there is more »
     if thread:
         newest_first = len(rows) > 1 and rows[0]["occurred_at"] > rows[-1]["occurred_at"]
         # until is exclusive (the last shown), since inclusive (the first not shown): no event read twice

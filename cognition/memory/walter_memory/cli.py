@@ -232,9 +232,11 @@ def main(argv=None) -> None:
             _print({"error": "invalid_request", "message": str(err)})
             raise SystemExit(2)
         rows = events.get_events(source=a.source, event_types=a.type, thread_id=a.thread, since=a.since, until=a.until,
-                                 text=a.text, limit=a.limit, order=a.order, event_id=a.event_id,
+                                 text=a.text, limit=a.limit + (1 if a.compact and not a.event_id else 0),
+                                 order=a.order, event_id=a.event_id,
                                  max_privacy="cloud_allowed" if a.cloud_safe else "local_only")
-        _print(events.compact(rows, a.text, a.compact) if a.compact else
+        # compact reads fetch one row more than asked: a conversation longer than `limit` answers a cursor too
+        _print(events.compact(rows, a.text, a.compact, limit=a.limit) if a.compact else
                events.with_refs(rows, max_privacy="cloud_allowed" if a.cloud_safe else "local_only"))
     elif a.cmd == "types":
         _print(types.list_types() if a.action == "list" else {"synced": types.sync_seed()})

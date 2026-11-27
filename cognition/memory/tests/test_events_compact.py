@@ -50,3 +50,15 @@ def test_a_search_keeps_the_former_shape_with_the_owner_named(monkeypatch):
     monkeypatch.setattr(events, "attachments", lambda rows, **kw: {})
     out = events.compact([_msg(1, mine=True), _msg(2)], "message", width=100)
     assert "next" not in out and out["events"][0]["actor"] == "Monsieur" and "content" in out["events"][0]
+
+
+def test_a_read_capped_by_limit_answers_a_cursor_when_more_rows_exist():
+    """2026-11-27: the CLI fetches limit+1 rows; compact shows `limit` and the extra row means « more » (cursor)."""
+    from datetime import datetime, timedelta, timezone
+    from walter_memory import events
+    t0 = datetime(2026, 11, 1, tzinfo=timezone.utc)
+    rows = [{"event_id": i, "occurred_at": t0 + timedelta(minutes=i), "source": "s", "thread_id": "t",
+             "event_type": "message.received", "content": f"m{i}", "actor_name": "a"} for i in range(3)]
+    out = events.compact(rows, None, 500, limit=2, max_privacy="cloud_allowed")
+    assert [e["event_id"] for e in out["events"]] == [0, 1]
+    assert out["truncated"] == 1 and out["cursor"] and out["next"] == {"since": str(rows[2]["occurred_at"])}
