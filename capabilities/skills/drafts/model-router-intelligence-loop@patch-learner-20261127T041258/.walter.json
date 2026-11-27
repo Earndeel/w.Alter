@@ -1,0 +1,11 @@
+{
+ "base_sha": "f8bdb0fdff20b60af1001fdc0ad65a8a8a1152ead24cedd843d52318c3f73c59",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-27T04:12:58.429257+00:00",
+ "domain": "models",
+ "kind": "patch",
+ "reason": "This adds a repeatable account-quota incident workflow to the existing Router skill: align provider polls with local execution records, then trace the dominant calls to their originating job. It distinguished two different incidents in this session: a 47-point day dominated by repeated payload benchmarks, and a fresh 0–4% rise during which memory reclassification generated 180 of 189 gateway calls. The procedure preserves the distinction between observed activity and exact provider-side quota attribution. [session codex/Codex Desktop/01a2134d-f0f8-7491-8b59-23c2a6683d4c]",
+ "runtime": "learner",
+ "session_id": "codex/Codex Desktop/01a2134d-f0f8-7491-8b59-23c2a6683d4c",
+ "target": "model-router-intelligence-loop"
+}
