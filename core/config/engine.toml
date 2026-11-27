@@ -14,7 +14,7 @@ cookie_max_age_days = 30          # DSH's own default
 [dsh.budget]
 # Ceilings of one engine turn (plugin `budget`). General ones: a turn without a plan, with a degraded plan, or a
 # delegated mission. `levels`: an owner request the preflight understood, by the EFFORT its plan states (`decision.effort`
-# = context level raised by the difficulty asked and, for work to carry out, to L4; decision A7 2026-11-11, 12/11):
+# = the text tier asked, L4 for work to carry out or a deep search; never the context level since 27/11; A7 11-12/11):
 # checkpoint = steps after which the agent is told once where it stands; then the same two stages as the general
 # ceilings (told to conclude, refused after the grace). A level never exceeds the general ceilings.
 max_steps = 80
