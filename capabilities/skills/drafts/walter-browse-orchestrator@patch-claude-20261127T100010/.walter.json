@@ -1,0 +1,11 @@
+{
+ "base_sha": "d17bb7adc0ea7b88e0442c05dd2a91edceec62fe8d59d8c159dcbb26c4ad4d03",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-27T10:00:10.574316+00:00",
+ "domain": "web",
+ "kind": "patch",
+ "reason": "Observation 2026-11-27 (17 real requests): the description « Use first for any web task » made the skill a mandatory step before every walter_browse call. 3 of 3 web turns read this skill plus 1–2 others first (15–28 s, up to 41 k chars) for a plain search that walter_browse's own contract covers. New description: open it when a web task goes beyond one plain call. Body trimmed with no procedure removed: the computer_use boundary, parameter choices, prohibitions, network rule, signed-in sessions and the skill table are kept. The stale \"Hors Hermes (Claude Code, Codex, DSH) — état 2026-11-01\" heading becomes « Site connecté comme Monsieur » (DSH was uninstalled on 18/11).",
+ "runtime": "claude",
+ "session_id": null,
+ "target": "walter-browse-orchestrator"
+}
