@@ -414,7 +414,10 @@ def _memory_budget(plan: ContextPlan) -> dict | None:
     Proportionate (2026-11-27, Monsieur): the memory a message needs no longer comes with its subject's history —
     L3/L4 plans read their level's sections; « memory needed » reads the L3 sections at any level, L0 included,
     without the threads; a personal domain at L1/L2 as before; a taste of the owner alone (personal « preferences »)
-    gets a targeted lookup, `[pack.memory_budget.targeted]`."""
+    gets a targeted lookup, `[pack.memory_budget.targeted]`. A chronological question (`chronological`, 27/11) reads
+    only the owner's latest exchanges, in order: `[pack.memory_budget.chronological]`, whatever the level."""
+    if chronological(plan) and "chronological" in MEMORY_BUDGET:
+        return {**MEMORY_BUDGET["chronological"], **NOT_HERE}
     if plan.level in MEMORY_BUDGET and plan.level.startswith("L"):
         return {**MEMORY_BUDGET[plan.level], **NOT_HERE}
     if "memory" in plan.capabilities or (plan.level != "L0" and set(plan.domains) - NO_MEMORY_DOMAINS):
@@ -424,18 +427,59 @@ def _memory_budget(plan: ContextPlan) -> dict | None:
     return None
 
 
-def _memory_block(message: str, budget: dict) -> Block | None:
+RECORDS_HEAD = "## Décisions et règles consignées"
+
+
+def _memory_block(message: str, budget: dict, *, recent_hours: float | None = None,
+                  before_rerank=None) -> list[Block] | None:
+    """Memory's assembly for the message, as blocks: the curated records it matched (decisions register, consignes
+    written in the records) become the `records` block, cut first over the budget like the records block itself, and
+    the rest stays `memory`. Until 27/11 they were one block: at L0 the records (600 tokens, partly unrelated: a
+    2026-10-04 Router rule matched on « message reçu ») came first in it, so the budget dropped the memory tool card
+    and the relevant memory instead of them."""
     from walter_memory import context
-    r = context.get_context(message, budget=budget, include_profile=False)
+    kw = {"recent_hours": recent_hours} if recent_hours else {}
+    if before_rerank is not None:
+        kw["before_rerank"] = before_rerank
+    r = context.get_context(message, budget=budget, include_profile=False, **kw)
     if not r.get("text"):
         return None
-    refs = [ref for s in (r.get("trace") or {}).get("sections", {}).values() for ref in (s.get("refs") or [])]
-    return Block("memory", 4, _body(r["text"]), sources=refs[:20])
+    secs = (r.get("trace") or {}).get("sections", {})
+    body = _body(r["text"])
+    head, sep, rest = ("\n\n" + body).partition("\n\n" + RECORDS_HEAD)
+    blocks = []
+    if sep:
+        mine, more, after = rest.partition("\n\n## ")
+        blocks.append(Block("records", 4, (RECORDS_HEAD + mine).strip(),
+                            sources=list((secs.get("records") or {}).get("refs") or [])[:20]))
+        body = (head + (more + after if more else "")).strip()
+    refs = [ref for k, s in secs.items() if k != "records" for ref in (s.get("refs") or [])]
+    if body.strip():
+        blocks.insert(0, Block("memory", 4, body, sources=refs[:20]))
+    return blocks or None
 
 
-def memory(plan: ContextPlan, message: str) -> Block | None:
+def chronological(plan: ContextPlan) -> float | None:
+    """Hours of the owner's latest exchanges to read in order, when the plan's question is about what just happened
+    in his life (personal « history » on an instant/day horizon) and names no day and no person — those are read by
+    the period synthesis and the people's cards. None: no chronological reading. Owner 2026-11-27: a request about
+    recent events is met by a structured, deterministic read (no semantic search, no rerank); the model stays free
+    to read more with memory_events."""
+    hours = PACK.get("chronological_hours") or {}
+    horizons = set(plan.horizons or [])
+    obs = plan.observations or {}
+    if plan.level not in (PACK.get("chronological_levels") or ()):
+        return None                 # a heavier plan needs its whole memory (24/1 744 plans 24–27/11, 21 of them L3)
+    if "history" not in (plan.personal or []) or not horizons or not horizons <= set(hours):
+        return None
+    if obs.get("dates") or obs.get("people"):
+        return None
+    return float(max(hours[h] for h in horizons))
+
+
+def memory(plan: ContextPlan, message: str) -> list[Block] | None:
     budget = _memory_budget(plan)
-    return _memory_block(message, budget) if budget is not None else None
+    return _memory_block(message, budget, recent_hours=chronological(plan)) if budget is not None else None
 
 
 def records(plan: ContextPlan, message: str) -> Block | None:
@@ -627,8 +671,9 @@ def _workers():
 def _timed(step):
     t0 = time.perf_counter()
     b = step()
-    if b is not None:
-        b.ms = round((time.perf_counter() - t0) * 1000, 1)
+    for x in (b if isinstance(b, list) else [b]):
+        if x is not None:
+            x.ms = round((time.perf_counter() - t0) * 1000, 1)
     return b
 
 
@@ -639,24 +684,46 @@ class Prefetch:
     Memory is started at the budget most plans ask for: L3, and L1/L2 with a personal domain (about 60 % of the
     14–16/11 records). gather() takes a result only when the plan asks for exactly these inputs, so the same
     functions get the same arguments: the pack is the same, only ready sooner. A result the plan does not ask for is
-    dropped, never shown. Its cost is one memoized rerank call and about 0.3 s of CPU."""
+    dropped, never shown.
+    The local candidate searches run during the decision; the rerank call over their union (about 190 passages,
+    24 000 tokens) waits for the plan and runs only when the plan takes this memory (27/11: it ran for every message,
+    an L0 chronological question included, and was thrown away). Past `prefetch_gate_s` without a plan it is not
+    made, and the plan then asks its memory itself."""
 
     def __init__(self, message: str, session_key: str | None, socle_rules: bool = False):
         w = _workers()
         self.message, self.session_key, self.socle_rules = message, session_key, socle_rules
         self.memory_budget = {**MEMORY_BUDGET["L3"], **NOT_HERE}
+        self._go, self._lock, self._wanted, self._skipped = threading.Event(), threading.Lock(), False, False
         w.submit(_notes)                         # warms the shared notes; their blocks read the cache
         self.state = w.submit(_timed, lambda: session_state(None, message, session_key, socle_rules))
-        self.memory = w.submit(_timed, lambda: _memory_block(message, self.memory_budget))
+        self.memory = w.submit(_timed, lambda: _memory_block(message, self.memory_budget, before_rerank=self._gate))
+
+    def _gate(self) -> bool:
+        """Memory asks before its rerank call: wait for the plan; rerank only if the plan takes this memory."""
+        self._go.wait(PACK.get("prefetch_gate_s", 8))
+        with self._lock:
+            if not self._go.is_set():
+                self._skipped = True
+            return self._wanted and not self._skipped
 
     def taken(self, plan: ContextPlan, message: str, session_key: str | None) -> dict:
         """name → future, for the sources this plan asks for with exactly the prefetched inputs."""
-        if message != self.message or session_key != self.session_key:
+        same = message == self.message and session_key == self.session_key
+        with self._lock:
+            self._wanted = same and not self._skipped and _memory_budget(plan) == self.memory_budget
+            self._go.set()
+        if not same:
             return {}
         out = {"session_state": self.state} if plan.level != "L0" and continues(plan) else {}
-        if _memory_budget(plan) == self.memory_budget:
+        if self._wanted:
             out["memory"] = self.memory
         return out
+
+    def release(self) -> None:
+        """No plan will take anything (the caller gives up): the rerank is not made."""
+        with self._lock:
+            self._go.set()
 
 
 def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, native_history: bool = True,
@@ -727,6 +794,8 @@ def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, n
             reason = "route absent" if isinstance(exc, RouteAbsent) else f"{type(exc).__name__}: {str(exc)[:120]}"
             notes.append(f"{name}: {reason}")
             continue
-        if b is not None:
+        if isinstance(b, list):
+            blocks += [x for x in b if x is not None]
+        elif b is not None:
             blocks.append(b)
     return blocks, notes

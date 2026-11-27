@@ -140,6 +140,21 @@ def preflight_settings(path: str | Path | None = None) -> dict:
 def pack_settings(path: str | Path | None = None) -> dict:
     """[pack]: total budget per context level, cut order, per-block budgets and the board/tasks/experience bounds."""
     out = _section("pack", PACK_KEYS, path)
+    raw = tomllib.loads(Path(path or DEFAULT_PATH).read_text()).get("pack") or {}
+    # optional (27/11): absent = no chronological reading, the early rerank waits 8 s for the plan at most
+    hours = raw.get("chronological_hours") or {}
+    if not isinstance(hours, dict) or not all(isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
+                                              for v in hours.values()):
+        raise ValueError("[pack].chronological_hours: positive hours per horizon")
+    out["chronological_hours"] = dict(hours)
+    levels = raw.get("chronological_levels", ["L0"])
+    if not isinstance(levels, list) or not set(levels) <= {"L0", "L1", "L2", "L3", "L4"}:
+        raise ValueError("[pack].chronological_levels: context levels")
+    out["chronological_levels"] = list(levels)
+    gate = raw.get("prefetch_gate_s", 8)
+    if not isinstance(gate, (int, float)) or isinstance(gate, bool) or gate < 0:
+        raise ValueError("[pack].prefetch_gate_s: invalid value")
+    out["prefetch_gate_s"] = gate
     if set(out["budget"]) != {"L0", "L1", "L2", "L3", "L4"} or not all(
             isinstance(v, int) and v > 0 for v in out["budget"].values()):
         raise ValueError("[pack].budget: a positive token budget for each of L0..L4")

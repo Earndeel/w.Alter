@@ -198,6 +198,8 @@ budget = { L0 = 800, L1 = 3350, L2 = 4150, L3 = 5150, L4 = 6650 }
 cut_order = ["subjects_board", "records", "tool_cards", "recent_exchanges", "memory", "people", "experience", "subject",
              "session_state", "tasks"]
 min_block_tokens = 80               # a block that would shrink below this is dropped instead
+chronological_levels = ["L0"]      # see [pack.chronological_hours] below
+prefetch_gate_s = 8                 # the early memory read waits this long for the plan before its rerank call (27/11)
 board_tokens = 200                  # subjects board: active subjects only (before: the whole table, 17 lines, ~350)
 board_max_lines = 6
 board_recent_hours = 48             # recent = last activity within this (instant: 6 h, day: 24 h, from the plan horizon)
@@ -217,6 +219,29 @@ late_grace_s = 0.25                 # a source is given at least this long once 
 people_tokens = 300                 # people the message names (preflight observation, Walter Decision 2.0): their cards
 readings_wait_s = 1.0               # the most `now` / `people` wait for readings asked apart, counted from the message
                                     # (never past the deadline); 17/11 bench, cal split: readings p95 0.75 s
+
+# Chronological questions (owner 2026-11-27, « quels sont mes derniers messages reçus ? »): a plan with personal
+# « history » on these horizons, naming no day and no person, reads the owner's latest exchanges with others in order
+# (Memory get_context recent_hours: deterministic, no search, no rerank) within this many hours; the memory block is
+# then only that, `[pack.memory_budget.chronological]`. The level budgets above are unchanged. Rollback: remove the
+# chronological table (the plan then reads its level's sections as before).
+#   levels: the light plans only (L0 = the message and tools suffice); a heavier plan keeps its level's memory.
+[pack.chronological_hours]
+instant = 24
+day = 48
+
+[pack.memory_budget.chronological]
+profile = 0
+rules = 0
+working = 0
+people = 0
+records = 0
+knowledge = 0
+evidence = 400
+views = 0
+periods = 0
+tasks = 0
+experience = 0
 
 [pack.memory_budget.L3]             # Memory get_context sections (tasks/experience come from their own routes: 0 here)
 profile = 0
