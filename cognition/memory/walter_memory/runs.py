@@ -546,6 +546,18 @@ def listed_channels(channels: list[str] | str | None, thread_id: str | None = No
     return [c for c in (channels or ["owner"]) if c] or ["owner"]
 
 
+def session_channel(session_id: str | None) -> str:
+    """The channel of a harness session's latest run: `test` for a test account's sessions, else `owner` (the same
+    rule as objective_candidates: a test session works on its own objectives, never sees the owner's)."""
+    if not session_id or not has_tasks_schema():
+        return "owner"
+    with connect() as conn:
+        row = conn.execute(f"""select coalesce(r.origin->>'channel', 'owner') ch from runs.runs r
+                               where {_session_match()} order by r.started_at desc limit 1""",
+                           (session_id, session_id)).fetchone()
+    return "test" if row and row["ch"] == "test" else "owner"
+
+
 def tasks_list(thread_id: str | None = None, session_id: str | None = None, status: str | list | None = None,
                limit: int = 10, channels: list[str] | None = None) -> list[dict]:
     """The owner's objectives, most recently active first, in the binding shape (SOCLE.md, contracts between lots):

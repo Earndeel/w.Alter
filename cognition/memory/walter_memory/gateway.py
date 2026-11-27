@@ -321,6 +321,7 @@ class TasksListIn(BaseModel):
     status: str | list[str] | None = None     # one status, a list, "all"; default the active ones (open, suspended)
     limit: int = 10
     channels: str | list[str] | None = None   # default: the owner's, unless narrowed to a thread or a session
+    asking_session: str | None = None         # the session the list is for: its channel's objectives only (27/11)
 
 
 class TaskUpdateIn(BaseModel):
@@ -340,9 +341,11 @@ class ExperienceIn(BaseModel):
 @app.post("/v1/tasks/list", dependencies=[Depends(auth)])
 def post_tasks_list(body: TasksListIn):
     from . import runs
+    channels = runs.listed_channels(body.channels, body.thread_id, body.session_id)
+    if body.asking_session and body.channels is None and channels is not None:
+        channels = [runs.session_channel(body.asking_session)]
     return {"tasks": runs.tasks_list(thread_id=body.thread_id, session_id=body.session_id, status=body.status,
-                                     limit=max(1, min(body.limit, 50)),
-                                     channels=runs.listed_channels(body.channels, body.thread_id, body.session_id))}
+                                     limit=max(1, min(body.limit, 50)), channels=channels)}
 
 
 @app.post("/v1/tasks/update", dependencies=[Depends(auth)])
