@@ -13,6 +13,13 @@ import resolver  # noqa: E402
 REL = [r for r in json.loads(subprocess.run(["walter", "decisions"], capture_output=True, text=True, check=True,
                                             timeout=60).stdout).get("relations", [])
        if r.get("module") in ("context", "memory")]
+# Retired from production on 2026-11-27 (memory, thread depth and execution budget made independent, Monsieur): kept
+# here as fixtures, they are still the shortest examples of a strict rule and of a dependency for the resolver.
+REL += [{"id": "context.needs_memory_plan", "module": "context", "type": "implies",
+         "if": {"signal": "context.needs", "has": "memory"}, "then": {"signal": "context.plan", "in": ["thread_and_memory"]},
+         "prefer": "if", "strict": True},
+        {"id": "context.extensive_needs_thread", "module": "context", "type": "depends", "signal": "context.extensive",
+         "on": {"signal": "context.plan", "in": ["thread", "thread_and_memory"]}}]
 ASKED = ["context.act", "context.thread", "context.plan", "context.extensive", "context.needs", "memory.resume"]
 
 
