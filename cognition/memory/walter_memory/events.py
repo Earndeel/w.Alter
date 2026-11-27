@@ -114,22 +114,80 @@ def record_event(**event) -> dict:
     return record_events([event])
 
 
+# Reading filters (owner 2026-11-27, « derniers messages reçus »: order='desc' was refused, event_type='message'
+# answered an empty list as if nothing had happened). Common unambiguous spellings are read as what they mean; a
+# family is asked explicitly; a filter that names nothing says so, with the valid names, never an empty answer.
+ORDERS = {"desc": "desc", "newest": "desc", "asc": "asc", "oldest": "asc"}
+# source groups: who the conversation is with. AGENT_SOURCES = the owner's conversations with W.Alter's own agents
+# (there his prompts are « message.received »); « people » = every other source, the owner's life with others.
+SOURCE_GROUPS = ("people", "agents")
+
+
+class UnknownFilter(ValueError):
+    """A filter that names no registered event type or family; `valid` = the names to use instead."""
+
+    def __init__(self, message: str, valid: list[str]):
+        super().__init__(message)
+        self.valid = valid
+
+
+def order_of(value: str | None) -> str:
+    """'newest'/'desc' → desc, 'oldest'/'asc' → asc (empty: desc)."""
+    o = ORDERS.get(str(value or "desc").strip().lower())
+    if not o:
+        raise UnknownFilter("order: newest (or desc) | oldest (or asc)", ["newest", "oldest"])
+    return o
+
+
+def resolve_types(values: Iterable[str] | None) -> tuple[list[str], list[str]]:
+    """(exact names, families). 'message.received' = that type exactly, as before; 'message.*' = every registered
+    message.<x> type. A bare family name ('message') or an unknown name raises UnknownFilter with the members or the
+    closest registered names."""
+    import difflib
+    known = sorted(types.names())
+    exact, families = [], []
+    for v in (str(x).strip() for x in values or [] if str(x).strip()):
+        if v.endswith(".*"):
+            fam = v[:-2].rstrip(".")
+            if not any(n.startswith(fam + ".") for n in known):
+                raise UnknownFilter(f"no event family {v!r}", sorted({n.split(".")[0] + ".*" for n in known}))
+            families.append(fam)
+        elif v in known:
+            exact.append(v)
+        else:
+            members = [n for n in known if n.startswith(v + ".")]
+            if members:
+                raise UnknownFilter(f"{v!r} is an event family, not a type: event_type='{v}.*' reads all of it, or "
+                                    f"name one of its types", members + [f"{v}.*"])
+            raise UnknownFilter(f"unknown event_type {v!r}",
+                                difflib.get_close_matches(v, known, n=4, cutoff=0.5) or known)
+    return exact, families
+
+
 def get_events(*, source: str | None = None, event_types: list[str] | None = None, thread_id: str | None = None,
                actor_identity_id: str | None = None, since: Any = None, until: Any = None, text: str | None = None,
                limit: int = 50, include_retracted: bool = False, max_privacy: str = "local_only",
                order: str = "desc", event_id: str | None = None) -> list[dict]:
-    """Read events newest first (order="asc": oldest first, e.g. « the first event about X »). Retracted events are
-    hidden unless include_retracted. max_privacy: 'cloud_allowed' returns only cloud_allowed rows (for callers that
-    will ship them to a cloud model)."""
-    if order not in ("asc", "desc"):
-        raise ValueError("order must be asc or desc")
+    """Read events newest first (order="asc"/"oldest": oldest first, e.g. « the first event about X »). Retracted
+    events are hidden unless include_retracted. max_privacy: 'cloud_allowed' returns only cloud_allowed rows (for
+    callers that will ship them to a cloud model). event_types: exact names and/or families ('message.*'); an unknown
+    one raises UnknownFilter. source: one source, or a group — 'people' (conversations with others: every source but
+    W.Alter's agents) / 'agents' (the owner's conversations with W.Alter's agents)."""
+    order = order_of(order)
     where, args = [], []
     if event_id:
         where.append("e.event_id = %s::uuid"); args.append(event_id)
-    if source:
+    if source in SOURCE_GROUPS:
+        from .search import AGENT_SOURCES
+        where.append("e.source <> all(%s)" if source == "people" else "e.source = any(%s)")
+        args.append(list(AGENT_SOURCES))
+    elif source:
         where.append("e.source = %s"); args.append(source)
     if event_types:
-        where.append("e.event_type = any(%s)"); args.append(event_types)
+        exact, families = resolve_types(event_types)
+        terms = (["e.event_type = any(%s)"] if exact else []) + (["e.event_type like any(%s)"] if families else [])
+        where.append("(" + " or ".join(terms) + ")")
+        args += ([exact] if exact else []) + ([[f.replace("_", "\\_") + ".%" for f in families]] if families else [])
     if thread_id:
         where.append("e.thread_id = %s"); args.append(thread_id)
     if actor_identity_id:

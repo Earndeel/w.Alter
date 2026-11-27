@@ -371,13 +371,67 @@ def _states(refs: list[str], *, past: bool, max_privacy: str) -> dict[str, list[
     return out
 
 
+RECENT_CHARS = 200
+
+
+def _recent_exchanges(hours: float, budget: int, max_privacy: str) -> tuple[str, int, list[str]]:
+    """What others wrote to the owner lately (never his conversations with W.Alter's agents), newest first, one line
+    each — local time, network, conversation, author, text — within `budget` tokens; what he sent in the same window
+    is one line (how many, the last one), so a question about what came in does not read his own messages; the last
+    line says how many were left out and how to read the rest."""
+    from datetime import datetime, timedelta, timezone
+    from .flows import tz
+    zone = tz()
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    got = events.get_events(source="people", event_types=["message.received", "email.received"], since=since,
+                            limit=60, order="desc", max_privacy=max_privacy)
+    sent = events.get_events(source="people", event_types=["message.sent", "email.sent"], since=since, limit=1,
+                             order="desc", max_privacy=max_privacy)
+    lines, used, room = [], 0, budget * 4 - 260
+    for r in got:
+        p = r.get("payload") or {}
+        chat = p.get("chat") or {}
+        where = " · ".join(x for x in (chat.get("network") or r.get("source_account") or r["source"],
+                                       f"groupe « {chat['title']} »" if chat.get("type") == "group" and chat.get("title")
+                                       else "") if x)
+        who = r.get("actor_name") or p.get("sender_name") or "?"
+        text = " ".join((r.get("content") or "").split())
+        files = p.get("attachments") or []
+        text = (text[:RECENT_CHARS] + ("…" if len(text) > RECENT_CHARS else "")) + (
+            f" (+{len(files)} fichier{'s' if len(files) > 1 else ''})" if files else "")
+        line = (f"- [{r['occurred_at'].astimezone(zone):%d/%m %H:%M} · {where} · {who}] {text or '(sans texte)'} "
+                f"(event:{r['event_id']})")
+        if used + len(line) + 1 > room:
+            break
+        lines.append(line); used += len(line) + 1
+    shown = len(lines)
+    if not got:
+        lines.append(f"- Rien reçu d'autres personnes dans les {hours:g} dernières heures.")
+    else:
+        left = len(got) - shown
+        lines.append(f"- Reçus dans les {hours:g} dernières heures (heure {zone.key}) : {shown} montré(s), les plus "
+                     "récents" + (f" ; {left}{'+' if len(got) >= 60 else ''} autre(s) plus ancien(s)" if left else ""))
+    if sent:
+        lines.append(f"- Envoyés par {events.owner_label()} sur la même période : dernier le "
+                     f"{sent[0]['occurred_at'].astimezone(zone):%d/%m à %H:%M} (non listés).")
+    lines.append('- La suite ou un autre angle : memory_events(event_type="message.received", source="people"), '
+                 'thread_id pour une conversation.')
+    return "\n".join(lines), shown, [r["event_id"] for r in got[:shown]]
+
+
 def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "cloud_allowed",
                 include_profile: bool = True, history: bool = False,
                 session: tuple[str, str] | None = None, thread_id: str | None = None,
-                exclude_universal: bool = False) -> dict:
+                exclude_universal: bool = False, recent_hours: float | None = None,
+                before_rerank=None) -> dict:
     """Returns {"text": assembled block, "sections": {...}, "trace": {...}}. Knowledge comes from the readable memory
     generations; history=True also reads archived ones, each such line marked « pré-V1 ». thread_id: the preflight's
-    thread when the caller knows it (else the thread of the session's latest run) — for the tasks / experience layers."""
+    thread when the caller knows it (else the thread of the session's latest run) — for the tasks / experience layers.
+    recent_hours: the question is about what just happened (the caller's plan says so): the evidence section is the
+    owner's latest exchanges with others within that many hours, newest first, read from the canonical history in
+    order (deterministic, no search, no rerank), instead of the passages a search finds for the words.
+    before_rerank: asked once the local candidates are found, before the rerank call (a caller that started this
+    early, before knowing whether it needs it); False = no rerank call, the ranked sections stay empty."""
     from .generations import read_mode, read_set
     b = {**DEFAULT_BUDGET, **(budget or {})}
     readable = read_set() or []
@@ -446,13 +500,15 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
             want["g0"] = (dict(lanes=("knowledge",), generations=["g0"]), mode["g0_candidates"], mode["g0_slots"])
         else:
             want["knowledge"] = (dict(lanes=("knowledge",)), CANDIDATES["knowledge"], 12)
-    if b["evidence"] > 0 and EVIDENCE_HINT.search(query):
+    if b["evidence"] > 0 and EVIDENCE_HINT.search(query) and not recent_hours:
         want["evidence"] = (dict(include_derived=False), CANDIDATES["evidence"], 8)
     cand = {k: pool.submit(lambda kw=kw, n=n: search.search(query, limit=n, max_privacy=max_privacy, history=history,
                                                              **kw)) for k, (kw, n, _) in want.items()}
 
     def ranked():
         pools = {k: (f.result(), want[k][2]) for k, f in cand.items()}
+        if before_rerank is not None and pools and not before_rerank():
+            return {k: [] for k in pools}
         if "knowledge" in pools and len(pools["knowledge"][0]) < 3:      # thin knowledge: both lanes
             pools["both"] = (search.search(query, limit=CANDIDATES["evidence"], max_privacy=max_privacy,
                                            history=history), 12)
@@ -620,7 +676,18 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
                                           "refs": [r["ref_id"] for r in res[:8]]}
         trace["items"] = [{"ref": r["ref_id"], "kind": r.get("kind"), "generation": r.get("generation"),
                            "source": r.get("source"), "text": r["text"][:120]} for r in res]
-    if b["evidence"] > 0 and EVIDENCE_HINT.search(query):
+    if b["evidence"] > 0 and recent_hours:
+        t = time.perf_counter()
+        try:
+            text, n, refs = _recent_exchanges(recent_hours, b["evidence"], max_privacy)
+            if text:
+                sections["evidence"] = text
+            trace["sections"]["evidence"] = {"mode": "chronological", "hours": recent_hours, "events": n,
+                                             "tokens": tokens(text) if text else 0, "refs": refs[:20],
+                                             "ms": round((time.perf_counter() - t) * 1000)}
+        except Exception as e:  # noqa: BLE001 — the model still has memory_events
+            trace["sections"]["evidence"] = {"mode": "chronological", "error": type(e).__name__}
+    elif b["evidence"] > 0 and EVIDENCE_HINT.search(query):
         t = time.perf_counter()
         res = fut["evidence"].result()
         direct = []

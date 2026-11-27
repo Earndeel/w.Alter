@@ -106,3 +106,9 @@ def sync_seed(path: Path = SEED) -> int:
 def list_types() -> list[dict]:
     with connection() as conn:
         return conn.execute("select name, version, status, description from core.event_types order by name, version").fetchall()
+
+
+def names() -> set[str]:
+    """Every registered type name, active or retired (a retired type still names historic rows a reader may ask for)."""
+    _load()
+    return set(_cache) | set(_retired)

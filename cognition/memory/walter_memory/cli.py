@@ -61,7 +61,7 @@ def main(argv=None) -> None:
     e = sub.add_parser("events"); e.add_argument("--source"); e.add_argument("--type", action="append")
     e.add_argument("--cloud-safe", action="store_true", help="only cloud_allowed canonical events")
     e.add_argument("--thread"); e.add_argument("--since"); e.add_argument("--text"); e.add_argument("--limit", type=int, default=20)
-    e.add_argument("--until"); e.add_argument("--id", dest="event_id"); e.add_argument("--order", choices=["asc", "desc"], default="desc")
+    e.add_argument("--until"); e.add_argument("--id", dest="event_id"); e.add_argument("--order", choices=["asc", "desc", "newest", "oldest"], default="desc")
     e.add_argument("--compact", type=int, default=0, metavar="CHARS", help="agent form: content window of CHARS, no payload")
     e.add_argument("--cursor", help="the `cursor` of a previous answer (continues the same read, lot 3e)")
     t = sub.add_parser("types"); t.add_argument("action", choices=["list", "sync"])
@@ -231,10 +231,15 @@ def main(argv=None) -> None:
         except refs.RefError as err:
             _print({"error": "invalid_request", "message": str(err)})
             raise SystemExit(2)
-        rows = events.get_events(source=a.source, event_types=a.type, thread_id=a.thread, since=a.since, until=a.until,
-                                 text=a.text, limit=a.limit + (1 if a.compact and not a.event_id else 0),
-                                 order=a.order, event_id=a.event_id,
-                                 max_privacy="cloud_allowed" if a.cloud_safe else "local_only")
+        try:
+            rows = events.get_events(source=a.source, event_types=a.type, thread_id=a.thread, since=a.since,
+                                     until=a.until, text=a.text,
+                                     limit=a.limit + (1 if a.compact and not a.event_id else 0),
+                                     order=a.order, event_id=a.event_id,
+                                     max_privacy="cloud_allowed" if a.cloud_safe else "local_only")
+        except events.UnknownFilter as err:      # said with the valid names, never an empty list (27/11)
+            _print({"error": "invalid_filter", "message": str(err), "valid": err.valid})
+            raise SystemExit(0)
         # compact reads fetch one row more than asked: a conversation longer than `limit` answers a cursor too
         _print(events.compact(rows, a.text, a.compact, limit=a.limit) if a.compact else
                events.with_refs(rows, max_privacy="cloud_allowed" if a.cloud_safe else "local_only"))

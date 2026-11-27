@@ -12,8 +12,9 @@ write door (library or gateway). Privacy classes: `cloud_allowed`, `redacted_clo
 - `memory_context(query)`: a ready context block (people named, knowledge, original sources). The turn's
   `<walter-context>` block usually holds it already.
 - `memory_search(query)`: knowledge + original evidence with source and date.
-- `memory_events(text, source, thread_id, since, until, order="newest"|"oldest", event_id, limit)`: the exact text of
-  canonical events; a conversation in order with `thread_id` (about a hundred messages per read, continue with
+- `memory_events(text, source, event_type, thread_id, since, until, order="newest"|"oldest", event_id, limit)`: the
+  exact text of canonical events; `event_type` exact (`message.received` = written to Monsieur) or a family
+  (`message.*`), `source="people"` = his exchanges with others, not with W.Alter; a conversation in order with `thread_id` (about a hundred messages per read, continue with
   `next`); `event_id` for one event in full. Messages with files carry `attachments` (voice-note transcript,
   document text…).
 - `person_lookup(name)`: a person's card (identities, relationship, `thread_id` of their conversations).

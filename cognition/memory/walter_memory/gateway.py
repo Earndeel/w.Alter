@@ -56,8 +56,11 @@ def post_events(body: EventsIn):
 @app.get("/v1/events", dependencies=[Depends(auth)])
 def list_events(source: str | None = None, event_type: str | None = None, thread_id: str | None = None,
                 since: str | None = None, text: str | None = None, limit: int = 50):
-    return events.get_events(source=source, event_types=[event_type] if event_type else None, thread_id=thread_id,
-                             since=since, text=text, limit=min(limit, 500))
+    try:
+        return events.get_events(source=source, event_types=[event_type] if event_type else None,
+                                 thread_id=thread_id, since=since, text=text, limit=min(limit, 500))
+    except events.UnknownFilter as e:            # said with the valid names, never an empty list (27/11)
+        raise HTTPException(422, {"message": str(e), "valid": e.valid})
 
 
 @app.post("/v1/objects", dependencies=[Depends(auth)])
