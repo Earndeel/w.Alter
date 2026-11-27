@@ -110,6 +110,17 @@ def _doc_layer(form: str) -> str:
         return ""
 
 
+# lot 3e (2026-11-27), exposure "python": what replaces the walter_call note, and the head of the only tool
+PYTHON_ONLY = ("This is your only tool: every capability (W.Alter's modules and the engine's own read, write, edit, "
+               "bash, subagent, present, ask_user_question…) is called from here as `await tools.<name>(**args)`.")
+PYTHON_ONLY_NOTE = ("## Using capabilities\n"
+                    "Your only tool is `python`, the persistent kernel. Every capability named in this documentation is "
+                    "a function there: `await tools.memory_search(query=…)`, `await tools.read(file_path=…)`, "
+                    "`await tools.subagent(...)`. `await tools.search(\"need\")` finds one, `await tools.describe(name)` "
+                    "gives its parameters and effects, `await tools.catalog()` lists them all. Calls follow the same "
+                    "permissions and logs as direct calls; independent ones run together with `asyncio.gather`.")
+
+
 def _walter_call_note(instructions: str) -> str:
     """The MCP instructions' section on tools reachable through `walter_call` (its heading may be in any language)."""
     for part in re.split(r"\n(?=## )", instructions):
@@ -661,7 +672,7 @@ class Engine:
             self._drain_steers(a, turn)
             await self._reassess(a, turn)
             messages = await self._pressure(a)
-            tools = None if no_tools else self.registry.schemas()
+            tools = None if no_tools else self._tool_schemas(a)
             stats["steps"] += 1
             try:
                 ans = await self._call_model(a, messages, tools)
@@ -1190,6 +1201,22 @@ class Engine:
                 "thread_id": thread}
 
     # ── what the model sees ──
+    def _exposure(self, a: Agent) -> str:
+        """lot 3e: "python" (the kernel is the only tool) or "hybrid". A test account may carry its own (bench arms);
+        a sub-agent follows its root's."""
+        p = (a.root().principal if a.parent_sid else a.principal) or {}
+        if p.get("kind") == "test" and str(p.get("id")) in self.s.exposure_accounts:
+            return self.s.exposure_accounts[str(p.get("id"))]
+        return self.s.exposure
+
+    def _tool_schemas(self, a: Agent) -> list[dict]:
+        if self._exposure(a) != "python" or "python" not in self.registry.tools:
+            return self.registry.schemas()
+        sch = self.registry.tools["python"].schema()
+        fn = sch.get("function", sch)
+        fn["description"] = PYTHON_ONLY + " " + (fn.get("description") or "")
+        return [sch]
+
     def _layout(self, a: Agent) -> str:
         p = a.principal or {}
         if p.get("kind") == "test":   # a test account may carry its own layout (bench arms), then the test layout
@@ -1334,11 +1361,12 @@ class Engine:
             # lot 3c: W.Alter's own documentation replaces the MCP server's module layer; only the server's note on
             # tools reachable through walter_call is kept (it depends on this client's toolset)
             named.append(("walter_doc", a._doc))
-            note = _walter_call_note(self.mcp.instructions or "")
+            note = PYTHON_ONLY_NOTE if self._exposure(a) == "python" else _walter_call_note(self.mcp.instructions or "")
             if note:
                 named.append(("mcp_instructions", note))
         elif self.mcp.instructions:
-            named.append(("mcp_instructions", self.mcp.instructions.strip()))
+            named.append(("mcp_instructions", self.mcp.instructions.strip()
+                          + ("\n\n" + PYTHON_ONLY_NOTE if self._exposure(a) == "python" else "")))
         if v2 and comm:
             profile = "\n\n".join(t for t in (self._read_part(p) for p in self._communication_files(a)) if t)
             if profile:

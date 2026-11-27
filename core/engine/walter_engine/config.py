@@ -105,6 +105,10 @@ class Settings:
     prompt_layout: str = "v1"
     prompt_layout_test: str = ""
     prompt_layout_accounts: dict = field(default_factory=dict)   # test account id → layout (A/B arms of the bench)
+    # lot 3e (2026-11-27): how capabilities reach the model. "hybrid" = direct tools + walter_call + python;
+    # "python" = 100 % Unharnessed, the python kernel is the model's only tool (every capability through tools.*)
+    exposure: str = "hybrid"
+    exposure_accounts: dict = field(default_factory=dict)        # test account id → exposure (A/B arms of the bench)
     # lot 3c: documentation layer of the v2 layout ("mcp" | "s1" | "s2"; a layout "v2+s2" overrides it) and the skills
     # map (a layout suffix "-skills" drops it)
     doc_layer: str = "mcp"
@@ -181,6 +185,8 @@ def load(state: Path | None = None) -> Settings:
         system_blocks=bool(n.get("system_blocks", True)),
         prompt_layout=str(n.get("prompt_layout", "v1")), prompt_layout_test=str(n.get("prompt_layout_test", "")),
         prompt_layout_accounts={str(k): str(v) for k, v in dict(n.get("prompt_layout_accounts", {})).items()},
+        exposure=str(n.get("exposure", "hybrid")),
+        exposure_accounts={str(k): str(v) for k, v in dict(n.get("exposure_accounts", {})).items()},
         doc_layer=str(n.get("doc_layer", "mcp")), skills_map=bool(n.get("skills_map", True)),
         communication=bool(n.get("communication", False)),
         owner_rules=str(n.get("owner_rules", "pack")),
