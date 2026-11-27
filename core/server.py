@@ -29,7 +29,10 @@ import sys
 from pathlib import Path
 
 import httpx
+from typing import Annotated
+
 from mcp.server.fastmcp import Context, FastMCP
+from pydantic import Field
 
 CLIENT_TAG = os.environ.get("WALTER_CLIENT_TAG", "claude")
 # Machine services Walter relies on without owning them; module services come from the registry.
@@ -220,8 +223,14 @@ def _walter_memory(*args: str, timeout: float = 600) -> str:
 TASK_STATUSES = ("open", "suspended", "done", "failed", "cancelled")
 
 
+def _choices(*values: str):
+    """A parameter whose allowed values are a short closed set: declared in the tool's input schema (its contract),
+    which the capability maps generated from it show (27/11); the function still checks and answers the valid ones."""
+    return Annotated[str, Field(json_schema_extra={"enum": list(values)})]
+
+
 @mcp.tool()
-def tasks_list(status: str = "", thread_id: str = "", limit: int = 10) -> str:
+def tasks_list(status: _choices(*TASK_STATUSES, "all") = "", thread_id: str = "", limit: int = 10) -> str:
     """The owner's durable tasks (objectives that outlive a turn, a session, an interface or a restart): what is in
     progress or suspended, with its progress, the number of attempts and how the last one ended. Use it to resume
     work or to answer "où en est… ?". status: open | suspended | done | failed | cancelled | all (default: the active
@@ -272,7 +281,7 @@ def task_create(goal: str, entity_id: str = "", person: str = "", due_at: str = 
 
 
 @mcp.tool()
-def task_update(task_id: str, status: str = "", progress: dict | None = None, result: dict | None = None,
+def task_update(task_id: str, status: _choices(*TASK_STATUSES) = "", progress: dict | None = None, result: dict | None = None,
                 note: str = "") -> str:
     """Record where a durable task stands, so it can be resumed later from any conversation: `progress` (what is done,
     what remains, the next step — merged key by key), a short `note` (a finding, a failure and its cause), `result`
@@ -375,12 +384,22 @@ def person_lookup(name: str) -> str:
     return _walter_memory("social", "person", name, "--cloud-safe", timeout=60)
 
 
+# Allowed values carried by the tool's contract (its input schema), so every map generated from it can show them;
+# the tool itself also reads the common spellings (desc/asc), 27/11.
+EventsOrder = _choices("newest", "oldest")
+
+
 @mcp.tool()
 def memory_events(text: str = "", source: str = "", event_type: str = "", thread_id: str = "", since: str = "",
-                  until: str = "", order: str = "newest", event_id: str = "", limit: int = 20, cursor: str = "") -> str:
+                  until: str = "", order: EventsOrder = "newest", event_id: str = "", limit: int = 20,
+                  cursor: str = "") -> str:
     """Read W.Alter's canonical event history (what actually happened: messages, conversations with W.Alter,
-    e-mails, calendar, files...). Exact substring search on content; filters: source (hermes, beeper, gmail,
-    calendar, vault, claude_code, codex, dsh…), event_type (message.received, message.sent…), thread_id,
+    e-mails, calendar, files...). Exact substring search on content; filters: source = one source (beeper, gmail,
+    calendar, vault, walter, claude_code, codex…) or a group: "people" = the owner's conversations with others (every
+    source but W.Alter's agents), "agents" = his conversations with W.Alter's agents (there his own prompts are
+    message.received); event_type = an exact type (message.received = written to the owner, message.sent = by him,
+    email.received…) or a family ("message.*" = every message.<x> type); an unknown type answers the valid names.
+    « Mes derniers messages reçus » = event_type="message.received", source="people". thread_id,
     since/until (ISO). order="oldest" for the first events (« le tout premier message sur X »), "newest" by default.
     Answer = compact list (event_id, date, source, a window of the content around `text`); event_id="…" (or
     "event:…") returns that one event in full, with `typed_ref` and `reply_to_event_id` when the replied message is
@@ -388,10 +407,10 @@ def memory_events(text: str = "", source: str = "", event_type: str = "", thread
     text}] — e.g. a voice note's transcript, a PDF's text (vault_get for the bytes, vault_search(thread=…) for all the
     files of a conversation). Use memory_search for synthesised knowledge, this for the original record. Rows follow
     Walter Memory's privacy policy for cloud readers (the owner's cloud ceiling); credentials are never exposed."""
-    if order not in ("newest", "oldest"):
-        return json.dumps({"error": "order must be newest or oldest"})
-    args = ["events", "--limit", str(max(1, min(int(limit), 200))), "--cloud-safe",
-            "--order", "asc" if order == "oldest" else "desc"]
+    o = {"newest": "desc", "desc": "desc", "oldest": "asc", "asc": "asc"}.get(str(order or "newest").strip().lower())
+    if not o:
+        return json.dumps({"error": "order: newest (or desc) | oldest (or asc)"})
+    args = ["events", "--limit", str(max(1, min(int(limit), 200))), "--cloud-safe", "--order", o]
     for flag, value in (("--text", text), ("--source", source), ("--type", event_type), ("--thread", thread_id),
                         ("--since", since), ("--until", until), ("--id", event_id), ("--cursor", cursor)):
         if value:
@@ -452,7 +471,8 @@ def logs_get(session: str = "", seq: int = -1, ref: str = "") -> str:
 
 
 @mcp.tool()
-def vault_search(text: str = "", kind: str = "", source: str = "", thread: str = "", event_id: str = "",
+def vault_search(text: str = "", kind: _choices("image", "screenshot", "video", "audio", "document", "archive") = "",
+                 source: str = "", thread: str = "", event_id: str = "",
                  since: str = "", until: str = "", limit: int = 20) -> str:
     """Search the Raw Vault: every raw file of the user's life that is not text (photos, pictures, screenshots,
     videos, voice notes, scanned or received documents: quotes, invoices, PDFs). Matches file names and derived text (OCR/transcripts/captions); empty text lists
@@ -493,7 +513,8 @@ def vault_put(path: str, source: str = "", captured_at: str = "", links: list[st
 
 
 @mcp.tool()
-def browser_session(site: str, session: str = "", verify: bool = True, engine: str = "camoufox") -> str:
+def browser_session(site: str, session: str = "", verify: bool = True,
+                    engine: _choices("camoufox", "chromium") = "camoufox") -> str:
     """Open (or refresh) a Camoufox browser session logged in as the owner on a site (google, meta, linkedin, x…; see
     browser_sites), so you can use a web interface on the owner's behalf. Their current Brave cookies are copied from his Mac,
     decrypted and injected server-side: only metadata comes back (cookie counts, authenticated yes/no), never a value.

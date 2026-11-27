@@ -99,6 +99,9 @@ def purpose(description: str, limit: int = 90) -> str:
     return first.rstrip(" ,;:")
 
 
+ENUM_MAX, ENUM_VALUE_CHARS = 6, 12       # a closed set shown in a signature: at most 6 values of at most 12 chars
+
+
 def _short(name: str) -> str:
     """A tool as Python names it: Walter tools by their short name (`mcp__walter__memory_search` → `memory_search`)."""
     return name.removeprefix("mcp__walter__")
@@ -249,11 +252,20 @@ class Registry:
         return f"no tool named {name}{hint} (await tools.search(\"…\") finds one by need)"
 
     def signature(self, t: Tool, optional: int = 5) -> str:
-        """`name(required, optional?, …)`: enough to call a tool from Python without describing it first."""
-        props = list(((t.parameters or {}).get("properties") or {}))
+        """`name(required, optional?, …)`: enough to call a tool from Python without describing it first. A parameter
+        whose contract (input schema) declares a short closed set shows it, `order?: newest|oldest` (owner 27/11: the
+        model guessed order='desc' from the bare name); a long or free set stays the bare name."""
+        schema = (t.parameters or {}).get("properties") or {}
+        props = list(schema)
         req = [p for p in ((t.parameters or {}).get("required") or []) if p in props]
         opt = [p for p in props if p not in req]
-        args = req + [f"{p}?" for p in opt[:optional]] + (["…"] if len(opt) > optional else [])
+
+        def arg(p: str, mark: str = "") -> str:
+            values = (schema.get(p) or {}).get("enum") if isinstance(schema.get(p), dict) else None
+            short = (isinstance(values, list) and 1 < len(values) <= ENUM_MAX
+                     and all(isinstance(v, str) and 0 < len(v) <= ENUM_VALUE_CHARS for v in values))
+            return f"{p}{mark}: {'|'.join(values)}" if short else f"{p}{mark}"
+        args = [arg(p) for p in req] + [arg(p, "?") for p in opt[:optional]] + (["…"] if len(opt) > optional else [])
         return f"{_short(t.name)}({', '.join(args)})"
 
     def capability_map(self, common: tuple | list | None = None) -> str:
