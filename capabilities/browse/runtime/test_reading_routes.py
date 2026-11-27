@@ -159,6 +159,11 @@ class ReadingRoutesTests(unittest.IsolatedAsyncioTestCase):
         routed = await self._go("https://small.test/", READ, body=body)
         self.assertEqual(routed.route, "static-html")
 
+    async def test_a_read_the_probe_cannot_parse_as_json_goes_to_the_browser(self) -> None:
+        routed = await self._go("https://shop4.test/p", READ, body="[broken json <html>")
+        self.assertEqual(routed.route, "camoufox-max")
+        self.assertEqual(self.scrapling.calls, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

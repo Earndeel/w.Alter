@@ -933,9 +933,12 @@ class UniversalRouter:
             if self.fallback_to_webtop and self.webtop is not None:
                 order.append("webtop-cdp")
 
-        if is_json:
-            # Direct JSON endpoint: no browser needed at all (downgrade-first).
+        if is_json and not (reading and self.fallback_to_camoufox):
+            # Direct JSON endpoint: no browser needed at all (downgrade-first). A read the probe could not serve as
+            # JSON (2026-11-27: a shop page whose body began with « [ ») goes to the browser like any page read.
             order = ["scrapling"]
+        elif is_json:
+            order = ["camoufox-max"]
         elif challenge:
             # Challenge/anti-bot: skip bare HTTP, jump straight to stealth.
             order = ["camoufox-max"]
