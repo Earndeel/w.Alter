@@ -406,14 +406,22 @@ def experience(plan: ContextPlan, message: str, fetch=_gateway, at: datetime | N
 
 
 def _gets_memory(plan: ContextPlan) -> bool:
-    return plan.level != "L0" and bool(MEMORY_BUDGET.get(plan.level) or (set(plan.domains) - NO_MEMORY_DOMAINS))
+    return _memory_budget(plan) is not None
 
 
 def _memory_budget(plan: ContextPlan) -> dict | None:
-    """The sections Memory's context assembly is asked for, or None when the plan gets no memory block."""
-    if not _gets_memory(plan):
-        return None
-    return {**(MEMORY_BUDGET.get(plan.level) or MEMORY_BUDGET["L3"]), **NOT_HERE}
+    """The sections Memory's context assembly is asked for, or None when the plan gets no memory block.
+    Proportionate (2026-11-27, Monsieur): the memory a message needs no longer comes with its subject's history —
+    L3/L4 plans read their level's sections; « memory needed » reads the L3 sections at any level, L0 included,
+    without the threads; a personal domain at L1/L2 as before; a taste of the owner alone (personal « preferences »)
+    gets a targeted lookup, `[pack.memory_budget.targeted]`."""
+    if plan.level in MEMORY_BUDGET and plan.level.startswith("L"):
+        return {**MEMORY_BUDGET[plan.level], **NOT_HERE}
+    if "memory" in plan.capabilities or (plan.level != "L0" and set(plan.domains) - NO_MEMORY_DOMAINS):
+        return {**MEMORY_BUDGET["L3"], **NOT_HERE}
+    if "preferences" in (plan.personal or []) and "targeted" in MEMORY_BUDGET:
+        return {**MEMORY_BUDGET["targeted"], **NOT_HERE}
+    return None
 
 
 def _memory_block(message: str, budget: dict) -> Block | None:
@@ -646,7 +654,7 @@ class Prefetch:
         if message != self.message or session_key != self.session_key:
             return {}
         out = {"session_state": self.state} if plan.level != "L0" and continues(plan) else {}
-        if plan.level != "L0" and _memory_budget(plan) == self.memory_budget:
+        if _memory_budget(plan) == self.memory_budget:
             out["memory"] = self.memory
         return out
 
@@ -692,8 +700,10 @@ def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, n
         steps += [("board", lambda: board(plan)), ("session_state", lambda: session_state(plan, message, session_key, socle_rules)),
                   ("subject", lambda: subject(plan))]
     steps += [("tasks", lambda: tasks(plan, session_key=session_key)), ("experience", lambda: experience(plan, message))]
+    if _gets_memory(plan):
+        steps.append(("memory", lambda: memory(plan, message)))
     if plan.level != "L0":
-        steps += [("memory", lambda: memory(plan, message)), ("recent", lambda: recent(session_key, native_history))]
+        steps.append(("recent", lambda: recent(session_key, native_history)))
     if not _gets_memory(plan):
         steps.append(("records", lambda: records(plan, message)))
 

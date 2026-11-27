@@ -66,7 +66,11 @@ Niveaux de contexte :
 | L1 | le dernier échange |
 | L2 | le sujet en aperçu |
 | L3 | le sujet en synthèse + mémoire ciblée |
-| L4 | extensif, multi-étapes |
+| L4 | le sujet en synthèse + une mémoire qui remonte loin (horizon « long ») ; avant le 27/11 : « extensif, multi-étapes » |
+
+Depuis le 27/11, la recherche étendue (`extensive`) ne règle plus que le budget d'exécution (`decision.effort` L4).
+Le bloc mémoire suit `needs`/`personal` à tout niveau. La règle « mémoire ⇒ niveau ≥ L3 » ci-dessous est retirée, avec
+la relation `needs_memory_plan`. Voir le README, § Trois dimensions.
 
 Les 4 plans du lot 1 correspondent à L0-L3.
 
@@ -107,7 +111,7 @@ récent. L'étape E devra ajouter la synthèse, les cumuls journaliers et la sci
 - **Stabilité et cohérence (09/11)** :
   - la décision = moyenne de 3 appels parallèles au même modèle (`llm.decide(samples=3)`) ; l'API échantillonne,
     mêmes entrées → capacité mémoire entre 0,37 et 0,55 sur un même message ;
-  - capacité mémoire ⇒ niveau ≥ L3 : sur 203 tirages des 29 messages du banc, 77 (13 messages) disaient à la fois
+  - (retirée le 27/11) capacité mémoire ⇒ niveau ≥ L3 : sur 203 tirages des 29 messages du banc, 77 (13 messages) disaient à la fois
     « mémoire nécessaire » et « rien au-delà du message / le fil suffit » ;
   - banc `bench/levels.py` (qui envoie désormais l'échange précédent au format du hook, `message/answer`), 2 passes
     avant / 3 après : niveaux justes 19–20/29 → 27–29/29, capacités 11/12 → 11–12/12, rappel 16/18 inchangé,

@@ -33,8 +33,12 @@ LEVELS = {
     "L1": "the last exchange of its thread",
     "L2": "its thread at overview depth (card, recent exchanges)",
     "L3": "its thread at synthesis depth plus targeted memory (people, decisions, other sources)",
-    "L4": "extensive: several sources, history, multi-step retrieval",
+    "L4": "its thread at synthesis depth plus deep memory reaching months or years back",
 }
+# Three independent dimensions (2026-11-27, Monsieur): this context depth (Context), the reasoning tier L1-L3
+# (model_profile.level, the Router) and the execution budget L0-L4 (decision.effort, the Engine). None is derived from
+# another: deep external research gets an L4 budget without the owner's memory, a simple question that needs a deep
+# memory lookup gets that memory without an L4 budget.
 # The four plans measured in lot 1 map onto the first four levels.
 PLAN_TO_LEVEL = {"none": "L0", "last_exchange": "L1", "thread": "L2", "thread_and_memory": "L3"}
 ACTS = ("new", "continue", "approve", "correct", "inform")

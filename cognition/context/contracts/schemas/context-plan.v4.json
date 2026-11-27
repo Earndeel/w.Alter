@@ -68,7 +68,7 @@
         "L3",
         "L4"
       ],
-      "description": "L0: nothing beyond the message: the assistant's tools suffice; L1: the last exchange of its thread; L2: its thread at overview depth (card, recent exchanges); L3: its thread at synthesis depth plus targeted memory (people, decisions, other sources); L4: extensive: several sources, history, multi-step retrieval"
+      "description": "L0: nothing beyond the message: the assistant's tools suffice; L1: the last exchange of its thread; L2: its thread at overview depth (card, recent exchanges); L3: its thread at synthesis depth plus targeted memory (people, decisions, other sources); L4: its thread at synthesis depth plus deep memory reaching months or years back"
     },
     "domains": {
       "type": "array",

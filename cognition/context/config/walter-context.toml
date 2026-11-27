@@ -240,6 +240,17 @@ views = 300
 tasks = 0
 experience = 0
 
+[pack.memory_budget.targeted]       # 2026-11-27: a taste of the owner alone (personal « preferences ») — the knowledge
+profile = 0                         # that matches the message, a little evidence; no people, views or thread. Rollback:
+rules = 0                           # remove this table (preferences then follow personal_needs_memory again, with the
+working = 0                         # relation's « preferences » restored in manifest/decisions.json)
+people = 0
+knowledge = 500
+evidence = 200
+views = 0
+tasks = 0
+experience = 0
+
 [pack.records_budget]
 profile = 0
 rules = 0

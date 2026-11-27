@@ -125,9 +125,18 @@ aussi si le message est un travail à suivre (`decision.work`) : c'est ce qui ou
 Une approbation ou une correction (`act` = `approve` / `correct`) envoyée moins de 30 min après un échange reste dans
 le fil de cet échange (`decision.thread_by = previous_exchange`, le choix du modèle en `thread.alternates`) ; le fil
 du dernier tour est désigné au modèle de décision, et une hésitation sans majorité y laisse la conversation.
-Le plan énonce aussi l'effort du tour (`decision.effort`) : le niveau de contexte dit ce que le modèle doit voir,
-l'effort ce qu'il doit faire (relevé par le palier de texte demandé, L4 pour un travail à mener) ; le moteur en tire
-les plafonds du tour.
+**Trois dimensions indépendantes** (27/11/2026, Monsieur) :
+- la **profondeur de contexte** L0–L4 (`level`, Context) vient du seul plan. L4 = le sujet plus une mémoire qui remonte
+  à des mois ou des années (plan « fil + mémoire », horizon « long ») ;
+- le **palier de raisonnement** L1–L3 (`model_profile.level`, le Router) ;
+- le **budget d'exécution** L0–L4 (`decision.effort`, le moteur, qui en tire les plafonds du tour). Il vient du palier,
+  et passe à L4 pour un travail à mener (`work`) ou une recherche approfondie (`extensive`), sans jamais dépendre du
+  niveau de contexte. Une recherche externe approfondie a donc L4 sans mémoire personnelle, et une question simple
+  qui demande de fouiller la mémoire garde son budget.
+
+La mémoire nécessaire (`needs` = memory) donne le bloc mémoire à tout niveau, sans les fils : la règle qui la
+liait au plan « fil + mémoire » est retirée. Un goût du propriétaire, seul (`personal` = preferences), donne une
+recherche ciblée (`[pack.memory_budget.targeted]`).
 **Réponse dans le délai de l'appelant** (13/11/2026) : l'appelant dit combien de temps il attend
 (`answer_within_ms`, 7 s pour le moteur et le hook) ; le preflight répond avant (`[preflight] answer_within_s`,
 `answer_margin_s`). Les sources du pack sont interrogées ensemble (le pack coûte sa source la plus lente, pas leur

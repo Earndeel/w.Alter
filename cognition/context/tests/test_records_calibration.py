@@ -37,8 +37,10 @@ def test_no_records_block_when_memory_block_runs(monkeypatch):
     monkeypatch.setattr(retrieval, "records", lambda plan, m: retrieval.Block("records", 4, "r"))
     ids = lambda p: [b.id for b in retrieval.gather(p, "x")[0]]          # noqa: E731
     assert ids(_plan(level="L3", caps=("tools", "memory"))) == ["memory"]
-    assert ids(_plan(level="L0", caps=("tools", "memory"))) == ["records"]
-    assert ids(_plan(level="L2", caps=("tools", "memory"), domains=("projects",))) == ["records"]
+    # 2026-11-27: « memory needed » gets the memory block at any level (no longer only through a forced L3)
+    assert ids(_plan(level="L0", caps=("tools", "memory"))) == ["memory"]
+    assert ids(_plan(level="L2", caps=("tools", "memory"), domains=("projects",))) == ["memory"]
+    assert ids(_plan(level="L2", caps=("tools",), domains=("projects",))) == ["records"]
 
 
 def test_session_state_is_layer_two_beyond_l0(monkeypatch):
@@ -73,3 +75,19 @@ def test_lone_unsure_word_gets_no_records(monkeypatch):
     monkeypatch.setattr(ctx, "get_context", lambda *a, **k: {"text": "x", "trace": {}})
     assert retrieval.records(_plan(conf=0.2), "test") is None
     assert retrieval.records(_plan(conf=0.2), "port du proxy mac ?") is not None
+
+
+def test_a_taste_of_the_owner_gets_a_targeted_lookup_not_the_whole_memory():
+    """2026-11-27 (Monsieur): a preference that seems to matter (« quel casque pour moi ? ») is looked up, in
+    proportion — no thread, no extended memory, no L4 budget. The decision relations no longer turn it into
+    « memory needed » and a thread_and_memory plan."""
+    import json
+    from pathlib import Path
+    p = ContextPlan(turn_id="t", thread=ThreadChoice(id=None, new=True), act="new", level="L0", domains=[],
+                    capabilities=["tools", "web"], personal=["preferences"], decision={"confidence": {"plan": 0.9}})
+    b = retrieval._memory_budget(p)
+    assert b["knowledge"] == retrieval.MEMORY_BUDGET["targeted"]["knowledge"] < retrieval.MEMORY_BUDGET["L3"]["knowledge"] + 1
+    assert b["people"] == 0 and b["views"] == 0
+    rel = json.loads((Path(__file__).resolve().parents[1] / "manifest" / "decisions.json").read_text())["relations"]
+    assert "preferences" not in rel["personal_needs_memory"]["if"]["has_any"]
+    assert "needs_memory_plan" not in rel and "extensive_needs_thread" not in rel

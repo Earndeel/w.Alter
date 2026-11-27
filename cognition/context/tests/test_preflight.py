@@ -5,7 +5,7 @@ import types
 
 import pytest
 
-from walter_context import preflight
+from walter_context import preflight, retrieval
 from walter_context.preflight import Exchange, Request, fast_path, run
 
 
@@ -258,15 +258,29 @@ def test_the_effort_of_a_turn_is_not_its_context_level(fake_llm):
     assert run(Request("t", "Compare ces deux formulations et dis laquelle est la plus claire")).decision["effort"] == "L2"
     _full(answers, plan={"choice": "none"}, work={"noul": 0.1}, model_level={"choice": "L1"})
     p = run(Request("t", "Quelle est la capitale de l'Australie, en un mot ?"))
-    assert p.level == "L0" and p.decision["effort"] == "L0"            # a light question keeps the light ceilings
-    _full(answers, plan={"choice": "thread_and_memory"}, work={"noul": 0.1}, model_level={"choice": "L1"})
-    assert run(Request("t", "Rappelle-moi ce qu'on avait dit sur le budget", previous=prev())).decision["effort"] == "L3"
+    assert p.level == "L0" and p.decision["effort"] == "L1"            # a light question keeps the light ceilings
+    # 2026-11-27 (Monsieur): three independent dimensions. A simple question that needs a deep memory lookup sees that
+    # memory and keeps its tier's ceilings; deep external research gets L4 without the owner's memory.
+    _full(answers, plan={"choice": "thread_and_memory"}, horizon={"choice": "long"}, work={"noul": 0.1},
+          model_level={"choice": "L1"})
+    p = run(Request("t", "Rappelle-moi ce qu'on avait dit sur le budget", previous=prev()))
+    assert p.level == "L4" and p.decision["effort"] == "L1"
+    _full(answers, plan={"choice": "none"}, extensive={"noul": 0.8}, work={"noul": 0.1}, model_level={"choice": "L2"})
+    p = run(Request("t", "Compare les offres vidéo de trois fournisseurs, sources à l'appui"))
+    assert p.level == "L0" and p.decision["effort"] == "L4" and p.decision["extensive"] == 0.8
+    assert "memory" not in p.capabilities
 
 
-def test_extensive_search_lifts_a_thread_plan_to_l4(fake_llm):
+def test_extensive_search_is_a_budget_and_deep_memory_a_context_level(fake_llm):
+    """2026-11-27: « extensive » sizes the work (decision.effort), not the context; L4 context = the subject plus
+    memory reaching far back (plan thread_and_memory, horizon long)."""
     calls, answers = fake_llm
     _full(answers, extensive={"noul": 0.8})
-    assert run(Request("t", "retrouve tout ce qu'on a décidé sur la mémoire depuis septembre", previous=prev())).level == "L4"
+    p = run(Request("t", "retrouve tout ce qu'on a décidé sur la mémoire depuis septembre", previous=prev()))
+    assert p.level == "L2" and p.decision["effort"] == "L4"
+    _full(answers, plan={"choice": "thread_and_memory"}, horizon={"choice": "long"})
+    p = run(Request("t", "retrouve tout ce qu'on a décidé sur la mémoire depuis septembre", previous=prev()))
+    assert p.level == "L4" and p.decision["effort"] == "L2"
 
 
 def test_router_answers_are_cached_and_refreshed_off_the_message_path(tmp_path, monkeypatch):
@@ -363,14 +377,17 @@ def test_memory_needed_lifts_the_plan_to_the_level_that_carries_memory(fake_llm)
     answers.update({"act": {"choice": "new"}, "plan": {"choice": "none", "confidence": 0.6},
                     "cap_memory": {"noul": 0.8}})
     p = run(Request(turn_id="t", message="Qui décide si un message que je reçois mérite une notification ?"))
-    assert p.level == "L3" and "memory" in p.capabilities
+    # 2026-11-27: memory needed no longer lifts the plan to L3 (no threads with it): the memory block comes at L0
+    assert p.level == "L0" and "memory" in p.capabilities
+    assert retrieval._memory_budget(p)["knowledge"] == retrieval.MEMORY_BUDGET["L3"]["knowledge"]
     kw = calls["decide"][0][2]                  # several samples, averaged or hedged (17/11 bench: same plans)
     assert kw["samples"] == preflight.DECISION_SAMPLES >= 2
     assert kw.get("sampling", "mean") == preflight.DECISION_SAMPLING
     answers["cap_memory"] = {"noul": 0.2}
     assert run(Request(turn_id="t2", message="Traduis « bonjour » en espagnol")).level == "L0"
     answers.update({"plan": {"choice": "thread_and_memory"}, "extensive": {"noul": 0.9}, "cap_memory": {"noul": 0.9}})
-    assert run(Request(turn_id="t3", message="Fais le point complet sur mes projets")).level == "L4"
+    p = run(Request(turn_id="t3", message="Fais le point complet sur mes projets"))
+    assert p.level == "L3" and p.decision["effort"] == "L4"
 
 
 def test_the_answer_comes_within_the_time_the_caller_waits(fake_llm, monkeypatch, tmp_path):
@@ -496,11 +513,12 @@ def test_set_3_reading_maps_plans_to_c_levels_with_the_floor():
          "model_level": {"choice": "L2", "confidence": 0.7}, "doc_memory": {"noul": 0.8}, "doc_raw_vault": {"noul": 0.2},
          "work": {"noul": 0.6}}
     out = preflight.read_v3(a, Request("t", "x"), MODS)
-    assert (out["C"], out["L"], out["docs"], out["work"], out["handling"]) == ("C4", "L2", ["memory"], "yes", "answer")
+    assert (out["C"], out["L"], out["docs"], out["work"], out["handling"]) == ("C2", "L2", ["memory"], "yes", "answer")
     assert out["confidence"]["doc_raw_vault"] == 0.8 and "resume" not in out
     near = Request("t", "ok", previous=prev())                       # within the floor window: C0 becomes C1
     assert preflight.context_level("none", None, near) == "C1" and preflight.context_level("none", None) == "C0"
-    assert preflight.context_level("thread_and_memory", 0.2) == "C3"
+    assert preflight.context_level("thread_and_memory", "medium") == "C3"
+    assert preflight.context_level("thread_and_memory", "long") == "C4"
 
 
 def test_with_no_previous_exchange_there_is_nothing_to_approve_or_correct(fake_llm):

@@ -45,20 +45,28 @@ PLANS = {"none": "nothing beyond the new message: the assistant's tools suffice"
          "thread": "more of its subject's history: earlier decisions, other sessions or tools",
          "thread_and_memory": "its subject plus long-term memory: people, past events, other sources"}
 PLAN_LEVEL = {"none": "L0", "last_exchange": "L1", "thread": "L2", "thread_and_memory": "L3"}
+EXTENSIVE_QUESTION = ("Does the work need an extensive search or investigation, carried out while answering: many "
+                      "sources, several rounds of searching, reading, checking or comparing? How much of the owner's "
+                      "own context it needs is asked separately.")
 RESUME_QUESTION = ("A thread shows a task of the owner still open or suspended. Does the new message ask to carry on, "
                    "resume or finish that task, rather than ask something else or start a different piece of work?")
 WORK_MIN = 0.5                          # decision.work at or above: work to carry out and follow (a durable task)
-EFFORT_BY_TIER = {"L2": "L2", "L3": "L3"}                # the text tier the request asks for → the least effort level
+EFFORT_BY_TIER = {"L1": "L1", "L2": "L2", "L3": "L3"}   # the text tier the request asks for → its effort level
+EXTENSIVE_MIN = 0.5                     # decision.extensive at or above: a deep search or investigation to carry out
 
 
-def effort(level: str, model_level: str | None, work: float | None) -> str:
-    """The ceilings the engine gives the turn (`decision.effort`, SOCLE A7). The plan's level says what the model
-    must SEE, not how much it must DO: a request can need nothing beyond its own message (L0) and still be a long
-    piece of work (three delegated evaluations and a file to write — cut short at L0 ceilings on 2026-11-12). So:
-    the context level, raised to the difficulty the plan states (text tier L2 / L3), and to L4 — the general
-    ceilings — for work to carry out and follow."""
-    floor = "L4" if isinstance(work, (int, float)) and work >= WORK_MIN else EFFORT_BY_TIER.get(model_level or "", "L0")
-    return max(level, floor, key=list(LEVELS).index)
+def effort(model_level: str | None, work: float | None, extensive: float | None = None) -> str:
+    """The ceilings the engine gives the turn (`decision.effort`, SOCLE A7): how much the model may DO, from what the
+    work is, never from how much context it must SEE (2026-11-27, Monsieur: three independent dimensions — the
+    context level used to be a floor here, so a comparison planned « thread and memory » for one taste of the owner
+    got the general L4 ceilings). The text tier (L1-L3) sets the level; work to carry out and follow (2026-11-12:
+    three delegated evaluations cut short at L0 ceilings) and a deep search or investigation — external research
+    with many sources and rounds, which needs no personal memory — get L4, the general ceilings."""
+    if isinstance(work, (int, float)) and work >= WORK_MIN:
+        return "L4"
+    if isinstance(extensive, (int, float)) and extensive >= EXTENSIVE_MIN:
+        return "L4"
+    return EFFORT_BY_TIER.get(model_level or "", "L1")
 
 WORD = re.compile(r"[a-zà-ÿ0-9][a-zà-ÿ0-9'’\-]+", re.I)
 SHORT = re.compile(r"^\s*(oui|ok|okay|non|vas[- ]?y|go|parfait|merci|d'?accord|valid|fais[- ]le|c'?est bon|top|"
@@ -288,9 +296,7 @@ def questions(req: Request) -> tuple[dict, dict]:
                  "instructions": "What does the new message do, given the previous exchange?" + NOTE},
          "plan": {"type": "choice", "criteria": PLANS,
                   "instructions": "What must the assistant see, beyond the new message, to answer it well?" + NOTE},
-         "extensive": {"type": "noul", "instructions": (
-             "Does answering need an extensive search: several sources, a long history, several rounds of looking "
-             "things up?" + NOTE)},
+         "extensive": {"type": "noul", "instructions": EXTENSIVE_QUESTION + NOTE},
          "domain": {"type": "choice", "criteria": DOMAIN_CRITERIA,
                     "instructions": "Which kind of stored knowledge about the owner matters most here?" + NOTE},
          "horizon": {"type": "choice", "criteria": HORIZON_CRITERIA,
@@ -640,11 +646,11 @@ def questions_v3(req: Request, modules: list[dict] | None = None) -> tuple[dict,
     return state, q
 
 
-def context_level(plan_choice: str | None, extensive: float | None, req: Request | None = None) -> str:
-    """C0-C4 from the plan question and the extensive yes/no, with the production floor (a message close to the
-    previous exchange sees at least that exchange). Same reading as run() for set 2's L0-L4."""
+def context_level(plan_choice: str | None, horizon: str | None, req: Request | None = None) -> str:
+    """C0-C4 from the plan question and the horizon (memory reaching far back = C4), with the production floor (a
+    message close to the previous exchange sees at least that exchange). Same reading as run() for L0-L4."""
     c = C_OF_PLAN.get(plan_choice or "", "C1")
-    if (extensive or 0) >= 0.5 and c in ("C2", "C3"):
+    if c == "C3" and horizon == "long":
         c = "C4"
     prev = req.previous if req else None
     if c == "C0" and prev and prev.age_s is not None and prev.age_s < FLOOR_WINDOW_S:
@@ -659,7 +665,7 @@ def read_v3(a: dict, req: Request | None = None, modules: list[dict] | None = No
     noul = lambda k: (a.get(k) or {}).get("noul")                        # noqa: E731
     mods = [m["module"] for m in (module_lines() if modules is None else modules)]
     out = {"handling": pick("handling"), "act": pick("act"), "thread": pick("thread"),
-           "C": context_level(pick("plan"), noul("extensive"), req), "L": pick("model_level"),
+           "C": context_level(pick("plan"), pick("horizon"), req), "L": pick("model_level"),
            "domain": pick("domain"), "horizon": pick("horizon"),
            "docs": sorted(m for m in mods if (noul(doc_key(m)) or 0) >= 0.5)}
     for k in ("work", "resume"):
@@ -707,12 +713,15 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
         thread = ThreadChoice(id=None, new=True, confidence=conf("thread"))
     else:
         thread = _default_thread(req)
+    domain, horizon = pick("domain"), pick("horizon")
+    # The context depth comes from the plan alone: what the model must see. L4 = the subject plus memory reaching
+    # months or years back (horizon « long »). A deep search to carry out (extensive) is the execution budget's, not
+    # the context's (2026-11-27: it used to raise L2/L3 to L4 and, set aside below a thread, dropped the budget too).
     level = PLAN_LEVEL.get(pick("plan"), "L1")
-    if ((a.get("extensive") or {}).get("noul") or 0) >= 0.5 and level in ("L2", "L3"):
+    if level == "L3" and horizon == "long":
         level = "L4"
     if level == "L0" and req.previous and req.previous.age_s is not None and req.previous.age_s < FLOOR_WINDOW_S:
         level = "L1"                                                       # plan floor
-    domain, horizon = pick("domain"), pick("horizon")
     if SIGNALS == "questions":
         caps = [c for c in CAPABILITIES if c != "tools" and ((a.get("cap_" + c) or {}).get("noul") or 0) >= 0.5]
     else:                     # one several-options question (emulated as one noul per option where not native)
@@ -726,11 +735,9 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
     memory_by = void_thread_memory(a, thread, req) if "memory" not in caps else None
     if memory_by:
         caps.insert(0, "memory")
-    if "memory" in caps and level in ("L0", "L1", "L2"):
-        # coherence (2026-11-09): the model answers « memory needed » and « nothing / the thread suffices » in the same
-        # call (77 of 203 draws, 13 of the 29 bench messages): the specific question wins, the plan
-        # takes the level that carries the owner's memory
-        level = "L3"
+    # « memory needed » no longer raises the level to L3 (coherence rule of 2026-11-09, and its strict relation
+    # needs_memory_plan, removed 2026-11-27): memory and the subject's history are two things; retrieval gives the
+    # memory block a plan's capabilities ask for at any level (retrieval._memory_budget), without the threads.
     # The turn's main model is always the general one at the plan's tier (the owner 2026-11-13, restated 2026-11-15:
     # « le routeur ne doit plus proposer de modèle spécialisé ») : a specialism is a sub-agent the L1/L2/L3 model
     # chooses, never a pre-classification that swaps the whole turn's model. The decision model's answer is ignored.
@@ -772,6 +779,8 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
         seen_media["audio"] = True
     tier = pick("model_level") if pick("model_level") in MODEL_LEVELS else "L1"
     work = round(float(a["work"]["noul"]), 2) if isinstance((a.get("work") or {}).get("noul"), (int, float)) else None
+    ext = (a.get("extensive") or {}).get("noul")
+    extensive = round(float(ext), 2) if isinstance(ext, (int, float)) else None
     resume = round(float(a["resume"]["noul"]), 2) if isinstance((a.get("resume") or {}).get("noul"), (int, float)) else None
     plan = ContextPlan(
         turn_id=req.turn_id, thread=thread, act=act, level=level,
@@ -781,7 +790,8 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
         decision={"model": res.get("model"), "ms": round((time.perf_counter() - t0) * 1000),
                   **({"signals": traced} if traced else {}),
                   **({"parts": [p.get("model") for p in res["parts"]]} if len(res.get("parts") or ()) > 1 else {}),
-                  **({"work": work} if work is not None else {}), "effort": effort(level, tier, work),
+                  **({"work": work} if work is not None else {}), "effort": effort(tier, work, extensive),
+                  **({"extensive": extensive} if extensive is not None else {}),
                   **({"resume": resume} if resume is not None else {}),
                   **({"samples": res["samples"]} if res.get("samples") else {}),
                   **({"thread_by": by} if by else {}), **({"act_by": act_by} if act_by else {}), **({"memory_by": memory_by} if memory_by else {}),
