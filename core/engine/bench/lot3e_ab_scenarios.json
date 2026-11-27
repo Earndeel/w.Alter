@@ -1,0 +1,295 @@
+{
+ "_doc": "Banc comparatif lot 3e (27/11/2026) : architecture hybride (outils directs + walter_call + python) contre 100 % Unharnessed (python seul). 20 conversations en 10 familles : R1 raisonnement sans outil, R2 opération simple, R3 recherche web, R4 mémoire, R5 capacité peu connue, R6 orchestration, R7 traitement de données, R8 génération multimodale, R9 délégation, R10 plusieurs tours. Repris du banc payload sauf x_*. Rien n'est envoyé à personne.",
+ "scenarios": [
+  {
+   "id": "f1_calcul",
+   "family": "R1",
+   "turns": [
+    "combien font 17 % de 240 ?"
+   ],
+   "checks": [
+    {
+     "answer_any": [
+      "40,8",
+      "40.8"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "f7_desaccord",
+   "family": "R1",
+   "interface": "web",
+   "turns": [
+    "Je pense que réécrire tout Walter en Rust réglerait nos problèmes de lenteur. Bonne idée, non ?"
+   ],
+   "checks": [
+    {
+     "answer_regex_none": "(?i)\\b(tu|toi|t'es|t'as)\\b"
+    }
+   ],
+   "expect": "Avis indépendant, sans flatterie : la lenteur vient surtout des appels de modèles et du réseau, pas du langage ; une réécriture complète coûterait cher pour peu de gain. Une recommandation claire (mesurer, cibler les points lents), éventuellement des alternatives."
+  },
+  {
+   "id": "f6_ecriture",
+   "family": "R2",
+   "turns": [
+    "Crée /tmp/bench-payload/auto/notes.txt avec la date du jour et la liste des fichiers de /tmp/bench-payload/proj."
+   ],
+   "checks": [
+    {
+     "file_nonempty": "/tmp/bench-payload/auto/notes.txt"
+    },
+    {
+     "no_approval": true
+    }
+   ],
+   "tool_expected": true,
+   "expect": "Walter agit seul (aucune demande d'accord), crée le fichier et le confirme brièvement."
+  },
+  {
+   "id": "f7_execution",
+   "family": "R2",
+   "interface": "web",
+   "turns": [
+    "Supprime les fichiers .tmp du dossier /tmp/bench-payload/clean2."
+   ],
+   "checks": [
+    {
+     "path_absent": [
+      "/tmp/bench-payload/clean2/a.tmp",
+      "/tmp/bench-payload/clean2/b.tmp"
+     ]
+    },
+    {
+     "path_exists": [
+      "/tmp/bench-payload/clean2/keep.txt"
+     ]
+    },
+    {
+     "no_approval": true
+    },
+    {
+     "answer_regex_none": "(?i)\\b(tu|toi|t'es|t'as)\\b"
+    }
+   ],
+   "tool_expected": true,
+   "expect": "Instruction explicite : supprime a.tmp et b.tmp sans redemander confirmation, garde keep.txt, et le confirme brièvement."
+  },
+  {
+   "id": "f4_web",
+   "family": "R3",
+   "turns": [
+    "Cherche sur le web la dernière version stable de Python, sa date de sortie et une source."
+   ],
+   "tool_expected": true
+  },
+  {
+   "id": "f3_meteo",
+   "family": "R3",
+   "turns": [
+    "Quel temps fera-t-il à Paris demain ?"
+   ],
+   "tool_expected": true
+  },
+  {
+   "id": "f2_budget_tests",
+   "family": "R4",
+   "turns": [
+    "Quel budget ai-je fixé pour les tests payants ?"
+   ],
+   "expect": "2 € par 24 heures pour les tests et les scénarios du moteur en direct ; vérifier `walter-llm test-budget` avant."
+  },
+  {
+   "id": "f2_sagora",
+   "family": "R4",
+   "turns": [
+    "C'est quoi Sagora, et est-ce que c'est en ligne ?"
+   ],
+   "expect": "L'application de streaming familiale de Monsieur (base Stremio/AIOStreams), dans /apps/sagora (GitHub Earndeel/sagora), en ligne sur sagora.walter-ai.cloud."
+  },
+  {
+   "id": "f3_vault",
+   "family": "R5",
+   "turns": [
+    "De quand date le dernier fichier enregistré dans le Raw Vault ? Donne juste la date."
+   ],
+   "tool_expected": true
+  },
+  {
+   "id": "f8_decision_live",
+   "family": "R5",
+   "interface": "web",
+   "tool_expected": true,
+   "turns": [
+    "Quel modèle le Router utilise-t-il en ce moment pour le poste decision ?"
+   ],
+   "expect": "État vivant à vérifier par un outil : D1.2 Ultra (Liquid AI), choix épinglé (au 24/11/2026)."
+  },
+  {
+   "id": "f4_images",
+   "family": "R6",
+   "turns": [
+    "Liste les modèles que le Router a choisis pour les postes image et écris-les dans /tmp/bench-payload/images.md, une ligne par poste."
+   ],
+   "checks": [
+    {
+     "file_nonempty": "/tmp/bench-payload/images.md"
+    }
+   ],
+   "tool_expected": true
+  },
+  {
+   "id": "f4_fix_test",
+   "family": "R6",
+   "turns": [
+    "Dans /tmp/bench-payload/proj, un test échoue. Trouve la cause, corrige le code (pas le test) et vérifie que les tests passent."
+   ],
+   "checks": [
+    {
+     "pytest_passes": "/tmp/bench-payload/proj"
+    },
+    {
+     "file_unchanged": "/tmp/bench-payload/proj/test_textutil.py"
+    }
+   ],
+   "tool_expected": true
+  },
+  {
+   "id": "f4_logs_llm",
+   "family": "R7",
+   "turns": [
+    "Analyse la dernière heure du journal de walter-llm : nombre d'appels, erreurs, modèle le plus utilisé."
+   ],
+   "tool_expected": true
+  },
+  {
+   "id": "f4_sous_agent",
+   "family": "R9",
+   "turns": [
+    "Fais rédiger par un sous-agent une présentation de W.Alter en 5 lignes pour un nouvel arrivant, puis relis-la et donne-moi la version finale."
+   ],
+   "checks": [
+    {
+     "tool_any": [
+      "subagent"
+     ]
+    }
+   ],
+   "tool_expected": true
+  },
+  {
+   "id": "f5_correction",
+   "family": "R10",
+   "turns": [
+    "Quelle est la capitale de l'Australie ?",
+    "Non, je voulais dire la plus grande ville."
+   ],
+   "checks": [
+    {
+     "turn": 2,
+     "answer_any": [
+      "Sydney"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "f5_dossiers",
+   "family": "R10",
+   "turns": [
+    "Propose trois noms de dossier pour ranger les résultats d'un banc de mesure, à créer dans /tmp/bench-payload/dirs.",
+    "Ok vas-y pour le premier."
+   ],
+   "checks": [
+    {
+     "turn": 2,
+     "dir_has_child": "/tmp/bench-payload/dirs"
+    }
+   ]
+  },
+  {
+   "id": "x_edgewise",
+   "family": "R6",
+   "tool_expected": true,
+   "turns": [
+    "Vérifie si edgewise.walter-ai.cloud répond, puis écris dans /tmp/bench-payload/auto/edgewise.txt le code HTTP obtenu et l'heure de la vérification."
+   ],
+   "checks": [
+    {
+     "file_nonempty": "/tmp/bench-payload/auto/edgewise.txt"
+    },
+    {
+     "no_approval": true
+    }
+   ]
+  },
+  {
+   "id": "x_ventes",
+   "family": "R7",
+   "tool_expected": true,
+   "turns": [
+    "Dans /tmp/bench-payload/data/ventes.csv, quel produit a le plus gros chiffre d'affaires total (quantité × prix), et de combien ? Donne aussi le total des trois produits."
+   ],
+   "checks": [
+    {
+     "answer_any": [
+      "tapis"
+     ]
+    },
+    {
+     "answer_any": [
+      "1200"
+     ]
+    },
+    {
+     "answer_any": [
+      "2742,5",
+      "2742.5"
+     ]
+    }
+   ],
+   "expect": "tapis : 1 200 € ; lampe 925 € ; vase 617,5 € ; total 2 742,5 €."
+  },
+  {
+   "id": "x_affiche",
+   "family": "R8",
+   "tool_expected": true,
+   "turns": [
+    "Génère une image d'affiche simple pour une soirée jeux de société samedi soir, et enregistre-la dans /tmp/bench-payload/auto/ (fichier image)."
+   ],
+   "checks": [
+    {
+     "dir_has_file_suffix": {
+      "dir": "/tmp/bench-payload/auto",
+      "suffix": [
+       ".png",
+       ".jpg",
+       ".jpeg",
+       ".webp"
+      ]
+     }
+    },
+    {
+     "no_approval": true
+    }
+   ],
+   "expect": "Une vraie image générée par le modèle d'image du Router (pas un dessin en code), enregistrée dans le dossier demandé, chemin donné."
+  },
+  {
+   "id": "x_parallele",
+   "family": "R9",
+   "tool_expected": true,
+   "turns": [
+    "Confie à deux sous-agents, en parallèle : l'un résume en deux phrases le code de /tmp/bench-payload/proj/textutil.py, l'autre liste les tests de /tmp/bench-payload/proj/test_textutil.py. Puis donne-moi les deux résultats."
+   ],
+   "checks": [
+    {
+     "tool_any": [
+      "subagent"
+     ]
+    }
+   ]
+  }
+ ]
+}

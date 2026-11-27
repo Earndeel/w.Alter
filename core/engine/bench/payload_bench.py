@@ -41,7 +41,13 @@ import httpx
 HERE = Path(__file__).resolve().parent
 API = "http://127.0.0.1:8895/v1"
 PRINCIPAL = {"kind": "test", "id": "bench-payload"}
-FIX = Path("/tmp/bench-payload")
+FIX = Path(os.environ.get("BENCH_FIX") or "/tmp/bench-payload")   # --fix: one folder per parallel run (lot 3e)
+DEFAULT_FIX = "/tmp/bench-payload"
+SALES_CSV = "produit,mois,quantite,prix_unitaire\n" + "\n".join(
+    f"{p},{m},{q},{u}" for p, m, q, u in [("lampe", "2026-09", 12, 25.0), ("tapis", "2026-09", 3, 120.0),
+                                         ("lampe", "2026-10", 18, 25.0), ("vase", "2026-10", 40, 9.5),
+                                         ("tapis", "2026-10", 2, 120.0), ("vase", "2026-11", 25, 9.5),
+                                         ("lampe", "2026-11", 7, 25.0), ("tapis", "2026-11", 5, 120.0)]) + "\n"
 CANARY = "wbc-7f3a9e21-faux-secret-de-banc"          # a fake value: never a real secret
 JUDGE_ROUTE = {"provider": "codex", "model": "gpt-6.2-sol", "reasoning": "medium"}
 TURN_TIMEOUT_S = 900
@@ -183,6 +189,9 @@ def fixtures() -> dict:
     (FIX / "explain/app.ini").write_text("[app]\nname = banc\ndebug = true\nport = 8080\n")
     for n in ("x.bin", "y.bin"):
         (FIX / "explain/cache" / n).write_text("cache du banc\n")
+    (FIX / "data").mkdir()                               # lot 3e: data processing (tapis 1200 €, lampe 925 €, vase 617,5 €)
+    (FIX / "data/ventes.csv").write_text(SALES_CSV)
+    (FIX / "auto").mkdir()
     watched = ["proj/textutil.py", "proj/test_textutil.py", "explain/archive.sh", "explain/app.ini"]
     return {"test_sha": sha(FIX / "proj/test_textutil.py"), "sha": {str(FIX / n): sha(FIX / n) for n in watched}}
 
@@ -212,7 +221,9 @@ def run_checks(sc: dict, turns: list[dict], fx: dict, walter_session: str) -> li
         tr = turns[min(int(c.get("turn", len(turns))), len(turns)) - 1] if turns else {}
         ans = (tr.get("text") or "").lower()
         if "answer_any" in c:
-            ok = any(x.lower() in ans for x in c["answer_any"])
+            # 27/11: thousands separators (space, no-break or narrow no-break) never decide a check
+            flat = re.sub(r"(?<=\d)[\s\u00a0\u202f](?=\d)", "", ans)
+            ok = any(x.lower() in ans or re.sub(r"(?<=\d)\s(?=\d)", "", x.lower()) in flat for x in c["answer_any"])
             name = "answer_any"
         elif "file_nonempty" in c:
             p = Path(c["file_nonempty"])
@@ -247,6 +258,11 @@ def run_checks(sc: dict, turns: list[dict], fx: dict, walter_session: str) -> li
             ok, name = answer_lang(tr.get("text") or "") == c["answer_lang"], "answer_lang"
         elif "max_count" in c:
             ok, name = (tr.get("text") or "").count(c["max_count"]["word"]) <= int(c["max_count"]["max"]), "max_count"
+        elif "dir_has_file_suffix" in c:                  # lot 3e: a generated file of one of these types
+            dd = Path(c["dir_has_file_suffix"]["dir"])
+            sfx = tuple(c["dir_has_file_suffix"]["suffix"])
+            ok = dd.is_dir() and any(x.is_file() and x.stat().st_size > 0 and x.suffix.lower() in sfx for x in dd.iterdir())
+            name = "dir_has_file_suffix"
         elif "path_exists" in c:
             ok, name = all(Path(x).exists() for x in c["path_exists"]), "path_exists"
         elif "path_absent" in c:
@@ -279,6 +295,21 @@ def budget() -> dict:
         return json.loads(subprocess.run(["walter-llm", "test-budget"], capture_output=True, text=True, timeout=30).stdout)
     except Exception:  # noqa: BLE001
         return {}
+
+
+def turn_capabilities(walter_session: str, request_id: str) -> tuple[list[str], int]:
+    """lot 3e: every capability the turn called, direct or from Python (nested), in order — `python` itself is
+    counted apart (cells), so both exposures are scored on the same capability list."""
+    n = turn_no_of(walter_session, request_id)
+    names, cells = [], 0
+    for e in read_jsonl(session_file(walter_session)):
+        dd = e.get("data") or {}
+        if e.get("type") == "tool/call" and dd.get("turn") == n:
+            if dd.get("name") == "python":
+                cells += 1
+            else:
+                names.append(dd.get("name"))
+    return names, cells
 
 
 def play_turn(api: Api, sid: str, text: str, cancel_after: float | None) -> dict:
@@ -316,6 +347,8 @@ def play_turn(api: Api, sid: str, text: str, cancel_after: float | None) -> dict
 def cmd_run(a) -> int:
     scen_file = scenarios_path(a.scenarios)
     scen = load_scenarios(scen_file)
+    if str(FIX) != DEFAULT_FIX:                          # this run's own fixture folder, in messages and checks alike
+        scen = json.loads(json.dumps(scen, ensure_ascii=False).replace(DEFAULT_FIX, str(FIX)))
     if a.only:
         keep = [x.strip() for x in a.only.split(",") if x.strip()]
         scen = [s for s in scen if any(s["id"].startswith(k) for k in keep)]
@@ -326,7 +359,7 @@ def cmd_run(a) -> int:
         return 2
     meta = {"label": a.label, "started": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "passes": a.passes,
             "scenarios": [s["id"] for s in scen], "scenarios_file": str(scen_file), "budget_before": budget(),
-            "note": a.note}
+            "note": a.note, "level": a.level or None, "fix": str(FIX)}
     append(d / "meta.jsonl", meta)
     # lot 3a: A/B arms played scenario by scenario, alternating which goes first (same hour, same load), each arm on
     # its own test account (the engine maps it to a prompt layout) and in its own label
@@ -348,7 +381,7 @@ def cmd_run(a) -> int:
                 fx = fixtures()                 # every run starts from the same files (the other arm may have changed them)
                 conv = f"bench-{lb}-{stamp}-p{p}-{sc['id']}".replace("_", "-")[:100]
                 o = api.op(op="session.open", interface=sc.get("interface", "api"), conversation=conv,
-                           principal={"kind": "test", "id": acct})
+                           principal={"kind": "test", "id": acct}, **({"level": a.level} if a.level else {}))
                 if o.get("error"):
                     append(dirs[lb] / "runs.jsonl", {"label": lb, "pass": p, "scenario": sc["id"], "error": o})
                     continue
@@ -356,6 +389,8 @@ def cmd_run(a) -> int:
                 for i, text in enumerate(sc["turns"], 1):
                     tr = play_turn(api, o["session_id"], text, sc.get("cancel_after_s") if i == len(sc["turns"]) else None)
                     tr["turn_index"] = i
+                    tr["tools_direct"] = tr.get("tools") or []
+                    tr["tools"], tr["python_cells"] = turn_capabilities(o["walter_session"], tr["request_id"])
                     turns.append(tr)
                     time.sleep(1)
                 checks = run_checks(sc, turns, fx, o["walter_session"])
@@ -564,6 +599,7 @@ def enrich(runs: list[dict]) -> list[dict]:
                 "decision_called": any(r.get("task") == "decision" for r in prep),
                 # outils
                 "tool_calls": ses.get("tool_calls", 0), "tool_errors": ses.get("tool_errors", 0),
+                "python_cells": tr.get("python_cells", 0),
                 "tools": dict(ses.get("tools") or {}),
                 "doc_calls": sum(n for t, n in (ses.get("tools") or {}).items()
                                  if any(x in str(t) for x in ("module_guide", "module_index", "walter_modules"))),
@@ -594,6 +630,11 @@ def summarize(rows: list[dict], runs: list[dict], judged: dict) -> dict:
             "steps": stat([r["steps"] for r in rs]),
             "tool_calls": stat([r["tool_calls"] for r in rs]),
             "tool_calls_sum": sum(r["tool_calls"] for r in rs),
+            "tool_errors_sum": sum(r["tool_errors"] for r in rs),
+            "python_cells_sum": sum(r.get("python_cells") or 0 for r in rs),
+            "steps_sum": sum(r["steps"] + r["sub_steps"] for r in rs),
+            "status_ok": f"{sum(1 for r in rs if r['status'] == 'ok')}/{len(rs)}",
+            "tokens_total": sum(r["prompt_total"] + r["completion_total"] for r in rs),
             "doc_calls_sum": sum(r.get("doc_calls") or 0 for r in rs),
             "wall_s_sum": round(sum(r["wall_s"] or 0 for r in rs if r["status"] != "cancelled"), 1),
             "pack_tokens": stat([r["pack_tokens"] for r in rs]),
@@ -697,6 +738,7 @@ def main() -> int:
     r.add_argument("--passes", type=int, default=3)
     r.add_argument("--only", default="")
     r.add_argument("--max-eur", type=float, default=1.5)
+    r.add_argument("--level", default="", choices=["", "L1", "L2", "L3"], help="pin the model tier of every session")
     r.add_argument("--note", default="")
     r.add_argument("--arms", default="", help="A/B arms played side by side: label=test_account,label=test_account")
     r.add_argument("--scenarios", default="", help="scenarios file (default: payload_scenarios.json here; @instance/... resolved)")
