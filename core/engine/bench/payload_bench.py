@@ -312,6 +312,37 @@ def turn_capabilities(walter_session: str, request_id: str) -> tuple[list[str], 
     return names, cells
 
 
+def turn_evidence(walter_session: str, request_id: str, budget: int = 6000) -> str:
+    """lot 3e: what the turn really did, for the judge — every call in order (direct, from Python, Python cells with
+    their code) with a short excerpt of its arguments and result. Same view for both exposures: a capability list
+    alone hides the work a Python cell does with `bash` or plain code, and the judge then flags it « invented »."""
+    n = turn_no_of(walter_session, request_id)
+    calls, results = [], {}
+    for e in read_jsonl(session_file(walter_session)):
+        dd = e.get("data") or {}
+        if dd.get("turn") != n:
+            continue
+        if e.get("type") == "tool/call":
+            calls.append(dd)
+        elif e.get("type") == "tool/result":
+            results[dd.get("callId")] = dd
+    lines = []
+    for c in calls:
+        args = c.get("arguments") or ""
+        try:
+            parsed = json.loads(args)
+            args = parsed.get("code") if c.get("name") == "python" and isinstance(parsed, dict) else args
+        except Exception:  # noqa: BLE001
+            pass
+        r = results.get(c.get("callId")) or {}
+        err = " (erreur)" if str(r.get("isError")) == "True" else ""
+        pre = "  ↳ " if str(c.get("nested")) == "True" else ""
+        lines.append(f"{pre}{c.get('name')}: {' '.join(str(args).split())[:300]} → "
+                     f"{' '.join(str(r.get('content') or '').split())[:200]}{err}")
+    out = "\n".join(lines)
+    return (out[:budget] + " …") if len(out) > budget else (out or "aucune")
+
+
 def play_turn(api: Api, sid: str, text: str, cancel_after: float | None) -> dict:
     rid = "bench-" + uuid.uuid4().hex[:16]
     t0 = time.time()
@@ -358,6 +389,7 @@ def cmd_run(a) -> int:
         print("engine API not healthy", file=sys.stderr)
         return 2
     meta = {"label": a.label, "started": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "passes": a.passes,
+            "fix": str(FIX),
             "scenarios": [s["id"] for s in scen], "scenarios_file": str(scen_file), "budget_before": budget(),
             "note": a.note, "level": a.level or None, "fix": str(FIX)}
     append(d / "meta.jsonl", meta)
@@ -485,7 +517,8 @@ def judge(sc: dict, run: dict, cache: dict, d: Path) -> dict:
         return cache[key]
     keep = int(sc.get("judge_chars") or 3000)          # 2026-11-24: long comparisons are judged whole, not cut at 3000
     convo = "\n".join(f"[Message {i}] {t}\n[Réponse {i}] {(tr.get('text') or '(aucune réponse)')[:keep]}\n"
-                      f"[Outils utilisés {i}] {', '.join(tr.get('tools') or []) or 'aucun'}"
+                      f"[Actions {i} — appels réels, extraits] "
+                      f"{turn_evidence(run['walter_session'], tr['request_id']) if tr.get('request_id') else 'aucune'}"
                       for i, (t, tr) in enumerate(zip(sc["turns"], run["turns"]), 1))
     expect = f"\nFaits attendus (vérité connue) : {sc['expect']}" if sc.get("expect") else ""
     if sc.get("criteria"):                             # a real request of the owner: what he wanted, from his reactions
@@ -661,6 +694,9 @@ def cmd_report(a) -> int:
         return 1
     recorded = [m.get("scenarios_file") for m in read_jsonl(d / "meta.jsonl") if m.get("scenarios_file")]
     scen = {s["id"]: s for s in load_scenarios(scenarios_path(a.scenarios or (recorded[0] if recorded else None)))}
+    fix = os.environ.get("BENCH_FIX") or next((m["fix"] for m in read_jsonl(d / "meta.jsonl") if m.get("fix")), "")
+    if fix and fix != DEFAULT_FIX:                       # the judge reads the messages the run really sent
+        scen = json.loads(json.dumps(scen, ensure_ascii=False).replace(DEFAULT_FIX, fix))
     judged = {r["key"]: r for r in read_jsonl(d / "judge.jsonl")}
     if not a.no_judge:
         for run in runs:

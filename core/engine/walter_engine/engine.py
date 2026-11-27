@@ -118,7 +118,11 @@ PYTHON_ONLY_NOTE = ("## Using capabilities\n"
                     "a function there: `await tools.memory_search(query=…)`, `await tools.read(file_path=…)`, "
                     "`await tools.subagent(...)`. `await tools.search(\"need\")` finds one, `await tools.describe(name)` "
                     "gives its parameters and effects, `await tools.catalog()` lists them all. Calls follow the same "
-                    "permissions and logs as direct calls; independent ones run together with `asyncio.gather`.")
+                    "permissions and logs as direct calls; independent ones run together with `asyncio.gather`. "
+                    "Before doing by hand what a capability does (an image, a web search, a delegation), look for it: "
+                    "`tools.search` covers every capability, `tools.skills_search` only written procedures. Finish "
+                    "within the turn: await what you start (an image through `walter_run` takes a minute or two) and "
+                    "leave work running in the background only when the owner asks for it.")
 
 
 def _walter_call_note(instructions: str) -> str:
