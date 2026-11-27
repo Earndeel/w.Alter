@@ -272,7 +272,7 @@ class McpError(RuntimeError):
 _READ_PREFIXES = ("memory_context", "memory_recall", "memory_search", "memory_events", "memory_reflect", "memory_view",
                   "person_lookup", "logs_", "vault_search", "vault_get", "skills_", "skill_read", "walter_profile",
                   "walter_health", "walter_modules", "module_", "secret_search", "secret_reference", "walter_route",
-                  "walter_decide", "browser_sites", "walter_plans", "tasks_list", "beeper_read")
+                  "walter_decide", "browser_sites", "tasks_list", "beeper_read")
 
 
 def _read_only(name: str) -> bool:

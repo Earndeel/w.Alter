@@ -46,6 +46,23 @@ class Declarations(unittest.TestCase):
             if "outgoing" in d["effects"]:
                 self.assertEqual(cls, "outgoing", f"{tool} sends outside but the policy does not class it outgoing")
 
+    def test_a_tool_that_changes_something_is_not_classed_read(self):
+        """2026-11-27: walter_plans (records plans) was classed read and devboard_correct had no class. A read-classed
+        tool may only cost money, count its own use, cache a local copy or open a public page."""
+        import sys
+        sys.path.insert(0, str(CORE / "security"))
+        from walter_security import policy
+        doc = policy.load(policy.POLICY, instance_root="/nonexistent-instance")
+        benign = {"audio_transcribe", "memory_reflect", "walter_decide",   # cost only
+                  "skill_read",                                           # usage counter
+                  "vault_get",                                            # local cached copy
+                  "walter_browse"}                                        # opens a public page
+        for tool, d in self.decls.items():
+            cls = policy.classify(doc, f"mcp__walter__{tool}")
+            self.assertNotEqual(cls, "unknown", f"{tool} has no policy class")
+            if cls == "read" and d["effects"] != ["none"]:
+                self.assertIn(tool, benign, f"{tool} declares {d['effects']} but the policy classes it read")
+
     def test_resource_keys_name_real_arguments(self):
         """A lock keyed on an argument the tool does not take would never serialise anything."""
         known ={"beeper_send_message": {"chat_id"}, "task_update": {"task_id"}, "devboard_correct": {"ref"},

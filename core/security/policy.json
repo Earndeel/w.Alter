@@ -66,13 +66,14 @@
       "mcp__walter__walter_decide",
       "mcp__walter__browser_sites",
       "mcp__walter__walter_browse",
-      "mcp__walter__walter_plans",
       "mcp__walter__audio_transcribe",
       "mcp__walter__tasks_list",
       "mcp__walter__beeper_read"
     ],
     "record": [
-      "mcp__walter__task_create"
+      "mcp__walter__task_create",
+      "mcp__walter__walter_plans",
+      "mcp__walter__devboard_correct"
     ],
     "write_local": [
       "write",
