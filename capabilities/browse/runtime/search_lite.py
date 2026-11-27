@@ -28,6 +28,12 @@ from typing import Any
 SEARCH_TIMEOUT = 8.0
 MAX_RESULTS = 8
 
+# Shared pacing (search_pace.py, 27/11): every search process takes its turn in its provider's cadence; temporary
+# errors (429, 5xx, timeouts) are retried a bounded number of times, each retry taking a new turn in the queue.
+MAX_ATTEMPTS = 3
+QUEUE_WAIT = {"brave": 20.0, "ddg": 15.0, "parallel": 20.0}   # longest wait for a turn before taking the fallback
+BACKEND_DEADLINE = {"brave": 30.0, "ddg": 45.0, "parallel": 60.0}  # seconds from the start of the search
+
 
 def _read_env_key(name: str) -> str:
     """Read a key from the Hermes .env without importing python-dotenv."""
@@ -68,7 +74,7 @@ def _grant_key(name: str) -> str:
         return ""
 
 
-def parallel_search(query: str, count: int = 5) -> list[dict[str, str]]:
+def parallel_search(query: str, count: int = 5, on_headers=None) -> list[dict[str, str]]:
     key = _grant_key("PARALLEL_API_KEY")
     if not key:
         raise RuntimeError("PARALLEL_API_KEY is not granted to browse")
@@ -83,6 +89,8 @@ def parallel_search(query: str, count: int = 5) -> list[dict[str, str]]:
         headers={"x-api-key": key, "Content-Type": "application/json", "parallel-beta": PARALLEL_BETA},
     )
     with urllib.request.urlopen(request, timeout=PARALLEL_TIMEOUT) as response:
+        if on_headers:
+            on_headers(response.headers)
         payload = json.loads(response.read().decode("utf-8", errors="replace"))
     results = []
     for item in payload.get("results") or []:
@@ -97,7 +105,7 @@ def parallel_search(query: str, count: int = 5) -> list[dict[str, str]]:
     return results
 
 
-def brave_search(query: str, count: int = 5) -> list[dict[str, str]]:
+def brave_search(query: str, count: int = 5, on_headers=None) -> list[dict[str, str]]:
     key = _read_env_key("BRAVE_SEARCH_API_KEY")
     if not key:
         raise RuntimeError("BRAVE_SEARCH_API_KEY is not configured")
@@ -107,6 +115,8 @@ def brave_search(query: str, count: int = 5) -> list[dict[str, str]]:
         headers={"Accept": "application/json", "X-Subscription-Token": key},
     )
     with urllib.request.urlopen(request, timeout=SEARCH_TIMEOUT) as response:
+        if on_headers:
+            on_headers(response.headers)
         payload = json.loads(response.read().decode("utf-8", errors="replace"))
     results = []
     for item in (payload.get("web") or {}).get("results", []) or []:
@@ -118,7 +128,7 @@ def brave_search(query: str, count: int = 5) -> list[dict[str, str]]:
     return results
 
 
-def ddg_search(query: str, count: int = 5) -> list[dict[str, str]]:
+def ddg_search(query: str, count: int = 5, on_headers=None) -> list[dict[str, str]]:
     """No-key fallback: DuckDuckGo HTML endpoint (lightweight)."""
     params = urllib.parse.urlencode({"q": query, "kl": "us-en"})
     request = urllib.request.Request(
@@ -146,6 +156,46 @@ def ddg_search(query: str, count: int = 5) -> list[dict[str, str]]:
     return results
 
 
+class QueueFull(RuntimeError):
+    """The provider's queue is longer than this search accepts to wait (or its quota is spent)."""
+
+
+def _paced(backend: str, call, deadline: float, notes: dict[str, Any]) -> list[dict[str, str]]:
+    """Run one provider call in its shared cadence; retry temporary errors, each retry in a new turn."""
+    import random
+    import urllib.error
+
+    from search_pace import Pacer
+
+    pacer = Pacer(backend)
+    timeout = PARALLEL_TIMEOUT if backend == "parallel" else SEARCH_TIMEOUT
+    last: Exception | None = None
+    for _ in range(MAX_ATTEMPTS):
+        room = deadline - time.time() - timeout
+        wait = pacer.reserve(max(0.0, min(QUEUE_WAIT.get(backend, 15.0), room)))
+        if wait is None:
+            if last is not None:
+                raise last
+            raise QueueFull(f"{backend}: no turn within the wait this search accepts")
+        if wait > 0:
+            notes["waited_s"] = round(notes.get("waited_s", 0.0) + wait, 2)
+            time.sleep(wait)
+        try:
+            return call(pacer.learn)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429:
+                pacer.refused(exc.headers)
+            elif exc.code < 500:
+                raise
+            last = exc
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            last = exc
+            time.sleep(random.uniform(0.2, 0.8))   # never retry in step with the other searches of a burst
+        notes["retries"] = notes.get("retries", 0) + 1
+    assert last is not None
+    raise last
+
+
 def search_lite(
     query: str,
     *,
@@ -158,26 +208,31 @@ def search_lite(
         {success, query, count, results: [{title, url, snippet}], backend, elapsed_ms}
     """
     started = time.perf_counter()
+    begun = time.time()
+    notes: dict[str, Any] = {}
     used_backend = "none"
     results: list[dict[str, str]] = []
     error: str | None = None
     if backend == "parallel":
         try:
-            results = parallel_search(query, count=count)
+            results = _paced("parallel", lambda learn: parallel_search(query, count=count, on_headers=learn),
+                             begun + BACKEND_DEADLINE["parallel"], notes)
             used_backend = "parallel"
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"[:200]
             results = []
     if backend in ("auto", "brave"):
         try:
-            results = brave_search(query, count=count)
+            results = _paced("brave", lambda learn: brave_search(query, count=count, on_headers=learn),
+                             begun + BACKEND_DEADLINE["brave"], notes)
             used_backend = "brave"
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"[:200]
             results = []
     if not results and backend in ("auto", "ddg"):
         try:
-            results = ddg_search(query, count=count)
+            results = _paced("ddg", lambda learn: ddg_search(query, count=count, on_headers=learn),
+                             begun + BACKEND_DEADLINE["ddg"], notes)
             used_backend = "ddg"
             error = None
         except Exception as exc:
@@ -190,6 +245,7 @@ def search_lite(
         "backend": used_backend,
         "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
         "error": error,
+        **({"pacing": notes} if notes else {}),
     }
 
 
