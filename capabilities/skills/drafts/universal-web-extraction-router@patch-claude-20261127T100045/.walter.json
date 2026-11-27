@@ -1,0 +1,11 @@
+{
+ "base_sha": "6c5df682483b088a8ff6a21615515a2f4beef12c4c6c6aeb46ccc59f42711bae",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-27T10:00:45.338664+00:00",
+ "domain": "web",
+ "kind": "patch",
+ "reason": "Observation 2026-11-27: the description « Use for all public web requests » made this 12.8 k-char internals document a mandatory read before every web search (3 of 3 web turns read it, 15 k chars each time, with no change in the calls made afterwards). Its routing section also contradicted walter_browse's single-door contract: it said « use web_search first », but web_search is not a W.Alter tool, and walter_browse(query=…) searches. The « First-class Hermes tool » section (tool_search/tool_describe/tool_call, terminal fallback) is stale: Hermes has been stopped since 10/11. What changes: the description now targets diagnosis of a failed or doubtful walter_browse result; the routing chain is condensed; the output contract, verification rules, CLI, lot references and the merged fallback procedure are kept.",
+ "runtime": "claude",
+ "session_id": null,
+ "target": "universal-web-extraction-router"
+}
