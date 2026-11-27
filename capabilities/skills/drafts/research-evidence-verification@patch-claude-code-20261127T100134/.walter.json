@@ -1,0 +1,11 @@
+{
+ "base_sha": "4b9252be21fc0fdda2d2cfc870ea9133a5f6aba883e51ff9f93e837766bc896b",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-27T10:01:34.316158+00:00",
+ "domain": "research",
+ "kind": "patch",
+ "reason": "Observation 2026-11-27: this skill was read in full (23.7 k chars) for a plain price comparison, though most of it is specialised (API pricing, provider access, Google Trends, review/UX audits). Those sections move unchanged to references/; SKILL.md keeps the core rule, procedure, output format, pitfalls and points to each reference.",
+ "runtime": "claude-code",
+ "session_id": null,
+ "target": "research-evidence-verification"
+}
