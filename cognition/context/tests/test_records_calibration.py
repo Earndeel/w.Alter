@@ -47,9 +47,13 @@ def test_session_state_is_layer_two_beyond_l0(monkeypatch):
     ctx = types.SimpleNamespace(get_context=lambda m, **k: calls.append(k) or {"text": "État", "trace": {"sections": {}}})
     monkeypatch.setitem(sys.modules, "walter_memory.context", ctx)
     monkeypatch.setitem(sys.modules, "walter_memory", types.SimpleNamespace(context=ctx))
-    b = retrieval.session_state(_plan(level="L2"), "x", "claude-code/vm/abc")
+    going_on = ContextPlan(turn_id="t", thread=ThreadChoice(id=None, new=True), act="continue", level="L2")
+    b = retrieval.session_state(going_on, "x", "claude-code/vm/abc")
     assert b.layer == 2 and b.id == "session_state" and calls[0]["session"] == ("claude_code", "abc")
     assert calls[0]["budget"]["knowledge"] == 0 and calls[0]["budget"]["working"] > 0
+    # 2026-11-27: a new request gets the owner's consignes tied to it, not the session's working state
+    retrieval.session_state(_plan(level="L2"), "x", "claude-code/vm/abc")
+    assert calls[1]["budget"]["working"] == 0 and calls[1]["budget"]["rules"] > 0
 
 
 def test_unsure_web_question_gets_no_memory_records(monkeypatch):

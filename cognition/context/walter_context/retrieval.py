@@ -192,6 +192,12 @@ def board(plan: ContextPlan | None = None, at: datetime | None = None) -> Block 
                  sources=[k for _, line, k in rows if line in lines])
 
 
+def continues(plan: ContextPlan) -> bool:
+    """The message carries on a thread (an existing one, or an act that follows the previous turn): its working state
+    and objectives are relevant. A new subject gets neither — the visible conversation is still in the history."""
+    return bool(plan.thread.id) and not plan.thread.new or plan.act != "new"
+
+
 def session_state(plan: ContextPlan, message: str, session_key: str | None, socle_rules: bool = False) -> Block | None:
     """Layer 2, SessionState (Memory V1 P1.1): the owner's durable rules in force (always, stable) and the working
     state of this session's thread — interpreted decisions and constraints of the thread and of its subject in other
@@ -206,6 +212,11 @@ def session_state(plan: ContextPlan, message: str, session_key: str | None, socl
         source, _, thread = session_key.split("/", 2)
         source = {"claude-code": "claude_code"}.get(source, source)
     budget = {k: 0 for k in ("profile", "people", "records", "knowledge", "evidence", "views")} | NOT_HERE | STATE_BUDGET
+    if plan is not None and not continues(plan):
+        # observation 2026-11-27: a new subject received the previous subject's working state (2.6 k tokens). A level
+        # is a retrieval depth, not a duty to fill every block: the session's working state comes when the message
+        # carries on its thread; the owner's consignes and preferences tied to the message always come
+        budget["working"] = 0
     r = context.get_context(message, budget=budget, include_profile=False,
                             session=(source, thread) if source and thread else None, exclude_universal=socle_rules)
     if not r.get("text"):
@@ -305,16 +316,20 @@ def _outcome(o) -> str:
     return _clip(o, 120)
 
 
-def tasks(plan: ContextPlan, fetch=_gateway, at: datetime | None = None) -> Block | None:
+def tasks(plan: ContextPlan, fetch=_gateway, at: datetime | None = None, session_key: str | None = None) -> Block | None:
     """The owner's objectives (Run Plane, SOCLE A3): those of the plan's thread, open or suspended, with progress,
-    last outcome, age and id; then up to tasks_others other active objectives (open or suspended) in one line each.
-    At L0 (the lightest context) only the thread's own objectives: a task is never continued without its state."""
+    last outcome, age and id — a task is never continued without its state; then, only when the answer depends on
+    the owner's tasks (plan.personal has `tasks`, 2026-11-27: a level is a depth, not a duty to fill every block), up
+    to tasks_others other active objectives in one line each, of the asking session's channel only (a test session
+    never sees the owner's objectives, the owner never sees a test's)."""
     at = at or datetime.now(timezone.utc)
     thread = plan.thread.id
     mine = (fetch("/v1/tasks/list", {"thread_id": thread, "limit": 5}).get("tasks") or []) if thread else []
     mine = [t for t in mine if t.get("status") in ("open", "suspended")]
-    others = [] if plan.level == "L0" else [
-        t for t in fetch("/v1/tasks/list", {"limit": 3 + PACK["tasks_others"]}).get("tasks") or []
+    want_others = plan.level != "L0" and "tasks" in (plan.personal or [])
+    others = [] if not want_others else [
+        t for t in fetch("/v1/tasks/list", {"limit": 3 + PACK["tasks_others"],
+                                            **({"asking_session": session_key} if session_key else {})}).get("tasks") or []
         if t.get("status") in ("open", "suspended") and t.get("task_id") not in {m.get("task_id") for m in mine}
         and (not thread or t.get("thread_id") != thread)][:PACK["tasks_others"]]
     if not mine and not others:
@@ -630,7 +645,7 @@ class Prefetch:
         """name → future, for the sources this plan asks for with exactly the prefetched inputs."""
         if message != self.message or session_key != self.session_key:
             return {}
-        out = {"session_state": self.state} if plan.level != "L0" else {}
+        out = {"session_state": self.state} if plan.level != "L0" and continues(plan) else {}
         if plan.level != "L0" and _memory_budget(plan) == self.memory_budget:
             out["memory"] = self.memory
         return out
@@ -676,7 +691,7 @@ def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, n
     if plan.level != "L0":
         steps += [("board", lambda: board(plan)), ("session_state", lambda: session_state(plan, message, session_key, socle_rules)),
                   ("subject", lambda: subject(plan))]
-    steps += [("tasks", lambda: tasks(plan)), ("experience", lambda: experience(plan, message))]
+    steps += [("tasks", lambda: tasks(plan, session_key=session_key)), ("experience", lambda: experience(plan, message))]
     if plan.level != "L0":
         steps += [("memory", lambda: memory(plan, message)), ("recent", lambda: recent(session_key, native_history))]
     if not _gets_memory(plan):

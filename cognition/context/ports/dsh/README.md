@@ -1,5 +1,7 @@
 # Walter Context for DSH
 
+> **Retour arrière seulement** (27/11/2026) : DSH a été désinstallé le 18/11/2026 ; le moteur natif `walter-engine` (`core/engine/walter_engine/`) fait ce travail depuis le 17/11. Ce dossier reste pour le retour arrière décrit dans `core/engine/docs/08-NATIF.md` § 8.
+
 The plugin connects the shared Walter Context checkpoint contract to DSH's public
 compaction service. It calls the Python 3.11+ stdlib core through bounded
 JSON/stdin subprocesses. It makes no summarization model call.

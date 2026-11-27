@@ -19,7 +19,7 @@ def sources(monkeypatch):
     calls = []
     monkeypatch.setattr(retrieval, "capabilities", lambda p: (calls.append("caps"), retrieval.Block("capabilities", 0, "M0 x10"))[1])
     monkeypatch.setattr(retrieval, "board", lambda *a: (calls.append("board"), retrieval.Block("subjects_board", 1, "- s1\n- s2"))[1])
-    monkeypatch.setattr(retrieval, "tasks", lambda p: None)
+    monkeypatch.setattr(retrieval, "tasks", lambda p, **k: None)
     monkeypatch.setattr(retrieval, "experience", lambda p, m: None)
     views = types.SimpleNamespace(read=lambda q: (calls.append(("view", q["depth"])),
                                                   {"depth": "overview", "content": "Titre : X", "version": 3})[1])
@@ -186,7 +186,11 @@ def test_tasks_and_experience_blocks_from_the_memory_routes():
         return {"items": [{"at": (at - timedelta(days=1)).isoformat(), "run_id": "r1", "status": "failed",
                            "summary": "Redémarrage du service", "errors": ["port déjà pris"], "lessons": ["arrêter l'ancien"],
                            "solutions": [], "pending": ["relancer"]}]}
-    b = retrieval.tasks(plan("L1"), fetch=fetch, at=at)
+    own = retrieval.tasks(plan("L1"), fetch=fetch, at=at)        # 27/11: the others only when the answer needs them
+    assert "Écrire le guide" not in own.text and own.sources == ["t1"]
+    asks = plan("L1")
+    asks.personal = ["tasks"]
+    b = retrieval.tasks(asks, fetch=fetch, at=at)
     assert "[open] Migrer la base" in b.text and "progrès : 2/3 étapes" in b.text and "il y a 2 h" in b.text
     assert "id t1" in b.text                                     # what task_update needs
     assert "Vieux" not in b.text and "Écrire le guide (3 j)" in b.text
@@ -206,7 +210,7 @@ def test_tasks_and_experience_blocks_from_the_memory_routes():
 
 def test_the_lightest_context_still_carries_the_task_and_a_recent_failure(sources, monkeypatch):
     """12/11: a one-line operation judged L0 was retried blind in a new conversation — its failure was in Memory."""
-    monkeypatch.setattr(retrieval, "tasks", lambda p: retrieval.Block("tasks", 3, "Objectifs de ce fil : …"))
+    monkeypatch.setattr(retrieval, "tasks", lambda p, **k: retrieval.Block("tasks", 3, "Objectifs de ce fil : …"))
     monkeypatch.setattr(retrieval, "experience", lambda p, m: retrieval.Block("experience", 4, "Expérience : déjà tenté…"))
     blocks, notes = retrieval.gather(plan("L0"), "lis le fichier")
     assert [b.id for b in blocks] == ["capabilities", "now", "tasks", "experience"] and not notes
@@ -215,7 +219,7 @@ def test_the_lightest_context_still_carries_the_task_and_a_recent_failure(source
 
 
 def test_absent_memory_routes_drop_the_block_with_a_note(sources, monkeypatch):
-    def absent(*a):
+    def absent(*a, **k):
         raise retrieval.RouteAbsent("/v1/tasks/list 404")
     monkeypatch.setattr(retrieval, "tasks", absent)
     monkeypatch.setattr(retrieval, "experience", absent)

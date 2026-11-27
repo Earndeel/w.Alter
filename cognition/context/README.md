@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Préparer et ordonner le contexte par message et par sous-agent, et compresser l'historique selon le contrat du harness. |
 | **Propriétaire** | walter-context (`/walter/cognition/context`). |
-| **État** | **active** (constat du 09/11/2026) : service `walter-context-preflight` ; Walter Engine (DSH) l'utilise. |
+| **État** | **active** (27/11/2026) : service `walter-context-preflight` ; le moteur natif Walter Engine (`walter-engine`) l'appelle à chaque message du propriétaire. |
 | **Ne fait pas** | Posséder les sujets, vues et originaux (Walter Memory, walter-logs) ; choisir un modèle (Router). |
 | **Contrats** | [contracts/context.json](contracts/context.json), [contracts/maintenance.json](contracts/maintenance.json), [contracts/schemas/](contracts/schemas/) (ContextPlan v4 — v3, v2 et v1 gardés, ChildContextSpec v1), [manifest/decisions.json](manifest/decisions.json) (signaux de décision déclarés) ; CLI `walter-context`. Spécification : `/walter/cognition/context/docs/CONTEXT-ENGINE.md`. |
 
@@ -20,6 +20,51 @@ que les sessions ont disparu de tous les ports.
 [Maintenance, dépendances, activation et retrait](docs/MAINTENANCE.md) ·
 [Contrat du module](contracts/context.json) · [Validation de rétention](docs/ACCEPTANCE.md).
 La spécification et les décisions propres à une instance restent dans sa documentation, hors du logiciel neutre.
+
+## Parcours d'un message du propriétaire (moteur natif, état du 27/11/2026)
+
+Qui décide de quoi, dans l'ordre. Cette section suffit pour expliquer l'architecture ; le code n'est à relire que
+pour un détail qu'elle ne donne pas. Sources : `walter_context/preflight/` (`__main__.py` service, `__init__.py`
+décision), `retrieval.py` (blocs), `assembly.py` (pack) ; côté moteur `core/engine/walter_engine/engine.py`
+(`_intake`), côté modèle `cognition/router/llm/gateway.py` (`planned_task`).
+
+1. **Engine** (`walter-engine`) reçoit le message d'une porte (Telegram, web, API), ouvre le **run** au Run Plane de
+   Memory (`runs start`) et lance en parallèle la recherche de skills. Un run `local_only` s'arrête là pour le
+   contexte (pas de préflight cloud).
+2. Engine appelle le **préflight** (`POST 127.0.0.1:8897/preflight?inject=1`) avec le message, **l'échange
+   précédent visible** de la session (dernier message et dernière réponse, avec leur âge et leur fil s'il y en a
+   un) et l'identifiant du run ; il attend au plus 7 s (`answer_within_ms`).
+3. Le préflight cherche les **fils candidats** (sujets de Memory proches) et démarre en avance les sources qui ne
+   dépendent que du message (`Prefetch`).
+4. **Règles déterministes d'abord** (`fast_path`) : réponse courte à un fil récent (« ok », « vas-y »), question
+   triviale (heure, date : répondue sans modèle).
+5. Sinon **Walter Decision** : un appel au **poste de décision du Router** (pas au modèle principal) pose en une fois
+   les signaux déclarés dans `manifest/decisions.json` et ceux de Router et Memory : acte (par rapport à
+   l'échange visible), fil persistant (par rapport aux fils stockés — deux questions distinctes : une suite peut
+   continuer la conversation sans rejoindre aucun fil), plan de lecture, besoins personnels, palier de modèle
+   (L1/L2/L3), travail à suivre, reprise de tâche, lectures (dates, personnes, lieux). Le **résolveur** applique
+   ensuite les relations déclarées (par ex. acte `new` ⇒ fil `new`) et met de côté une réponse incohérente.
+6. Le préflight en tire le **ContextPlan** : niveau de contexte L0–L4 (profondeur de récupération), acte, fil,
+   effort du tour, et `model_profile` = **toujours `general`** au palier jugé (un spécialiste est un sous-agent que le
+   modèle principal choisit, jamais un remplacement du modèle du tour).
+7. En parallèle : il **rattache le plan au run** (`walter-memory runs update` : fil, acte, `requested` {task, level,
+   work, resume}) — c'est là que le Run Plane ouvre ou reprend un objectif durable — et il **assemble le pack** :
+   les blocs que le plan demande (`retrieval.gather`), chacun seulement s'il est pertinent. Un niveau ne remplit pas
+   tous les blocs : l'état de travail de la session n'entre que si le message continue ce fil ou cet échange, les
+   autres objectifs que pour une demande qui touche aux tâches (`personal` contient `tasks`), filtrés par canal
+   (test ≠ propriétaire). Ordre : stable avant volatil ; budget par niveau (`[pack] budget`), coupes dites.
+8. Engine place le pack `<walter-context>` avant le message dans son historique. Les packs des tours précédents
+   sont remplacés par un talon dans l'historique (`[native] past_packs = "stub"`) : seul le pack du message actuel
+   vaut, l'original reste lisible avec `context_recover(ref="pack:<seq>")`.
+9. **Modèle du tour** : Engine appelle `walter-llm` avec le run ; le gateway lit `requested` sur le run et choisit
+   la tâche Router `general/<palier>` (`planned_task`) ; le **Router** résout ce poste en modèle et fournisseur
+   concrets (tables du Router, jamais codées dans Context ni dans Engine). Le même plan vaut pour tous les appels du
+   tour ; un palier épinglé par le propriétaire l'emporte.
+10. Pendant le tour, Context garde l'état vivant (`state`) et ne réévalue qu'en cas de déclencheur (`reassess` :
+    échec, réponse d'un sous-agent, fin de tâche), jamais un préflight complet ; la fenêtre envoyée au modèle est
+    projetée par `compress` (`head → record → compact → live`).
+
+En échec ou hors délai : plan dégradé déclaré (voir plus bas), jamais un silence.
 
 ## Composants présents
 
@@ -52,8 +97,8 @@ compactées gardent une représentation stable entre coupures. La politique éva
 cache ; ces estimations ne sont pas une mesure de facturation fournisseur.
 
 La projection peut remplacer des sorties d’outils par un digest et une référence, omettre le raisonnement, réduire
-les anciens tours et, si le budget l’impose, signaler l’omission de tours. Le checkpoint DSH exige de conserver
-le dialogue visible complet ou refuse la compression. Une référence permet de demander un original lorsqu’il est
+les anciens tours et, si le budget l’impose, signaler l’omission de tours. Le checkpoint (port DSH, historique) exigeait de conserver
+le dialogue visible complet ou refusait la compression. Une référence permet de demander un original lorsqu’il est
 encore disponible et autorisé ; elle ne rend pas ce contenu visible automatiquement dans chaque requête.
 Les injections des tours précédents ne sont pas recopiées comme des paroles de l’utilisateur.
 
@@ -64,10 +109,9 @@ la qualité sémantique générale des réponses, le cache réel d’un fourniss
 
 | Port | Contrat | État connu et portée |
 |---|---|---|
-| DSH | Transaction publique de compaction, checkpoint | Port sélectionné dans la configuration observée le 29 octobre 2026 ; chargement à confirmer par lancement/trace |
 | Codex et Claude Code | Compaction native ; contexte additionnel via hook/MCP | Notes de modules et preflight disponibles ; aucune substitution du compresseur natif |
 | Claude Code, entrée des sorties | Hook PostToolUse → `walter-context-entrance` (`updatedToolOutput` à terme) | **Fantôme** depuis le 6 novembre 2026 : enregistre ce qu’il aurait coupé (chiffres seulement) ; la sortie reste entière pour le modèle |
-| Walter Engine (`dsh-web`) | Pack par message : greffon d’entrée natif du moteur (`core/engine/plugins/intake`, `mode: native`) → `POST /preflight?inject=1` | **En service** (vérifié le 11/11/2026 dans `/opt/dsh/home/cordis.patch.yml`) : `pack` par défaut ; bloc Memory `legacy` seulement si le preflight échoue ou dépasse 7 s. Le hook DSH (`walter-hooks.json`) ne fait plus que SessionStart/PostToolUse |
+| Walter Engine (`walter-engine`, natif) | Pack par message : `_intake` du moteur → `POST /preflight?inject=1` ; fenêtre du tour par `compress` | **En service** depuis le 17/11/2026 : `pack` par défaut ; bloc Memory `legacy` seulement si le preflight échoue ou dépasse 7 s. (Jusqu'au 17/11 : greffon d'entrée de DSH, désinstallé le 18/11 ; port `ports/dsh/` = retour arrière seulement.) |
 | Router, sous-agent texte | `walter-context-child` | Construction du pack appelée par Router ; le mode et le comportement en échec sont définis côté consommateur |
 
 Plan dégradé (SOCLE A2, 11/11/2026) : si la décision échoue, le plan le dit (`decision.degraded`, `decision.error`),
@@ -75,7 +119,8 @@ reste prudent (L3, `tools` + `memory`, sujet le plus proche par embeddings locau
 session s’il a moins de 30 min sinon `general/L2`), ouvre le pack par une phrase qui le signale au modèle, émet
 `context.degraded` sur le bus et est compté à part par `--report`. Le pack a un budget total par niveau et des blocs
 Tâches / Expérience (routes Memory `/v1/tasks/list`, `/v1/experience`) : section `[pack]` de la configuration ; les
-tâches du fil et un échec récent entrent dans le pack à tous les niveaux, L0 compris (12/11/2026). Le preflight juge
+tâches du fil et un échec récent entrent dans le pack à tous les niveaux, L0 compris (12/11/2026) ;
+les autres objectifs actifs seulement quand la réponse dépend des tâches du propriétaire, du seul canal de la session (27/11/2026). Le preflight juge
 aussi si le message est un travail à suivre (`decision.work`) : c'est ce qui ouvre une tâche durable au Run Plane.
 Une approbation ou une correction (`act` = `approve` / `correct`) envoyée moins de 30 min après un échange reste dans
 le fil de cet échange (`decision.thread_by = previous_exchange`, le choix du modèle en `thread.alternates`) ; le fil
