@@ -45,9 +45,26 @@ def test_a_wrong_name_gets_the_closest_real_ones():
 
 
 def test_the_capability_map_gives_signatures_and_leaves_out_the_direct_doors_bridge():
-    m = registry().capability_map()
+    m = registry().capability_map()                               # "full": the rollback map, one signature per tool
     assert "`skill_read(name, file_path?)` Read a skill" in m and "`walter_browse(query?, url?)`" in m
     assert "walter_call" not in m and m.index("**browse**") < m.index("**skills**")
+
+
+def test_the_tiered_map_signs_the_everyday_capabilities_and_only_names_the_others():
+    m = registry().capability_map(("walter_browse",))
+    assert "- `walter_browse(query?, url?)` Look something up on the web" in m
+    assert "**skills** skill_read" in m and "skill_read(" not in m and "walter_call" not in m
+    assert "…" not in m
+
+
+def test_a_purpose_is_a_whole_clause_never_cut_inside_a_word():
+    from walter_engine.tools import purpose
+    long = ("Open (or refresh) a Camoufox browser session logged in as the owner on a site (google, meta, linkedin, "
+            "x) and return its metadata. More.")
+    assert purpose(long) == "Open a Camoufox browser session logged in as the owner on a site and return its metadata"
+    assert purpose("walter-logs: search what agents DID (any runtime). Then.") == "search what agents DID"
+    p = purpose("Find things " + "very " * 40 + "far away, then more.")
+    assert len(p) <= 90 and not p.endswith(("ver", "…")) and p.split()[-1] in ("very", "far")
 
 
 def test_a_past_pack_becomes_a_stable_stub_with_its_recovery_ref():

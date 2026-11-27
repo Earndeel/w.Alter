@@ -77,6 +77,28 @@ class Tool:
                                                  "parameters": self.parameters}}
 
 
+def purpose(description: str, limit: int = 90) -> str:
+    """What a tool is for, in a whole clause (observation 2026-11-27: the map cut summaries mid-word, « link… »): the
+    first sentence of its summary, without its asides, a module prefix or what follows a dash or a colon; a long one is
+    cut at a clause boundary, never inside a word, never with an ellipsis."""
+    text = " ".join(capabilities().summary(description or "").split())
+    text = re.sub(r"\b(e\.g|i\.e|etc)\.", lambda m: m.group(1) + "․", text)      # not sentence ends
+    first = re.split(r"(?<=[\w)\]`'\"][.;?!])\s", text, maxsplit=1)[0].rstrip(".;").replace("․", ".")
+    first = re.sub(r"^[\w-]+:\s+(?=[a-z])", "", first)                                  # « walter-logs: search … »
+    while re.search(r"\s*\([^()]*\)", first):                                           # asides out, whole
+        first = re.sub(r"\s*\([^()]*\)", "", first)
+    first = first.split(" (")[0]                                                        # an aside left open
+    for sep in (" — ", " - ", ": "):
+        head = first.split(sep, 1)[0]
+        if 24 <= len(head) < len(first):
+            first = head
+            break
+    if len(first) > limit:
+        cut = max(first.rfind(", ", 0, limit), first.rfind(" and ", 0, limit), first.rfind(" or ", 0, limit))
+        first = first[:cut] if cut >= 30 else first[:first.rfind(" ", 0, limit)]
+    return first.rstrip(" ,;:")
+
+
 def _short(name: str) -> str:
     """A tool as Python names it: Walter tools by their short name (`mcp__walter__memory_search` → `memory_search`)."""
     return name.removeprefix("mcp__walter__")
@@ -226,28 +248,41 @@ class Registry:
         hint = f"; did you mean {', '.join(close)}?" if close else ""
         return f"no tool named {name}{hint} (await tools.search(\"…\") finds one by need)"
 
-    def signature(self, t: Tool) -> str:
+    def signature(self, t: Tool, optional: int = 5) -> str:
         """`name(required, optional?, …)`: enough to call a tool from Python without describing it first."""
         props = list(((t.parameters or {}).get("properties") or {}))
         req = [p for p in ((t.parameters or {}).get("required") or []) if p in props]
         opt = [p for p in props if p not in req]
-        args = req + [f"{p}?" for p in opt[:5]] + (["…"] if len(opt) > 5 else [])
+        args = req + [f"{p}?" for p in opt[:optional]] + (["…"] if len(opt) > optional else [])
         return f"{_short(t.name)}({', '.join(args)})"
 
-    def capability_map(self) -> str:
-        """Every capability reachable from Python, by owner module, one line each: its call signature and the first
-        sentence of its description. Generated from the registry (the same source as search/describe), so it is
-        never stale; it changes only when a tool or a description changes (the cached socle follows)."""
-        caps = capabilities()
-        by: dict[str, list[str]] = {}
-        for t in self._searchable():
-            if _short(t.name) == "walter_call":       # the direct doors' bridge: Python reaches every tool itself
-                continue
-            text = " ".join(caps.summary(t.description).split())
-            first = re.split(r"(?<=[.;])\s(?=[A-Z`(])", text, maxsplit=1)[0].rstrip(".;")
-            first = first if len(first) <= 100 else first[:97].rstrip(" ,(") + "…"
-            by.setdefault(t.module or "core", []).append(f"`{self.signature(t)}` {first}")
-        return "\n".join(f"- **{m}**: " + " · ".join(by[m]) for m in sorted(by, key=lambda m: (m == "core", m)))
+    def capability_map(self, common: tuple | list | None = None) -> str:
+        """The capabilities reachable from Python, generated from the registry (the same source as search/describe),
+        so never stale; it changes only when a tool or a description changes (the cached socle follows).
+
+        `common` (owner 2026-11-27: « distingue les informations nécessaires pour connaître l'existence d'une
+        capacité de celles nécessaires pour l'exécuter »): the everyday ones keep their call signature and a short
+        purpose, so they are called without a lookup; every other one is named under its module, its contract on
+        demand (`tools.describe`). None = the former map, one signature per tool (rollback `capability_map = "full"`)."""
+        tools = [t for t in self._searchable() if _short(t.name) != "walter_call"]   # the direct doors' bridge
+        if common is None:
+            by: dict[str, list[str]] = {}
+            for t in tools:
+                by.setdefault(t.module or "core", []).append(f"`{self.signature(t)}` {purpose(t.description)}")
+            return "\n".join(f"- **{m}**: " + " · ".join(by[m]) for m in sorted(by, key=lambda m: (m == "core", m)))
+        rank = {str(n): i for i, n in enumerate(common)}
+        everyday = sorted((t for t in tools if _short(t.name) in rank), key=lambda t: rank[_short(t.name)])
+        others: dict[str, list[str]] = {}
+        for t in tools:
+            if _short(t.name) not in rank:
+                others.setdefault(t.module or "core", []).append(_short(t.name))
+        lines = ["Everyday, call directly:"]
+        lines += [f"- `{self.signature(t, optional=10)}` {purpose(t.description)}" for t in everyday]
+        if others:
+            lines.append("Others, by module (`await tools.describe(\"name\")` gives the contract when needed):")
+            lines.append(" · ".join(f"**{m}** " + ", ".join(others[m])
+                                    for m in sorted(others, key=lambda m: (m == "core", m))))
+        return "\n".join(lines)
 
     def catalog(self, module: str = "") -> dict:
         """Every tool reachable from Python, by owner, with its one-line summary and declared effects; the modules

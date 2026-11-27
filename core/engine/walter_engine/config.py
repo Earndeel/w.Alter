@@ -124,6 +124,10 @@ class Settings:
     # observation fixes (2026-11-27): "stub" = an earlier turn's <walter-context> pack is replaced in the history by
     # a one-line reference (context_recover pack:<seq>); "keep" = the former behaviour (rollback)
     past_packs: str = "stub"
+    # capability map (2026-11-27): "tiers" = the everyday capabilities (map_common) with their signature, the others
+    # named by module; "full" = one signature per tool (the map of the morning, rollback); "off" = no map
+    capability_map: str = "tiers"
+    map_common: tuple = ()
     soul: str = ""
     conduct: str = ""
     operating: str = str(ENGINE_ROOT / "instructions" / "OPERATING.md")
@@ -198,6 +202,7 @@ def load(state: Path | None = None) -> Settings:
         doc_layer=str(n.get("doc_layer", "mcp")), skills_map=bool(n.get("skills_map", True)),
         communication=bool(n.get("communication", False)),
         owner_rules=str(n.get("owner_rules", "pack")), past_packs=str(n.get("past_packs", "stub")),
+        capability_map=str(n.get("capability_map", "tiers")), map_common=tuple(str(x) for x in n.get("map_common", ())),
         soul=_resolve(n.get("soul", "")), conduct=_resolve(n.get("conduct", "")),
         operating=_module_path(n.get("operating", "instructions/OPERATING.md")),
         resume_interrupted=bool(n.get("resume_interrupted", True)), python=n.get("python", "full"),

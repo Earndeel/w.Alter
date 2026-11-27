@@ -135,9 +135,9 @@ PYTHON_ONLY = ("This is your only tool: every capability (W.Alter's modules and 
                "bash, subagent, present, ask_user_question…) is called from here as `await tools.<name>(**args)`.")
 PYTHON_ONLY_NOTE = ("## Using capabilities\n"
                     "Your only tool is `python`, the persistent kernel. Every capability is a function there, `await "
-                    "tools.<name>(…)`; the map below gives each one's signature (optional arguments marked `?`) "
-                    "and purpose, so calling one needs no lookup first. `await tools.describe(name)` gives the "
-                    "full contract (types, effects, returns) when the signature is not enough; `await tools.search(\"need\")` "
+                    "tools.<name>(…)`; the map below gives the everyday ones with their signature (optional arguments "
+                    "marked `?`), to call without a lookup, and names every other one under its module. `await "
+                    "tools.describe(name)` gives a full contract (types, effects, returns); `await tools.search(\"need\")` "
                     "finds one by need, each row with its `call`. Finding, reading a contract and calling go in one "
                     "cell when that makes sense; independent calls run together with `asyncio.gather`. Calls follow the "
                     "same permissions and logs as direct calls. A skill (`skills_search`, `skill_read`) is know-how for "
@@ -1357,7 +1357,8 @@ class Engine:
         """The Python door's note and the capability map generated from the registry (observation 2026-11-27: with
         only `search`/`describe` named, every web turn began with a discovery ritual of 3–5 cells)."""
         try:
-            cmap = self.registry.capability_map()
+            mode = self.s.capability_map
+            cmap = "" if mode == "off" else self.registry.capability_map(None if mode == "full" else self.s.map_common)
         except Exception as e:  # noqa: BLE001 — never a turn without its note
             log.warning("capability map unavailable: %s", e)
             cmap = ""

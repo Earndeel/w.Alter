@@ -59,6 +59,13 @@ operating = "instructions/OPERATING.md"           # the engine's own operating r
 context_window = 200000           # tokens the main model accepts (walter-context decides the window inside it)
 resume_interrupted = true         # a turn cut by a restart resumes from its journal (never re-running a done action)
 python = "full"                   # full = the engine's own rights; sandbox = the old walter-sandbox bubble
+capability_map = "tiers"          # python door's map (27/11): everyday capabilities with their signature, the others named by module; "full" = every signature (rollback), "off" = none
+# the everyday capabilities: signature + purpose in the map, called without a lookup (measured: the most used in the
+# engine's sessions over 14 days, + the everyday doors of memory and tasks); every other tool is named, its contract on demand
+map_common = ["walter_browse", "memory_search", "memory_events", "memory_context", "person_lookup", "tasks_list",
+              "task_create", "task_update", "vault_search", "logs_search", "skills_search", "skill_read",
+              "module_guide", "context_recover", "walter_run", "browser_session", "secret_search",
+              "bash", "read", "write", "edit", "grep", "glob", "read_image", "present"]
 python_idle_min = 30
 python_interpreter = "/services/python/engine-python/bin/python"
 web_cookie_days = 30
