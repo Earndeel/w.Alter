@@ -102,7 +102,8 @@ def manifest(root: Path | None = None) -> str:
 def render(search_tool: str) -> str:
     index_tool, manifest_tool = 'skills_index', 'skills_manifest'
     data = index()
-    header = ("W.Alter Skills — a library of procedures and workflows shared between agents.\n"
+    header = ("W.Alter Skills — a library of procedures and workflows shared between agents: know-how for a task a "
+              "capability's own contract does not settle, not a step before every call.\n"
               f"{manifest_tool} explains the module; {index_tool}(domain=…) says what each entry is for. "
               f"{search_tool}(query=…) searches by intent. Then read the chosen skill and only its useful references.\n"
               "Compact domain index (total / workflows; reserve = dormant skills, always findable, "

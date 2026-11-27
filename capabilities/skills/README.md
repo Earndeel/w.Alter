@@ -9,7 +9,7 @@
 | **Contrats** | [contracts/skills.json](contracts/skills.json), [contracts/data-classes.json](contracts/data-classes.json), [contracts/maintenance.json](contracts/maintenance.json) ; MCP `skills_search`, `skill_read`, `skill_propose`, `skill_patch` ; schéma PostgreSQL `skills`. |
 
 W.Alter's procedural memory: skills and workflows, owned by Walter, independent of any agent runtime. Walter Engine
-(DSH), Claude Code and Codex are adapters (Hermes was one until its removal on 2026-11-16). Plan: `/walter/cognition/memory/docs/PLAN.md` (P10). Decisions and measurements:
+(native since 2026-11-17; DSH until then), Claude Code and Codex are adapters (Hermes was one until its removal on 2026-11-16). Plan: `/walter/cognition/memory/docs/PLAN.md` (P10). Decisions and measurements:
 `DECISIONS.md` (2026-10-09/10). Operations: `RUNBOOK.md` § walter-skills.
 
 ## Manifest and discovery index
