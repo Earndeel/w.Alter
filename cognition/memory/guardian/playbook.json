@@ -3,7 +3,7 @@
  "module": "memory",
  "notes": [
   "Walter Memory: Postgres walter-pg (127.0.0.1:5433) holds the truth; walter-memory-gateway (:8890) is the write door; walter-logs-watch follows agent logs; connectors are oneshot units walter-memory-<name> run by timers.",
-  "The beeper connector reads the Beeper API on the owner's Mac: when the Mac sleeps it fails or goes stale. That is external and recovers alone when the Mac wakes.",
+  "The beeper connector reads the official Beeper Server on this VM (unit beeper-server, 127.0.0.1:23374; the owner's Mac is no longer used). An HTTP 401 / 'Token not found' / setup state needs-login means Beeper signed the server out of the owner's account (27/11/2026): it never recovers alone, no restart helps, and the re-login needs the owner (e-mail code read by Walter, then he approves the new device). That is needs_owner at once: tell him the Beeper Server of the VM is signed out and must be reconnected.",
   "gmail and calendar connectors wait for an OAuth consent from the owner: their failure needs_owner only if it lasts.",
   "An OpenRouter balance low or a monthly budget reached is the owner's decision (top up / raise the budget): needs_owner, no action.",
   "Dead jobs are kept for review, they are info only.",

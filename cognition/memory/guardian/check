@@ -33,6 +33,30 @@ def units_down(module, units, severity="high"):
 
 
 out = units_down("memory", ["walter-memory-gateway", "walter-logs-watch", "raw-vault-s3"])
+def beeper_signed_out():
+    """The Beeper Server of the VM answers its setup state without a token only when it is signed out (27/11/2026:
+    Beeper invalidated its session and every read got 401 for hours, reported as a mere warning). Re-login needs
+    the owner (device approval), so this is high: the guardian is consulted and the owner told."""
+    try:
+        import tomllib
+        conf = sh("walter", "instance", "config", "core", "beeper.toml", timeout=20).stdout.strip()
+        url = tomllib.load(open(conf, "rb")).get("api_url")
+    except (OSError, ValueError):
+        return []
+    if not url:
+        return []
+    setup = http_json(url.rstrip("/") + "/v1/app/setup")
+    state = setup.get("state")
+    if state in ("needs-login", "needs-verification"):
+        what = "déconnecté de votre compte Beeper" if state == "needs-login" else "connecté mais son appareil n'est pas vérifié"
+        return [inc("memory", "beeper:signed_out", "owner_action", "high",
+                    f"Le serveur Beeper de la VM est {what} : Walter ne reçoit plus vos messages. "
+                    "Reconnexion nécessaire (code e-mail lu par Walter, puis votre approbation du nouvel appareil).",
+                    {"setup_state": state, "api": url}, "G3")]
+    return []
+
+
+out += beeper_signed_out()
 r = sh("walter-memory", "health", timeout=120)
 try:
     h = json.loads(r.stdout)
