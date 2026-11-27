@@ -1,6 +1,6 @@
 ---
 name: research-evidence-verification
-description: Use when research needs exact prices or availability. See `references/constraint-ledger-and-live-availability.md` for the constraint ledger, dynamic-OTA protocol, and sub-agent reconciliation checklist. For Google Flights/OTA transport, price tiers, and cache/reparse policy, see `references/google-ota-transport-and-price-cache.md`.
+description: Use when a research answer depends on exact current prices, availability, schedules or other claims a dynamic page can invalidate: evidence levels (confirmed / live quote / lead / rejected), source hierarchy, reconciliation of conflicting prices, evidence matrix. Specialised procedures (API pricing, provider access, Google Trends, review/UX audits, OTA transport) are in its references.
 ---
 
 # Research Evidence Verification
@@ -43,61 +43,6 @@ Lead with the verdict, then separate:
 
 For each candidate, include the exact displayed price and source date, not a smoothed estimate. Keep URLs as plain text or inline code; do not hide them behind marketing labels.
 
-## API and model-pricing comparisons
-
-For current API/model prices, normalize the comparison before ranking it:
-
-1. Freeze one baseline (for video, normally 5 seconds, 16:9, no video input) and state whether the comparison is output-only or includes input materials.
-2. Preserve the provider's billing unit: per second, per image, per request, or token-based. Derive a common equivalent only when the source gives enough information; label derived values as approximate.
-3. Keep resolution bands semantically separate. `HD`, `FHD`, `720P`, `768P`, `1080P`, and `2K` are not interchangeable merely because they sound similar.
-4. Separate text/image-to-video from video-to-video, and no-video-input from video-input prices. Video-input models often apply duration-dependent minimums, so never reuse the no-input rate.
-5. Capture hidden or adjacent charges: audio, reference images, input-video duration, regeneration, rounding of partial seconds, free quotas, preview/invitation status, taxes, and reseller margins.
-6. Prefer the vendor's pricing page or API reference over marketplace listings. If a static extractor returns only shell/navigation or the extraction backend is search-only, switch to a rendered structured extractor and preserve the raw source URL plus the exact table context.
-7. Treat conflicting billing units as an evidence problem, not a conversion problem. If a provider's page simultaneously says `per run`, `per second`, or `per 1M tokens`, preserve each exact label, identify which view produced it, and do not multiply a headline `From` price into a normalized total unless the provider exposes the parameterized formula or quote.
-8. For regional first-party providers, preserve the native currency and the official worked examples first. Only convert to USD with a timestamped FX source and label the result approximate; do not let conversion hide a difference between a list price, a temporary promotion, and an adjacent model's price.
-
-### Video-generation benchmark × provider comparison (AA + OpenRouter + Kie.ai)
-
-When Monsieur asks for **all video models**, do not answer with only the models mentioned in the preceding exchange. Build the exhaustive comparison from the live Artificial Analysis video leaderboards, then join provider catalogs:
-
-1. Fetch and parse all three AA tables: `/video/leaderboard/image-to-video`, `/video/leaderboard/text-to-video`, and `/video/leaderboard/video-editing`. Keep rank, Elo, 95% confidence interval, sample count, release month, creator, and AA's displayed API price. Deduplicate only for the cross-model table; retain the per-board scores because a model can be strong in editing but absent from T2V.
-2. Fetch OpenRouter's dedicated generation catalog at `https://openrouter.ai/api/v1/videos/models`. Treat `pricing_skus` as discovery metadata, not always as a directly comparable clip tariff. For token-priced models (notably Seedance), fetch the public model page as well and prefer its `displayPricing` tiers, which expose normalized `/second` prices and resolution/audio/input variants. Preserve the raw token SKU in evidence but never invent a clip total from token price alone. Pitfall: the generic `/api/v1/models` list contains NO video models — a "flux" search over it returns zero hits while the videos catalog lists 24 (verified 2026-08-21). Always search the modality-specific catalog. Per-model API contracts are published as `https://openrouter.ai/<model-id>/llms.txt` (endpoint, request fields, job polling, response shape) — read that instead of guessing the wire format.
-3. Fetch Kie.ai's public catalog with `POST https://api.kie.ai/client/v1/model-pricing/page`, body `interfaceType: "Video"` (or `"Image"`), `pageSize: 100`, `pageNum: N`. Verified response shape (2026-08-21): rows live in `data.records`; `data.pages` is an INTEGER total-page count, not a list — paginate `pageNum` from 1 to `data.pages` and dedupe rows across pages. Filter by `modelDescription`/`provider`, preserving `usdPrice`, `creditPrice`, `creditUnit`, resolution, audio/input mode, and anchor URL. Kie may expose a family route rather than the exact provider model ID; label those rows as family matches.
-4. Freeze one baseline before normalizing: normally 5 seconds, 16:9, no video input, with audio/no-audio stated explicitly. Convert only genuine `/second` rates to a 5-second total. Keep `per video`, `per image`, `video_tokens`, minimum-generation charges, and unspecified-duration rates in their native units; do not call them exact 5-second prices.
-5. Report three sets separately: (a) AA models with exact OpenRouter and/or Kie matches, (b) AA models missing from a provider catalog, and (c) provider-only generation models absent from AA, such as a newly listed Seedance version. Do not silently treat a family match as an exact match.
-6. The AA video leaderboards are blind-preference Elo benchmarks, not a technical quality guarantee. State whether the page is the default With Audio view, and do not compare an AA model-level score as if it were a resolution-specific provider quote.
-
-The validated extraction recipe, matching notes, and evidence fields are in `references/aa-video-provider-comparison.md`.
-
-### Image-generation price normalization (GPT Image 2 class)
-
-For image models that mix flat marketplace tiers with token-priced native/proxy APIs:
-
-1. Freeze exact output dimensions and quality before comparing. Do not equate Kie `1K/2K/4K` with OpenRouter `low/medium/high`; they are different axes, and Kie’s flat tier does not by itself expose a public quality mapping.
-2. Query Kie’s public image catalog with `interfaceType: "Image"`, preserve `creditPrice`, `creditUnit`, `usdPrice`, `discountPrice`, and `falPrice`, and report Kie’s `usdPrice` rather than the reseller/anchor `falPrice`.
-3. Query OpenRouter’s dedicated image catalog (`/api/v1/images/models`) and model endpoint, not only the generic text-model list. Record the exact model ID and separate text-input, reference-image-input, and image-output token prices.
-4. When OpenRouter has no flat per-image tariff, use the model’s official output-token calculator or a completed `usage.cost`; label derived output-only numbers as estimates and add prompt/reference-image charges separately.
-5. State whether the comparison is output-only or all-in. For image-to-image, input reference images can materially change OpenRouter’s cost; never present a text-to-image output estimate as the total edit cost.
-
-The GPT Image 2-specific live endpoints, calculator formula, and 2026-08-11 evidence snapshot are in `references/gpt-image-2-provider-pricing.md`.
-
-## Access is a separate constraint from price
-
-For provider-access decisions, rank two different outputs:
-
-- **Absolute cheapest** — the lowest verified generation tariff, even if signup is region-locked.
-- **Cheapest usable** — the lowest tariff available to the user's region with a durable account, supported billing, API access, and no fragile shared/temporary credential.
-
-Verify the access path independently from the price:
-
-1. Inspect the provider's real signup page and record whether it accepts the user's country/phone, email-only signup, or requires enterprise onboarding. A reseller's SMS page is not evidence that the first-party form accepts that country code.
-2. Search the same vendor family for an international first-party service or regional endpoint before recommending rented OTP numbers. Verify that it exposes the same model family, exact API model ID, output modes, and billing unit.
-3. Include access friction in the recommendation: identity verification, payment availability, account durability, regional terms, and whether an API key can actually be created. Do not recommend shared/recycled SMS numbers as a durable access strategy.
-4. Calculate the break-even honestly. If an international first-party route is only a few percent more expensive than a region-locked route, it is normally the cheaper usable option once account risk and setup time are included.
-5. State the verdict in the form: `absolute cheapest: X; cheapest usable from the user's region: Y; difference: Z`. Keep the two rankings separate rather than forcing a nominal winner.
-
-See `references/video-model-pricing-normalization.md` for a reusable worksheet and a worked evidence snapshot. For the dated Seedance 2.5 provider-price evidence, including the international BytePlus access route, see `references/seedance-2-5-provider-pricing.md`. For the dated 2026-08-21 FLUX 3 price-and-access evidence (BFL direct Draft vs Standard, OpenRouter, Kie/fal/Replicate absence, Nous promo end), see `references/flux3-video-provider-pricing.md`.
-
 ## Pitfalls
 
 - Subagent summaries are reports, not proof: inspect the produced artifact and independently verify the critical source before repeating “confirmed”.
@@ -113,61 +58,11 @@ See `references/video-model-pricing-normalization.md` for a reusable worksheet a
 For the dynamic-booking and conflicting-price pattern captured during a Thailand beach search, see `references/evidence-labels-and-dynamic-booking.md`.
 For OTA URL parameter formats, tool-specific `wait_until` strategies (Booking.com → domcontentloaded, not load), Thai hotel pricing pitfalls (prices in images, not HTML text), and the tool preference order for OTA verification, see `references/ota-url-patterns.md`.
 
-## Collecter Google Trends et qualifier les lacunes Keyword Planner
+## Specialised procedures (references)
 
-- Pour une recherche de demande par pays, collecter séparément les fenêtres 5 ans et 12 mois, les expressions locales et une comparaison internationale utilisant la même expression. Consigner pays, termes exacts, période, catégorie, type de recherche et date de collecte. Ne jamais présenter un indice Trends comme un volume mensuel, un CPC ou une part de marché.
-- Lire le contrat du projet avant toute navigation. Réutiliser uniquement la session attribuée ; sur cette VM, le navigateur se pilote avec `/opt/walter-core/bin/walter-browser -s elie-google`. Ne pas créer de compte, campagne ou moyen de paiement pour débloquer Keyword Planner.
-- Préparer un répertoire de preuves et lancer une collecte séquentielle, sans multiplier les onglets :
-  ```bash
-  : "${PROJECT:?Définir le répertoire du projet}"
-  mkdir -p "$PROJECT/evidence/trends" "$PROJECT/work/trends"
-  W=/opt/walter-core/bin/walter-browser
-  SESSION=elie-google
-  timeout 45 "$W" -s "$SESSION" url
-  timeout 60 "$W" -s "$SESSION" nav 'https://trends.google.com/trends/explore?date=today%205-y&geo=FR&q=diamant%20de%20laboratoire&hl=fr'
-  sleep 5
-  timeout 45 "$W" -s "$SESSION" eval 'JSON.stringify({url:location.href,title:document.title,text:document.body.innerText})' > "$PROJECT/work/trends/FR_5y.browser.txt"
-  timeout 45 "$W" -s "$SESSION" shot "$PROJECT/evidence/trends/FR_5y.png"
-  ```
-- Remplacer `date=today%205-y` par `date=today%2012-m` pour la seconde fenêtre. Ces fenêtres sont relatives au jour réel de navigation : si la date de référence de l'étude diffère, utiliser des bornes explicites, encodées dans le paramètre `date`, et vérifier les dates effectivement affichées.
-- Conserver la sortie brute du navigateur avant transformation. L'interface Explorer observée exposait les données dans `document.body.innerText` sous forme tabulée, avec un en-tête `x\ty1`. Vérifier sa présence avant de parser ; ne pas supposer ce format stable :
-  ```bash
-  timeout 45 "$W" -s "$SESSION" eval 'JSON.stringify({url:location.href,header:document.body.innerText.indexOf("x\ty1"),preview:document.body.innerText.slice(0,1200)})'
-  ```
-- Rejeter comme collecte invalide toute page d'erreur, notamment HTTP 429, toute extraction sans tableau attendu, ou tout tableau dont les dates et le nombre de colonnes ne correspondent pas à la requête. Garder les preuves d'échec avec un nom explicite, mais les exclure des agrégations. Ne pas convertir une absence de données en zéro.
-- Chaque requête Trends est normalisée séparément. Ne pas classer des pays à partir des moyennes de leurs indices locaux indépendants. Pour les comparaisons géographiques, utiliser une extraction géographique commune et expliquer qu'elle reflète un intérêt relatif, non le nombre absolu de recherches. Distinguer termes de recherche et sujets, et signaler les faibles volumes ainsi que les périodes incomplètes.
-- Pour Keyword Planner, tenter uniquement la consultation de l'accès existant :
-  ```bash
-  timeout 60 "$W" -s "$SESSION" nav 'https://ads.google.com/aw/keywordplanner/home'
-  timeout 30 "$W" -s "$SESSION" eval 'JSON.stringify({url:location.href,title:document.title,text:document.body.innerText.slice(0,1500)})'
-  ```
-  Une navigation expirée ne prouve ni l'absence de compte Google Ads ni l'exigence de paiement. Classer ce résultat comme « accès non vérifié : incident technique ». Ne déclarer « création requise » que si l'interface le montre. Laisser volumes, CPC et concurrence vides lorsqu'ils n'ont pas été obtenus ; ne pas les remplacer par Trends ou des extraits de recherche non vérifiés.
-- Après des timeouts répétés, arrêter la collecte et diagnostiquer en lecture seule :
-  ```bash
-  curl -sS --max-time 10 http://127.0.0.1:9377/health
-  systemctl is-active camoufox-max
-  systemctl status camoufox-max --no-pager | head -20
-  journalctl -u camoufox-max --no-pager -n 20
-  uptime
-  free -m
-  ```
-  Un service `active` ne garantit pas que son endpoint répond. Ne pas boucler indéfiniment, créer des onglets de secours en série, supprimer des caches, tuer largement des processus ou redémarrer le navigateur partagé. Préserver la session authentifiée, enregistrer le blocage et ne reprendre qu'après rétablissement vérifié.
-- Dans les transformations, séparer les champs `country`, `window` et `variant` du nom de fichier : des variantes comme `DEb` ou des noms comportant plusieurs underscores ne sont pas des codes pays. Valider les mappings avant agrégation et reconstruire les sorties après exclusion des collectes invalides.
+Read only the one the task needs:
 
-## Auditer des avis clients et des dispositifs UX sans surinterpréter les preuves
-
-1. Lis le contrat de recherche avant toute collecte. Sépare les livrables : registre des sources, synthèse des avis par plateforme, thèmes d'avis, matrice UX et captures. Utilise le préfixe source attribué et relie chaque observation à une URL, une date de collecte et un identifiant de preuve.
-
-2. Collecte les avis par plateforme sans fusionner leurs notes. Relève la note, le nombre total d'avis et la distribution des étoiles seulement lorsqu'ils sont visibles. Conserve séparément la taille de l'échantillon effectivement lu, les dates et les thèmes. Une demande de « dix avis » adressée à WebFetch ne prouve pas que dix avis exploitables ont été obtenus. Vérifie le résultat et annonce le déficit d'échantillon.
-
-3. Applique trois états aux critères UX : `oui` = observé ; `non` = absence vérifiée dans un périmètre inspecté et explicité ; `nd` = non déterminé. Un critère non mentionné dans une extraction, un domaine inaccessible, une page bloquée ou une capture incomplète ne justifie jamais `non`. Vérifie aussi le domaine officiel avant de conclure qu'une marque n'a pas de site accessible.
-
-4. Inspecte successivement l'accueil, une fiche produit et les pages de service pertinentes. Traite le tunnel de commande comme un périmètre distinct : l'accueil ne démontre pas la visibilité des garanties au moment de l'achat. Respecte les limites de lecture seule ; ne commande pas, ne soumets pas de formulaire et ne contacte pas un vendeur pour compléter une preuve manquante.
-
-5. Pour les éléments visuels, vérifie d'abord l'environnement local avec `python3 -c "from playwright.sync_api import sync_playwright; print('playwright import OK')"`. Capture les pages publiques en desktop et mobile, par exemple avec `browser.new_page(viewport={"width": 1440, "height": 900})` puis `browser.new_page(viewport={"width": 390, "height": 844})`. Enregistre avec `page.screenshot(path=chemin, full_page=True)`. Ouvre ensuite les fichiers : une capture créée peut montrer seulement un bandeau de consentement, une erreur ou un chargement incomplet. Ne compte pas ces fichiers comme preuves du contenu masqué. Journalise URL finale, viewport et résultat.
-
-6. En cas de blocage, essaie une autre voie publique autorisée : extraction WebFetch, `walter_browse`, puis navigateur local. Une recherche ou un extrait de moteur sert à découvrir une source, pas à remplacer automatiquement son contenu. Si les forums restent inaccessibles, note la lacune au lieu de multiplier les requêtes puis de présenter la collecte comme complète.
-
-7. Pour calculer une fréquence de dispositif UX, affiche séparément `oui`, `non` et `nd`. Donne le nombre de marques réellement évaluables ; n'assimile pas les inconnus à des absences. Distingue ensuite observation du panel, témoignage individuel et recommandation analytique. La présence fréquente d'un dispositif chez les concurrents ne démontre pas, à elle seule, qu'il est indispensable à la conversion.
-
-8. Avant remise, compare couverture demandée et couverture obtenue : plateformes, avis lus, marques, pages et captures vérifiées. Déclare explicitement les périmètres partiels, notamment le tunnel et les expériences transfrontalières. Si la mission exige `SubagentHandback`, termine par cet appel unique avec les fichiers, résultats et limites ; ne double pas l'envoi par un autre canal.
+- API / model prices (normalising billing units, resolutions, hidden charges) and provider access (absolute cheapest vs cheapest usable): `references/api-model-pricing-and-access.md`; dated provider snapshots in the other `references/*-pricing*.md` files.
+- Google Trends collection and Keyword Planner gaps: `references/google-trends-keyword-planner.md`.
+- Customer reviews and UX audits without over-reading the evidence: `references/customer-reviews-ux-audit.md`.
+- Constraint ledger, dynamic-OTA protocol, sub-agent reconciliation: `references/constraint-ledger-and-live-availability.md`; Google Flights/OTA transport and price cache: `references/google-ota-transport-and-price-cache.md`.
