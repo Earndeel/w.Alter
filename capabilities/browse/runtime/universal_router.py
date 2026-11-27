@@ -51,6 +51,11 @@ _HTTP_PROBE_HEADERS = {
 # The probe must read far enough to see page BODY content, not just the <head>:
 # judging a static page on its 2KB header is how books.toscrape got branded SPA.
 _PROBE_BODY_BYTES = 262_144
+# Reading a page (content_only): the probe's body IS the read when the page is static, so it reads further (2026-11-27:
+# documentation pages of 0.3-2 MB were judged on their first 256 KB).
+_PROBE_BODY_BYTES_READING = 2_097_152
+# A page this short after cleaning is not a read (a title, a cookie banner); below it the browser reads the page.
+_READ_MIN_CHARS = 120
 _PROBE_JSON_LOOKAHEAD = 4096
 _PROBE_SNIPPET_CHARS = 2048
 
@@ -327,7 +332,18 @@ class CamoufoxMaxClient:
             )
 
             deadline = time.monotonic() + self.capture_wait_seconds
+            reading = _wants_content(spec)
+            read_from = time.monotonic() + 1.5
+            last_text_len = -1
             while True:
+                if reading and time.monotonic() >= read_from:
+                    # Reading a page (2026-11-27): the content is the rendered text, not a JSON response; once it is
+                    # there and stopped growing, waiting the whole capture window only delays the read.
+                    probe_text = await self._evaluate(tab_id, "(document.body?.innerText || '').length")
+                    text_len = int(probe_text) if isinstance(probe_text, (int, float)) else 0
+                    if text_len >= 500 and text_len == last_text_len:
+                        break
+                    last_text_len, read_from = text_len, time.monotonic() + 1.0
                 if native_capture_supported is not False:
                     try:
                         capture_response = await self._request(
@@ -425,6 +441,38 @@ class CamoufoxMaxClient:
 # validated HTTP replay downgrade. No LLM is involved anywhere in this layer.
 # ---------------------------------------------------------------------------
 
+def _visible_text(body: str) -> str:
+    """The readable text of an HTML body. A page that serves its content to clients without JavaScript inside
+    <noscript> (2026-11-27: ai.google.dev puts the whole page as Markdown in <noscript><pre>, and the rest of its body
+    is an empty app shell) is read from there; otherwise <noscript> is noise (« enable JavaScript »)."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(body, "lxml")
+    for tag in soup(["script", "style", "svg", "nav", "footer"]):
+        tag.decompose()
+    hidden = [ns.get_text(separator="\n", strip=True) for ns in soup("noscript")]
+    for ns in soup("noscript"):
+        ns.decompose()
+    squash = lambda s: re.sub(r"\n{2,}", "\n", s).strip()  # noqa: E731
+    text = squash(soup.get_text(separator="\n", strip=True))
+    alt = squash(max(hidden, key=len, default=""))
+    return alt if len(text) < 500 and len(alt) > len(text) else text
+
+
+def _is_app_shell(text: str, body: str) -> bool:
+    """A short text in a heavy scripted page is the shell of a client-rendered app (menus, footer links), not the page:
+    the browser renders it (2026-11-27: an RTINGS review gave 1.3 k chars of menus out of 160 KB of HTML)."""
+    return len(text) < 2000 and "<script" in body.lower() and len(text) < 0.02 * len(body)
+
+
+def _is_plain_text(content_type: str | None) -> bool:
+    """A textual resource that is its own content (Markdown, plain text, llms.txt, CSV, XML), not an HTML page."""
+    ct = (content_type or "").split(";")[0].strip().lower()
+    return (ct.startswith("text/") and ct not in ("text/html", "text/javascript", "text/css")) or ct in (
+        "application/markdown", "application/x-markdown", "application/xml", "application/rss+xml",
+        "application/atom+xml")
+
+
 def _looks_like_challenge(status: int, content_type: str, snippet: str) -> bool:
     """Recognize Cloudflare/challenge blocks from cheap signals only."""
     if status in (403, 429, 503):
@@ -458,6 +506,7 @@ async def http_probe(
     timeout: float = _HTTP_PROBE_TIMEOUT,
     content_hints: Sequence[str] | None = None,
     session: Any = None,
+    max_bytes: int = _PROBE_BODY_BYTES,
 ) -> dict[str, Any]:
     """Cheap GET probe that returns technical signals for routing.
 
@@ -504,12 +553,12 @@ async def http_probe(
                 result["status"] = response.status
                 result["content_type"] = str(response.headers.get("content-type") or "").lower()
                 result["redirect_target"] = response.geturl()
-                raw = response.read(_PROBE_BODY_BYTES)
+                raw = response.read(max_bytes)
         except urllib.error.HTTPError as exc:
             result["status"] = exc.code
             result["content_type"] = str(exc.headers.get("content-type") or "").lower()
             try:
-                raw = exc.read(_PROBE_BODY_BYTES)
+                raw = exc.read(max_bytes)
             except Exception:
                 raw = b""
         except urllib.error.URLError as exc:
@@ -517,6 +566,7 @@ async def http_probe(
             return
 
         result["bytes"] = len(raw)
+        result["truncated"] = len(raw) >= max_bytes
         snippet = raw.decode("utf-8", errors="replace")
         result["body"] = snippet
         result["is_json"] = "json" in (result["content_type"] or "") or snippet.lstrip().startswith(("{", "["))
@@ -584,11 +634,18 @@ class RoutedResult:
     signals: dict[str, Any] | None = None
     probe: dict[str, Any] | None = None
     downgrade: dict[str, Any] | None = None
+    total_s: float | None = None
 
     def summary(self) -> dict[str, Any]:
         payload = self.result.summary()
+        # elapsed_s = the whole access (probe + every attempt); the route's own time stays in last_attempt_s and each
+        # attempt carries its own elapsed_s (2026-11-27: a 58 s access used to show 11.9 s, its last attempt).
+        last_attempt_s = payload.get("elapsed_s")
+        if self.total_s is not None:
+            payload["elapsed_s"] = round(self.total_s, 2)
         payload.update(
             {
+                "last_attempt_s": last_attempt_s,
                 "route": self.route,
                 "attempts": self.attempts,
                 "escalation": self.escalation,
@@ -605,6 +662,9 @@ class RoutedResult:
                         "content_present": self.probe.get("content_present"),
                         "challenge": self.probe.get("challenge"),
                         "probe_ms": self.probe.get("probe_ms"),
+                        "probe_s": round((self.probe.get("probe_ms") or 0) / 1000, 2),
+                        "bytes": self.probe.get("bytes"),
+                        "truncated": self.probe.get("truncated"),
                     }
                     if self.probe
                     else None
@@ -843,14 +903,25 @@ class UniversalRouter:
         *,
         replay_available: bool = False,
         signals: Mapping[str, Any] | None = None,
+        reading: bool = False,
+        domain_hint: Mapping[str, Any] | None = None,
     ) -> list[str]:
         """Build the normal chain, moving only a fresh validated hint to front.
 
         Signal-aware: after a cheap probe, a direct-JSON endpoint skips the
         browser ladder entirely and a challenge skips the plain HTTP attempt.
+
+        Intent-aware (2026-11-27): reading a page (``reading``) does not start with Scrapling, whose strength is catching
+        the site's JSON responses (it waits up to 30 s for one; a page read never gets it): the browser reads the page.
+        Scrapling stays first for structured extraction, and for a read where this page's profile or the domain's
+        record for reads prefers it. A 5xx other than 503 gets one browser attempt. ``domain_hint`` (ProfileIndex.
+        domain_hint, per operation kind, several distinct paths required) moves the route that worked on this domain
+        first and a route that only ever failed there last, never out of the chain.
         """
         order = ["scrapling"]
         signals = signals or {}
+        hint = domain_hint or {}
+        status = signals.get("status") or 0
         is_json = bool(signals.get("is_json"))
         challenge = bool(signals.get("challenge"))
         looks_spa = bool(signals.get("looks_spa"))
@@ -870,11 +941,25 @@ class UniversalRouter:
             order = ["camoufox-max"]
             if self.fallback_to_webtop and self.webtop is not None:
                 order.append("webtop-cdp")
+        elif isinstance(status, int) and status >= 500 and self.fallback_to_camoufox:
+            # Server error (503 is handled as a challenge): one browser attempt, not the whole ladder.
+            order = ["camoufox-max"]
+        elif reading and self.fallback_to_camoufox:
+            if preferred_route != "scrapling" and hint.get("prefer") != "scrapling":
+                order = [b for b in order if b != "scrapling"]
         elif looks_spa:
             # JS-rendered: keep HTTP first (cheap negative), then browser.
             order = ["scrapling", "camoufox-max"]
             if self.fallback_to_webtop and self.webtop is not None:
                 order.append("webtop-cdp")
+
+        for route in hint.get("skip") or ():
+            if route in order and len(order) > 1 and route != preferred_route:
+                order.remove(route)
+                order.append(route)
+        if hint.get("prefer") in order and hint.get("prefer") != preferred_route:
+            order.remove(hint["prefer"])
+            order.insert(0, hint["prefer"])
 
         if replay_available:
             order.insert(0, "replay")
@@ -909,8 +994,43 @@ class UniversalRouter:
         mode: str = "auto",
         session: Any = None,
     ) -> RoutedResult:
+        started = time.perf_counter()
+        routed = await self._route_one(url, spec, mode=mode, session=session)
+        routed.total_s = time.perf_counter() - started
+        return routed
+
+    def _content_result(self, url: str, spec: ExtractionSpec, text: str, content_type: str,
+                        raw_len: int) -> ExtractionResult:
+        """A page read served by the probe itself: its text is the content."""
+        candidate = ResponseCandidate(
+            url=url,
+            method="DOM" if "html" in content_type else "GET",
+            status=200,
+            content_type=content_type,
+            response_bytes=raw_len,
+            elapsed_ms=0,
+            payload={"content": text[:200_000]},
+            matched_fields={"content"},
+            record_count=1,
+            score=100.0,
+        )
+        return finalize_extraction_result(url, spec, time.perf_counter(), [candidate])
+
+    def _observe_route(self, url: str, reading: bool, route: str, ok: bool) -> None:
+        if self.profile_index is not None and hasattr(self.profile_index, "observe_route"):
+            self.profile_index.observe_route(url, "read" if reading else "extract", route, ok)
+
+    async def _route_one(
+        self,
+        url: str,
+        spec: ExtractionSpec,
+        *,
+        mode: str = "auto",
+        session: Any = None,
+    ) -> RoutedResult:
         if mode not in {"auto", "scrapling", "camoufox", "webtop"}:
             raise ValueError("mode must be auto, scrapling, camoufox, or webtop")
+        reading = _wants_content(spec)
 
         authenticated_session = session is not None and (session.identity != 'anonymous' or session.authenticated or session.cookie_count > 0)
         if authenticated_session and mode != 'auto':
@@ -938,7 +1058,10 @@ class UniversalRouter:
                     if token
                 }
             )
-            probe = await http_probe(url, content_hints=hints, **({"session": session} if authenticated_session else {}))
+            probe = await http_probe(url, content_hints=hints, **({"session": session} if authenticated_session else {}),
+                                     **({"max_bytes": _PROBE_BODY_BYTES_READING} if reading else {}))
+            probe_attempt = {"backend": "probe", "usable": True,
+                             "elapsed_s": round((probe.get("probe_ms") or 0) / 1000, 2)}
             signals = {
                 "status": probe.get("status"),
                 "content_type": probe.get("content_type"),
@@ -995,7 +1118,7 @@ class UniversalRouter:
                                     spec,
                                     route="scrapling",
                                     result=direct_result,
-                                    attempts=[{"backend": "probe", "usable": True}],
+                                    attempts=[probe_attempt],
                                     api_discovered=False,
                                     api_replay_validated=None,
                                 )
@@ -1008,11 +1131,12 @@ class UniversalRouter:
                                     elapsed_s=direct_result.elapsed_s,
                                     endpoint_url=url,
                                 )
+                            self._observe_route(url, reading, "probe-http", True)
                             trace.append("HTTP_DIRECT_SUCCESS")
                             return RoutedResult(
                                 result=direct_result,
                                 route="probe-http",
-                                attempts=[{"backend": "probe", "usable": True}],
+                                attempts=[probe_attempt],
                                 profile=dict(profile_summary) if profile_summary is not None else None,
                                 trace=trace,
                                 signals=signals,
@@ -1027,35 +1151,16 @@ class UniversalRouter:
                     # Reading mode (content_only): the spec asks for free text.
                     from universal_extractor import normalize_token as _norm
 
-                    wants_content = any(
-                        "content" in _norm(key) or "text" in _norm(key)
-                        for key in spec.expected_fields
-                    )
+                    wants_content = reading
+                    app_shell = False
                     if wants_content:
                         try:
-                            from bs4 import BeautifulSoup
-
-                            soup = BeautifulSoup(body, "lxml")
-                            for tag in soup(["script", "style", "noscript", "svg", "nav", "footer"]):
-                                tag.decompose()
-                            visible_text = soup.get_text(separator="\n", strip=True)
-                            visible_text = re.sub(r"\n{2,}", "\n", visible_text).strip()
-                            if len(visible_text) >= 120:
-                                content_candidate = ResponseCandidate(
-                                    url=url,
-                                    method="DOM",
-                                    status=200,
-                                    content_type="text/html",
-                                    response_bytes=len(body.encode("utf-8", errors="replace")),
-                                    elapsed_ms=0,
-                                    payload={"content": visible_text[:200_000]},
-                                    matched_fields={"content"},
-                                    record_count=1,
-                                    score=100.0,
-                                )
-                                content_result = finalize_extraction_result(
-                                    url, spec, time.perf_counter(), [content_candidate]
-                                )
+                            visible_text = _visible_text(body)
+                            app_shell = _is_app_shell(visible_text, body)
+                            if len(visible_text) >= _READ_MIN_CHARS and not app_shell:
+                                content_result = self._content_result(
+                                    url, spec, visible_text, "text/html",
+                                    len(body.encode("utf-8", errors="replace")))
                                 if self._usable(content_result) and content_result.records:
                                     if self.profile_index is not None and not authenticated_session:
                                         self.profile_index.observe(
@@ -1063,13 +1168,14 @@ class UniversalRouter:
                                             spec,
                                             route="static-html",
                                             result=content_result,
-                                            attempts=[{"backend": "probe", "usable": True}],
+                                            attempts=[probe_attempt],
                                         )
+                                    self._observe_route(url, reading, "static-html", True)
                                     trace.append("HTML_CONTENT_DIRECT")
                                     return RoutedResult(
                                         result=content_result,
                                         route="static-html",
-                                        attempts=[{"backend": "probe", "usable": True}],
+                                        attempts=[probe_attempt],
                                         profile=(
                                             dict(profile_summary) if profile_summary is not None else None
                                         ),
@@ -1082,14 +1188,14 @@ class UniversalRouter:
                     from static_html import extract_static_html
 
                     static_result = extract_static_html(url, body, spec)
-                    if self._usable(static_result):
+                    if self._usable(static_result) and not app_shell:
                         if self.profile_index is not None and not authenticated_session:
                             self.profile_index.observe(
                                 url,
                                 spec,
                                 route="static-html",
                                 result=static_result,
-                                attempts=[{"backend": "probe", "usable": True}],
+                                attempts=[probe_attempt],
                                 api_discovered=False,
                                 api_replay_validated=None,
                             )
@@ -1102,11 +1208,12 @@ class UniversalRouter:
                                 elapsed_s=static_result.elapsed_s,
                                 endpoint_url=url,
                             )
+                        self._observe_route(url, reading, "static-html", True)
                         trace.append("HTML_STATIC_DIRECT")
                         return RoutedResult(
                             result=static_result,
                             route="static-html",
-                            attempts=[{"backend": "probe", "usable": True}],
+                            attempts=[probe_attempt],
                             profile=(
                                 dict(profile_summary) if profile_summary is not None else None
                             ),
@@ -1117,16 +1224,64 @@ class UniversalRouter:
                 except ImportError:
                     pass  # static extractor unavailable: normal ladder
 
+        if mode == "auto" and probe is not None:
+            status = probe.get("status") or 0
+            ctype = probe.get("content_type") or ""
+            raw_body = probe.get("body") or ""
+            # A textual resource (Markdown, plain text, llms.txt, XML…) read as content: the body is the content
+            # (2026-11-27: Runway's api.md took 46 s through Scrapling and Camoufox for what the probe already had).
+            if (reading and 200 <= status < 300 and _is_plain_text(ctype)
+                    and len(raw_body.strip()) >= _READ_MIN_CHARS):
+                text_result = self._content_result(url, spec, raw_body.strip(), ctype.split(";")[0],
+                                                   len(raw_body.encode("utf-8", errors="replace")))
+                if self._usable(text_result):
+                    if self.profile_index is not None and not authenticated_session:
+                        self.profile_index.observe(url, spec, route="static-html", result=text_result,
+                                                   attempts=[probe_attempt])
+                    self._observe_route(url, reading, "static-html", True)
+                    trace.append("TEXT_CONTENT_DIRECT")
+                    return RoutedResult(
+                        result=text_result, route="static-html", attempts=[probe_attempt],
+                        profile=dict(profile_summary) if profile_summary is not None else None,
+                        trace=trace, signals=signals, probe=probe)
+            # A page that really does not exist: the server says so and it is not an anti-bot page (those come as
+            # 403/429/503 or carry challenge markers). Answer at once instead of running every browser on an error page,
+            # unless this very page was read before (a known address that now 404s to robots only).
+            known_page = profile_hit is not None and profile_hit.preferred_route is not None
+            if status in (404, 410) and not probe.get("challenge") and not known_page:
+                trace.append("NOT_FOUND")
+                return RoutedResult(
+                    result=self._error_result(
+                        url, spec,
+                        f"page not found (HTTP {status}): this address does not exist on the site; search for the "
+                        "right address (a guessed URL is often wrong). mode='camoufox' forces a browser read."),
+                    route="probe-http",
+                    attempts=[{**probe_attempt, "usable": False}],
+                    profile=dict(profile_summary) if profile_summary is not None else None,
+                    trace=trace, signals=signals, probe=probe)
+
         if authenticated_session:
             return RoutedResult(self._error_result(url, spec, 'managed authenticated HTTP did not satisfy the contract; no anonymous fallback'),
                                 'session-http', [{'backend':'session-http', 'usable':False}], trace=trace, signals=signals, probe=probe)
 
         if mode == "auto":
+            hint = None
+            if self.profile_index is not None and hasattr(self.profile_index, "domain_hint"):
+                try:
+                    hint = self.profile_index.domain_hint(url, "read" if reading else "extract")
+                except Exception:  # noqa: BLE001 — a hint is optional
+                    hint = None
+            if hint and (hint.get("prefer") or hint.get("skip")) and signals is not None:
+                signals["domain_hint"] = {k: hint[k] for k in ("prefer", "skip")}
             order = self._auto_order(
                 profile_hit.preferred_route if profile_hit is not None else None,
                 replay_available=bool(profile_hit and profile_hit.replay_available),
                 signals=signals,
+                reading=reading,
+                domain_hint=hint,
             )
+            if signals and isinstance(signals.get("status"), int) and signals["status"] >= 500 and not signals.get("challenge"):
+                trace.append("SERVER_ERROR_ONE_ATTEMPT")
         else:
             order = {
                 "scrapling": ["scrapling"],
@@ -1139,6 +1294,8 @@ class UniversalRouter:
             attempt = self._attempt(backend, result)
             attempts.append(attempt)
             last_result = result
+            if mode == "auto":
+                self._observe_route(url, reading, backend, attempt["usable"])
             if self._usable(result):
                 # Lot 1: API discovery + validated HTTP replay downgrade.
                 # Browser/context stays live (Camoufox Max server keeps the

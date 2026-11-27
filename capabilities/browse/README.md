@@ -155,3 +155,35 @@ découverte et la réparation) :
   comme externe. Limite : sur ChatGPT ce contrôle n'a pas d'attribut stable, la recette retient
   son libellé `aria-label` dans la langue de l'empreinte (thaï) ; si elle change, déclarer le nouveau libellé.
 
+
+## Choix de la voie par intention et ressource (2026-11-27)
+
+`runtime/universal_router.py`, sans modèle. La sonde HTTP décide d'abord. Pour une lecture, elle lit jusqu'à 2 Mo, au lieu de 256 Ko pour une extraction.
+
+**Servi par la sonde :**
+- le JSON ;
+- le HTML statique qui a au moins 120 caractères de texte. Le texte d'un `<noscript>` compte quand la page n'a pas le sien : ai.google.dev met toute la page en Markdown dans `<noscript><pre>` ;
+- le Markdown, le texte brut, `llms.txt` et le XML (`TEXT_CONTENT_DIRECT`).
+
+**Coquille d'application.** Quand le texte est court dans une page lourde en scripts, ce sont des menus et non le contenu : le navigateur rend la page.
+
+**Ordre des tentatives :**
+- Une **lecture** (`content_only`) ne commence pas par Scrapling, qui attend jusqu'à 30 s une réponse JSON du site : elle passe directement par Camoufox. Camoufox s'arrête dès que le texte rendu est présent et stable.
+- Une **extraction** garde Scrapling en premier, puisque son rôle est de capter les API.
+
+**Erreurs :**
+- **404 et 410** sans marque anti-robot, sur une page jamais lue : réponse immédiate « page not found » (`NOT_FOUND`). `mode="camoufox"` force quand même une lecture.
+- **5xx** (sauf 503, traité comme un défi anti-robot) : une seule tentative de navigateur (`SERVER_ERROR_ONE_ATTEMPT`).
+
+**Apprentissage par domaine** (`ProfileIndex.observe_route` / `domain_hint`) :
+- Il est tenu par type d'opération (`read` / `extract`) et par voie, avec les chemins distincts.
+- Une voie qui a marché sur au moins 2 pages du domaine passe en tête.
+- Une voie qui a échoué sur au moins 2 pages, sans jamais réussir, passe en dernier, sans être retirée.
+- Les observations de plus de 30 jours sont oubliées.
+- Le profil de la page elle-même reste prioritaire.
+
+**Temps :**
+- `elapsed_s` donne l'accès complet ;
+- `last_attempt_s` donne la dernière tentative ;
+- chaque tentative a son `elapsed_s` ;
+- `probe.probe_s` donne la durée de la sonde.

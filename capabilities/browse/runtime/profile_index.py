@@ -1092,6 +1092,69 @@ class ProfileIndex:
                     result.append(dict(entry))
             return sorted(result, key=lambda e: (e.get("host", ""), e.get("name", "")))
 
+    # -- 2026-11-27: what each route did on a domain, per kind of operation ---------------------------------------------
+    # The domain aggregate above kept the last successful route only, whatever the operation, and the router never read
+    # it (observation 2026-11-27: ai.google.dev learned « Scrapling fails, Camoufox works » in the morning and paid
+    # Scrapling's 30 s again on two other pages of it). Here a route's outcome is kept per kind ("read" = a page's text,
+    # "extract" = structured fields) with the distinct paths it was seen on, and a hint is drawn only from several
+    # pages of the site (never one page generalised to the site) and recent observations.
+
+    HINT_MIN_PATHS = 2
+    HINT_MAX_AGE_S = 30 * 86400
+
+    def observe_route(self, url: str, kind: str, route: str, ok: bool) -> None:
+        host = _normalized_host(url)
+        if not host or kind not in ("read", "extract") or not route:
+            return
+        path = url_scope(url)["path"]
+        now_epoch = time.time()
+        try:
+            with self._thread_lock, self._file_lock():
+                payload = self._load_unlocked()
+                domain = payload["domains"].get(host)
+                if domain is None:
+                    domain = _new_domain_profile(host)
+                    payload["domains"][host] = domain
+                row = domain.setdefault("kinds", {}).setdefault(kind, {}).setdefault(
+                    route, {"ok": 0, "fail": 0, "ok_paths": [], "fail_paths": [], "last_epoch": 0.0})
+                key, paths = ("ok", "ok_paths") if ok else ("fail", "fail_paths")
+                row[key] = _safe_int(row.get(key)) + 1
+                seen = [p for p in row.get(paths) or [] if p != path] + [path]
+                row[paths] = seen[-8:]
+                row["last_epoch"] = now_epoch
+                payload["updated_at"] = _utc_now()
+                self._write_unlocked(payload)
+        except Exception:  # noqa: BLE001 — learning is best-effort, never breaks a read
+            pass
+
+    def domain_hint(self, url: str, kind: str, *, now_epoch: float | None = None) -> dict[str, Any]:
+        """{"prefer": route | None, "skip": [routes], "why": {...}} for this kind of operation on this URL's host.
+        prefer: a route that worked on ≥ 2 distinct pages and failed on fewer than it worked; skip: a route that failed
+        on ≥ 2 distinct pages and never worked there. Older than 30 days = forgotten."""
+        out: dict[str, Any] = {"prefer": None, "skip": [], "why": {}}
+        host = _normalized_host(url)
+        if not host:
+            return out
+        now_epoch = now_epoch or time.time()
+        with self._thread_lock, self._file_lock():
+            domain = self._load_unlocked()["domains"].get(host) or {}
+        rows = ((domain.get("kinds") or {}).get(kind) or {})
+        best = None
+        for route, row in rows.items():
+            if now_epoch - _safe_float(row.get("last_epoch"), 0.0) > self.HINT_MAX_AGE_S:
+                continue
+            ok, fail = _safe_int(row.get("ok")), _safe_int(row.get("fail"))
+            ok_paths, fail_paths = len(row.get("ok_paths") or []), len(row.get("fail_paths") or [])
+            if ok == 0 and fail_paths >= self.HINT_MIN_PATHS:
+                out["skip"].append(route)
+                out["why"][route] = f"failed on {fail_paths} pages of {host}, never worked ({kind})"
+            elif ok_paths >= self.HINT_MIN_PATHS and fail < ok and (best is None or ok > best[1]):
+                best = (route, ok)
+        if best:
+            out["prefer"] = best[0]
+            out["why"][best[0]] = f"worked on several pages of {host} ({kind})"
+        return out
+
     def domain_profile(self, host: str) -> dict[str, Any] | None:
         with self._thread_lock, self._file_lock():
             payload = self._load_unlocked()

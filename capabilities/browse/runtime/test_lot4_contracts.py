@@ -262,7 +262,7 @@ class UpgradeSimulationTests(unittest.IsolatedAsyncioTestCase):
 
         original_probe = ur_mod.http_probe
 
-        async def fake_probe(url, *, timeout=0.0, content_hints=None):
+        async def fake_probe(url, *, timeout=0.0, content_hints=None, **_):
             return {
                 "status": 200,
                 "content_type": "text/html",

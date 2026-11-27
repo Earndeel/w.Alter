@@ -250,7 +250,7 @@ class StaticHtmlFastPathTests(unittest.IsolatedAsyncioTestCase):
         # Patch http_probe to return our static fixture (no real network in tests).
         import universal_router as mod
 
-        async def fake_probe(url, *, timeout=0.0, content_hints=None):
+        async def fake_probe(url, *, timeout=0.0, content_hints=None, **_):
             body = self.STATIC_PAGE
             return {
                 "status": 200,
@@ -321,7 +321,7 @@ class SingleObjectJsonTests(unittest.IsolatedAsyncioTestCase):
     async def _route(self, spec):
         import universal_router as mod
 
-        async def fake_probe(url, *, timeout=0.0, content_hints=None):
+        async def fake_probe(url, *, timeout=0.0, content_hints=None, **_):
             return {"status": 200, "content_type": "application/json; charset=utf-8", "bytes": len(self.BODY),
                     "is_json": True, "has_scripts": False, "html_ratio": 1.0, "looks_spa": False,
                     "content_present": False, "challenge": False, "redirect_target": None, "error": None,
