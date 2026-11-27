@@ -19847,7 +19847,7 @@
     "config/subscriptions.json": "b024fe62090d03e99ea7c06e6a76fd98228ab0d9811692ae07a65ccf4f958dac",
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "e5a30b7b5a5cc295eb05115fc25b3ca5efdc2ea64a3414b5f57c94cd9916bc33",
-    "contracts/router.json": "81de180aa4a0e899c22bd575f38c9dbabeb9782edb4a860682661ba832781db9",
+    "contracts/router.json": "a2d01227f2b6ce55e47dce07fdf1760bac2b9f08279c4b2bdea16daf1568dea5",
     "documentation.py": "2c37ce0d6189e2551eb7b85ed70060fdd196ed6ef36f420bcb6b1e8e1e9e448c",
     "guardian/__init__.py": "a28ff92bf9c1254bad5416a6139b10f03a3cfedd0955894a65d042960b4ee587",
     "guardian/__main__.py": "507846e4c26dd1f427861a627daa6a4aea91e91710ed1640405f1e074d11b064",
