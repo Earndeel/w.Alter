@@ -98,8 +98,10 @@ def report(*, scan=False, live=False, path=None):
         from .documentation import scan as documentation
         out['documentation']=documentation(enforce=True)   # blocking since 2026-11-09 (stock caught up in E1)
         out['presentation']=_presentation_check()   # 2026-11-14: an invalid M0/M1 blocks here, not silently at injection
+        from .exposure import scan as exposure
+        out['exposure']=exposure()   # 2026-11-27: a world-readable credential file blocks (Python security study S0)
         out['ok']=(out['ok'] and out['interconnect']['ok'] and out['neutrality']['ok'] and out['documentation']['ok']
-                   and out['presentation']['ok'])
+                   and out['presentation']['ok'] and out['exposure']['ok'])
     return out
 
 
