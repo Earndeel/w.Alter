@@ -89,7 +89,7 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 |---|---|
 | Modules (walter-memory, Kardex…) | walter-llm with `model` = a router task; `pick` for service postes (STT, rerank, embeddings) |
 | walter-memory triage | `decision-chain` (Drex Max 1.1 on Nace's own API — pinned by the owner 2026-11-13, declared offer `nace/drex-max-v1.1`, grant `nace` —, then Clef on Workers AI; Mercury Decide withdrawn 2026-11-13) |
-| Claude Code, Codex, DSH | the `walter` MCP: the same four tools under the same names, the same runs; the brief in the MCP server instructions (Claude Code) and in their W.Alter profile (Codex, DSH). Their own model stays theirs |
+| Claude Code, Codex | the `walter` MCP: the same four tools under the same names, the same runs; the brief in the MCP server instructions (Claude Code) and in their W.Alter profile (Codex). (DSH, uninstalled 2026-11-18, used the same.) Their own model stays theirs |
 | walter-context (planned) | the decision model (`classify` / `ask`) to set the agentic level of a turn |
 | walter-core | `walter-router health` in `walter_health` |
 
