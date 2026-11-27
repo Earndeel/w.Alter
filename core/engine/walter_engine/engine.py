@@ -74,6 +74,26 @@ def past_pack(text: str, at_ms: int | None, epoch_ms: int | None) -> str:
 
 
 
+def pack_stub(text: str, seq: int) -> str:
+    """An earlier turn's prepared context once that turn is over (observation 2026-11-27: 18 k characters of old packs
+    re-sent at every call of a later turn). The answer that used it stays in the history; what it held stays
+    reachable (`context_recover(ref="pack:<seq>")`, and Memory itself). Deterministic: the same history gives the same
+    text, so the provider cache keeps the prefix."""
+    i, j = text.find("<walter-context>"), text.find("</walter-context>")
+    if i < 0 or j < i:
+        return text
+    titles = []
+    for line in text[i:j].splitlines():
+        if line.startswith("## "):
+            t = re.split(r" \(| —|:", line[3:], maxsplit=1)[0].strip()
+            if t and t not in titles:
+                titles.append(t)
+    what = f" ({'; '.join(titles[:6])})" if titles else ""
+    return (text[:i] + f"<walter-context>\n[Contexte préparé pour un message précédent{what}, retiré de l'historique "
+            f"une fois ce tour fini : le contexte du message actuel est celui qui vaut ; l'original reste lisible avec "
+            f"context_recover(ref=\"pack:{seq}\").]\n" + text[j:])
+
+
 def socle_block(answer: dict, parts: dict) -> dict | None:
     """The stable block from Memory's answer (/v1/owner-rules) and the socle parts this turn sends: a consigne is left
     out only while every quote of its covered_by marks is in the named part (owner 2026-11-26: a marking never makes a
@@ -114,15 +134,21 @@ def _doc_layer(form: str) -> str:
 PYTHON_ONLY = ("This is your only tool: every capability (W.Alter's modules and the engine's own read, write, edit, "
                "bash, subagent, present, ask_user_question…) is called from here as `await tools.<name>(**args)`.")
 PYTHON_ONLY_NOTE = ("## Using capabilities\n"
-                    "Your only tool is `python`, the persistent kernel. Every capability named in this documentation is "
-                    "a function there: `await tools.memory_search(query=…)`, `await tools.read(file_path=…)`, "
-                    "`await tools.subagent(...)`. `await tools.search(\"need\")` finds one, `await tools.describe(name)` "
-                    "gives its parameters and effects, `await tools.catalog()` lists them all. Calls follow the same "
-                    "permissions and logs as direct calls; independent ones run together with `asyncio.gather`. "
-                    "Before doing by hand what a capability does (an image, a web search, a delegation), look for it: "
-                    "`tools.search` covers every capability, `tools.skills_search` only written procedures. Finish "
-                    "within the turn: await what you start (an image through `walter_run` takes a minute or two) and "
-                    "leave work running in the background only when the owner asks for it.")
+                    "Your only tool is `python`, the persistent kernel. Every capability is a function there, `await "
+                    "tools.<name>(…)`; the map below gives each one's signature (optional arguments marked `?`) "
+                    "and purpose, so calling one needs no lookup first. `await tools.describe(name)` gives the "
+                    "full contract (types, effects, returns) when the signature is not enough; `await tools.search(\"need\")` "
+                    "finds one by need, each row with its `call`. Finding, reading a contract and calling go in one "
+                    "cell when that makes sense; independent calls run together with `asyncio.gather`. Calls follow the "
+                    "same permissions and logs as direct calls. A skill (`skills_search`, `skill_read`) is know-how for "
+                    "a procedure the contracts do not settle, not a step before using a capability.\n"
+                    "Delegation: `await delegate(prompt)` runs a sub-agent and returns its answer; `await "
+                    "delegate_all([...])` runs several at once; `h = await delegate(prompt, background=True)` starts one "
+                    "and `await h` waits for its answer later, without polling. Give each sub-agent a distinct part, "
+                    "do only the part you kept, then check and combine their answers: do not redo a delegated part.\n"
+                    "Finish within the turn: await what you start (an image through `walter_run` takes a minute or two) "
+                    "and leave work running in the background only when the owner asks for it.")
+CAPABILITY_MAP_HEAD = "### Capability map (generated from the live registry)\n"
 
 
 def _walter_call_note(instructions: str) -> str:
@@ -460,6 +486,15 @@ class Engine:
         else:
             a.inbox.append(item)
             self._ensure(a)
+
+    def consume_notice(self, a: Agent, job_id: str) -> None:
+        """A settled job's answer was just read (job_output, `await h` in Python): its wake-up notice, still queued, is
+        dropped so the result does not enter the context a second time."""
+        tag = f"({job_id})"
+        for q in (a.steers, a.inbox):
+            for it in [x for x in q if (x.get("source") or {}).get("kind") in ("subagent-settled", "tool-jobs")
+                       and tag in (x.get("text") or "")]:
+                q.remove(it)
 
     def interrupt(self, a: Agent, reason: str = "") -> bool:
         if not a.busy:
@@ -834,7 +869,7 @@ class Engine:
         t0 = time.monotonic()
         problems = caps.check_arguments(tool.parameters, args) if tool else {}
         if tool is None:
-            res = Result(f"no tool named {name}" + ("" if self.mcp.tools else " (Walter tools are starting; try again)"), True)
+            res = Result(self.registry.unknown(name) + ("" if self.mcp.tools else " (Walter tools are starting; try again)"), True)
         elif problems.get("missing") or problems.get("unknown"):
             # never run a tool on a guessed default (`read` without file_path = the cwd), never drop an argument
             # silently (logs_get(ref=…) against an older schema): the error carries the tool's own schema
@@ -1291,6 +1326,8 @@ class Engine:
             out.append(("walter_doc", hashlib.sha256(a._doc.encode()).hexdigest()[:16], doc))
         if a._rules:
             out.append(("owner_rules", a._rules["sha"]))
+        if self._exposure(a) == "python":      # the capability map follows the registry (a tool added, a description)
+            out.append(("capability_map", hashlib.sha256(self._python_note().encode()).hexdigest()[:16]))
         return tuple(out)
 
     async def _owner_rules(self, a: Agent) -> None:
@@ -1315,6 +1352,16 @@ class Engine:
         parts = {k: self._read_part(p) for k, p in (("soul", self.s.soul), ("engine_rules", self.s.operating),
                                                     ("conduct", self.s.conduct)) if p}
         a._rules = socle_block(last, parts)
+
+    def _python_note(self) -> str:
+        """The Python door's note and the capability map generated from the registry (observation 2026-11-27: with
+        only `search`/`describe` named, every web turn began with a discovery ritual of 3–5 cells)."""
+        try:
+            cmap = self.registry.capability_map()
+        except Exception as e:  # noqa: BLE001 — never a turn without its note
+            log.warning("capability map unavailable: %s", e)
+            cmap = ""
+        return PYTHON_ONLY_NOTE + ("\n\n" + CAPABILITY_MAP_HEAD + cmap if cmap else "")
 
     @staticmethod
     def _read_part(path: str) -> str:
@@ -1370,12 +1417,12 @@ class Engine:
             # lot 3c: W.Alter's own documentation replaces the MCP server's module layer; only the server's note on
             # tools reachable through walter_call is kept (it depends on this client's toolset)
             named.append(("walter_doc", a._doc))
-            note = PYTHON_ONLY_NOTE if self._exposure(a) == "python" else _walter_call_note(self.mcp.instructions or "")
+            note = self._python_note() if self._exposure(a) == "python" else _walter_call_note(self.mcp.instructions or "")
             if note:
                 named.append(("mcp_instructions", note))
         elif self.mcp.instructions:
             named.append(("mcp_instructions", self.mcp.instructions.strip()
-                          + ("\n\n" + PYTHON_ONLY_NOTE if self._exposure(a) == "python" else "")))
+                          + ("\n\n" + self._python_note() if self._exposure(a) == "python" else "")))
         if v2 and comm:
             profile = "\n\n".join(t for t in (self._read_part(p) for p in self._communication_files(a)) if t)
             if profile:
@@ -1443,9 +1490,13 @@ class Engine:
         out = [{"role": "system", "content": self._system_content(a)}]
         epoch = _epoch_ms((a._rules or {}).get("epoch"))
         times = {e["seq"]: e.get("time") for e in a.session.events} if a._rules else {}
+        stub = self.s.past_packs == "stub"
         for seq, m in journal.surface(a.session, prune=prune):
-            if a._rules and seq < live_from and m.get("role") == "user" and isinstance(m.get("content"), str):
-                m["content"] = past_pack(m["content"], times.get(seq), epoch)
+            if seq < live_from and m.get("role") == "user" and isinstance(m.get("content"), str):
+                if stub and m["content"].lstrip().startswith("<walter-context>"):
+                    m["content"] = pack_stub(m["content"], seq)
+                elif a._rules:
+                    m["content"] = past_pack(m["content"], times.get(seq), epoch)
             imgs = m.pop("_images", None)
             if imgs and seq >= live_from:
                 parts = [{"type": "text", "text": m.get("content") or ""}]

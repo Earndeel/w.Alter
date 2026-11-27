@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
@@ -74,6 +75,11 @@ class Tool:
     def schema(self) -> dict:
         return {"type": "function", "function": {"name": self.name, "description": self.description,
                                                  "parameters": self.parameters}}
+
+
+def _short(name: str) -> str:
+    """A tool as Python names it: Walter tools by their short name (`mcp__walter__memory_search` → `memory_search`)."""
+    return name.removeprefix("mcp__walter__")
 
 
 def clip(text: str, limit: int, *, head_ratio: float = 0.4) -> str:
@@ -192,15 +198,56 @@ class Registry:
         """Discovery for `await tools.search("…")`: BM25 over each tool's card, derived from its description, its
         module's presentation, its declaration and the intents generated from them (walter_platform.discovery).
         Each row: name, description, module, effects, score."""
-        return self._index().search(str(query or ""), limit)
+        rows = self._index().search(str(query or ""), limit)
+        for r in rows:              # the signature: search → call in the same cell, without a describe in between
+            t = self.tools.get(r["name"])
+            if t:
+                r["call"] = f"await tools.{self.signature(t)}"
+        return rows
 
     def describe(self, name: str) -> dict:
         """A tool's whole contract: description, parameters, owner, effects, concurrency, references, returns."""
         t = self.tools.get(name)
         if not t:
-            raise KeyError(f"no tool named {name}; await tools.search(\"…\")")
+            raise KeyError(self.unknown(name))
         return capabilities().describe_record(t.name, t.description, t.parameters,
                                               {**self.spec(name), "module": t.module})
+
+    def unknown(self, name: str) -> str:
+        """The answer to a name that is no tool (observation 2026-11-27: `skills_read` for `skill_read` cost a round
+        trip each time): the closest real names, so the next cell calls the right one."""
+        import difflib
+        short = {_short(n): n for n in self.tools if n != "python"}
+        want = _short(str(name or ""))
+        close = difflib.get_close_matches(want, list(short), n=2, cutoff=0.8)     # a misspelling: skills_read
+        for r in self.search(want.replace("_", " "), 3):                          # a guessed name: web_search
+            if len(close) < 3 and _short(r["name"]) not in close:
+                close.append(_short(r["name"]))
+        hint = f"; did you mean {', '.join(close)}?" if close else ""
+        return f"no tool named {name}{hint} (await tools.search(\"…\") finds one by need)"
+
+    def signature(self, t: Tool) -> str:
+        """`name(required, optional?, …)`: enough to call a tool from Python without describing it first."""
+        props = list(((t.parameters or {}).get("properties") or {}))
+        req = [p for p in ((t.parameters or {}).get("required") or []) if p in props]
+        opt = [p for p in props if p not in req]
+        args = req + [f"{p}?" for p in opt[:5]] + (["…"] if len(opt) > 5 else [])
+        return f"{_short(t.name)}({', '.join(args)})"
+
+    def capability_map(self) -> str:
+        """Every capability reachable from Python, by owner module, one line each: its call signature and the first
+        sentence of its description. Generated from the registry (the same source as search/describe), so it is
+        never stale; it changes only when a tool or a description changes (the cached socle follows)."""
+        caps = capabilities()
+        by: dict[str, list[str]] = {}
+        for t in self._searchable():
+            if _short(t.name) == "walter_call":       # the direct doors' bridge: Python reaches every tool itself
+                continue
+            text = " ".join(caps.summary(t.description).split())
+            first = re.split(r"(?<=[.;])\s(?=[A-Z`(])", text, maxsplit=1)[0].rstrip(".;")
+            first = first if len(first) <= 100 else first[:97].rstrip(" ,(") + "…"
+            by.setdefault(t.module or "core", []).append(f"`{self.signature(t)}` {first}")
+        return "\n".join(f"- **{m}**: " + " · ".join(by[m]) for m in sorted(by, key=lambda m: (m == "core", m)))
 
     def catalog(self, module: str = "") -> dict:
         """Every tool reachable from Python, by owner, with its one-line summary and declared effects; the modules

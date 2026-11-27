@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Source des parties de la composition DSH qui n'étaient pas encore rendues : la « face » du profil web (nom, phrase d'accueil, durée de connexion du navigateur). Rendue par walter-core (`walter harness install dsh`) dans un bloc géré `dsh-face`, juste avant le bloc `dsh-web`. |
 | **Propriétaire** | walter-core (`core/engine`). Les valeurs appartiennent à l'instance : `walter instance config core engine.toml` (défaut neutre : `core/config/engine.toml`). |
-| **État** | Actif depuis le 09/11/2026 (lot E1) : les lignes tenues à la main dans `/opt/dsh/home/profiles/web/cordis.patch.yml` ont été adoptées par le bloc rendu, configuration composée (`--dump-config`) identique avant et après. |
+| **État** | **Retour arrière seulement** depuis le 17/11/2026 (moteur natif ; DSH désinstallé le 18/11). Historique : actif depuis le 09/11/2026 (lot E1) : les lignes tenues à la main dans `/opt/dsh/home/profiles/web/cordis.patch.yml` ont été adoptées par le bloc rendu, configuration composée (`--dump-config`) identique avant et après. |
 | **Ne fait pas** | Ne lance ni ne redémarre DSH ; ne touche pas aux préférences que DSH enregistre lui-même (thème, langue, avis d'accueil : état de l'utilisateur, ajoutées par DSH après les blocs gérés) ; n'écrase jamais une ligne écrite à la main pour les mêmes cibles (conflit explicite). |
 | **Contrats** | Gabarit `dsh-face.patch.yml` (`${…}` remplacés par des scalaires JSON) ; valeurs `[dsh.web]` `name`, `tagline`, `cookie_max_age_days` (entier > 0) et `[dsh.model_names]` (noms affichés des tâches Walter Router) ; bloc `# walter:dsh-face` empreinté comme les autres sections gérées (`walter_platform/composition.py`). |
 

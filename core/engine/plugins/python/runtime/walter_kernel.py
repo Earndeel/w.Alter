@@ -367,11 +367,45 @@ async def _subagent_params() -> set:
     return _SUBAGENT_PARAMS
 
 
+class Delegation:
+    """A sub-agent working in the background. `await h` (or `await h.wait(timeout)`) waits for its answer without
+    polling (the engine's job wait); `h.agent_id` for send_message / interrupt_agent, `h.job_id` for job_output.
+    Ending the turn instead also works: the engine wakes the session with the answer."""
+
+    def __init__(self, agent_id: str, job_id: str, description: str):
+        self.agent_id, self.job_id, self.description = agent_id, job_id, description
+        self.answer: str | None = None
+        self.status = "running"
+
+    async def wait(self, timeout: float = 1800) -> str:
+        end = time.time() + max(1.0, float(timeout))
+        while self.answer is None:
+            left = end - time.time()
+            if left <= 0:
+                raise TimeoutError(f"sub-agent {self.description!r} still running after {timeout:.0f} s ({self.job_id})")
+            out = await tools.job_output(job_id=self.job_id, wait=True, timeout_ms=int(min(left, 600) * 1000))
+            j = (out or {}).get("job") if isinstance(out, dict) else None
+            if j and j.get("status") != "running":
+                self.status = j.get("status") or "completed"
+                text = (out.get("output") or "").strip()
+                self.answer = text if text and not out.get("truncated_before") else str(j.get("result") or text)
+        return self.answer
+
+    def __await__(self):
+        return self.wait().__await__()
+
+    def __repr__(self) -> str:
+        return f"<Delegation {self.job_id} {self.status}: {self.description}>"
+
+    def __reduce__(self):
+        return (str, (repr(self),))
+
+
 async def delegate(prompt: str, *, description: str | None = None, poste: str | None = None,
                    effort: str | None = None, background: bool = False) -> Any:
     """A sub-agent of the engine on a self-contained task; waits for and returns its result. `poste` = a Walter
     Router task (`code`, `general`, `document`…) for the child's model; omitted = the engine's default (the Router's
-    plan). `background=True` returns the sub-agent's id at once; the engine wakes the session when it settles."""
+    plan). `background=True` returns a Delegation at once: work on something else, then `await` it for the answer."""
     args: dict[str, Any] = {"description": (description or " ".join(prompt.split()[:6]))[:80], "prompt": prompt}
     if poste:
         args.update(provider="walter", model=poste)
@@ -379,7 +413,10 @@ async def delegate(prompt: str, *, description: str | None = None, poste: str | 
         args["reasoning_effort"] = effort
     if "run_in_background" in await _subagent_params():
         args["run_in_background"] = bool(background)
-    return await tools.call("subagent", **args)
+    out = await tools.call("subagent", **args)
+    if background and isinstance(out, dict) and out.get("job_id"):
+        return Delegation(str(out.get("agent_id") or ""), str(out["job_id"]), args["description"])
+    return out
 
 
 async def delegate_all(tasks: list, *, limit: int = 4) -> list:

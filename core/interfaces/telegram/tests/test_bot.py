@@ -101,7 +101,7 @@ def test_events_show_progress_then_the_answer_once(door):
     door.on_event(CHAT, sid, {"type": "message.assistant", "text": "**Sagora** est en ligne.", "seq": 3})
     door.on_event(CHAT, sid, {"type": "turn.ended", "status": "ok", "seq": 4})
     sends = [p for m, p in door.tg.calls if m == "sendMessage"]
-    assert sends[0]["text"] == "⏳ mémoire" and sends[0]["disable_notification"]
+    assert sends[0]["text"] == "⏳ 🧠 mémoire" and sends[0]["disable_notification"]
     assert sends[-1]["text"] == "<b>Sagora</b> est en ligne." and sends[-1]["parse_mode"] == "HTML"
     assert ("deleteMessage", {"chat_id": CHAT, "message_id": 101}) in door.tg.calls
     assert sid not in door.turns
@@ -334,3 +334,32 @@ def test_send_accepts_options_before_its_text_as_every_module_calls_it():
     assert B.parse_cli(["send", "--plain", "bonjour"]).text == "bonjour"
     assert B.parse_cli(["send", "bonjour", "--silent"]).silent is True
     assert B.parse_cli(["--check"]).check is True and B.parse_cli([]).command == "serve"
+
+
+def test_progress_names_the_capabilities_at_work_never_python_and_shows_the_answer_being_written(door, monkeypatch):
+    sid, clock = "s-progress", [1000.0]
+    monkeypatch.setattr(B.time, "time", lambda: clock[0])
+
+    def ev(e):
+        clock[0] += 3                                    # past the 2.5 s edit throttle
+        door.on_event(CHAT, sid, e)
+
+    def shown():
+        last = [p["text"] for m, p in door.tg.calls if m in ("sendMessage", "editMessageText") and p["text"].startswith("⏳")]
+        return last[-1]
+    ev({"type": "turn.started"})
+    ev({"type": "tool.called", "name": "python"})
+    assert shown() == "⏳ ⚙️ analyse"
+    ev({"type": "tool.called", "name": "mcp__walter__walter_browse", "nested": True})
+    ev({"type": "tool.called", "name": "mcp__walter__walter_browse", "nested": True})
+    ev({"type": "tool.called", "name": "job_output", "nested": True})          # bookkeeping: not shown
+    ev({"type": "tool.called", "name": "python"})                              # a later cell: no « analyse » again
+    ev({"type": "tool.called", "name": "mcp__walter__walter_run", "nested": True, "task": "image"})
+    assert shown() == "⏳ 🔎 recherche web ×2 · 🎨 génération d'image"
+    ev({"type": "message.delta", "text": "Voici "})
+    ev({"type": "message.delta", "text": "le comparatif"})
+    assert shown().endswith("✍️ Voici le comparatif")
+    ev({"type": "message.assistant", "text": "Voici le comparatif complet."})
+    ev({"type": "turn.ended", "status": "ok"})
+    assert [p["text"] for m, p in door.tg.calls if m == "sendMessage"][-1] == "Voici le comparatif complet."
+    assert not any("python" in p.get("text", "") for m, p in door.tg.calls)

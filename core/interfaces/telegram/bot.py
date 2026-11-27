@@ -154,7 +154,8 @@ class Engine:
     def events(self, session_id: str, since: int | None, stop: threading.Event):
         """SSE of one session, subscribed when this returns: an iterator of client events (dicts) until the stream
         ends or `stop` is set."""
-        q = f"session_id={urllib.request.quote(session_id, safe='')}" + (f"&since_seq={since}" if since is not None else "")
+        q = (f"session_id={urllib.request.quote(session_id, safe='')}&progress=1"     # capabilities at work + deltas
+             + (f"&since_seq={since}" if since is not None else ""))
         req = urllib.request.Request(f"{self.base}/v1/events?{q}", headers=self._headers())
         try:
             r = urllib.request.urlopen(req, timeout=45)   # pings every 15 s keep the read alive
@@ -330,6 +331,8 @@ class Turn:
     def __init__(self):
         self.text = ""
         self.tools: list[str] = []
+        self.counts: dict[str, int] = {}
+        self.draft = ""                              # the answer being written (live deltas), shown in the status
         self.status_msg: int | None = None
         self.status_shown = ""
         self.status_at = 0.0
@@ -457,16 +460,30 @@ class Bot:
         elif kind == "message.assistant":
             turn = self.turns.setdefault(sid, Turn())
             text = (ev.get("text") or "").strip()
+            turn.draft = ""      # the written text is now a message of its own
             if text:
                 if turn.text:     # an earlier message of the same turn: shown now, quietly (never lost)
                     self.send(chat, turn.text, disable_notification=True)
                 turn.text = text  # the latest one is kept for the end of the turn, with its notification
         elif kind == "tool.called":
             turn = self.turns.setdefault(sid, Turn())
-            label = tgformat.tool_label(ev.get("name", ""))
-            if label not in turn.tools:
-                turn.tools.append(label)
+            turn.draft = ""          # text written before a tool call was a step's preface, not the answer
+            label = tgformat.progress_label(ev.get("name", ""), ev.get("task") or "")
+            if label:
+                if label == "⚙️ analyse" and turn.tools:
+                    label = None     # a cell: shown only until the capabilities it calls are known
+                elif label != "⚙️ analyse" and "⚙️ analyse" in turn.tools:
+                    turn.tools.remove("⚙️ analyse")
+            if label:
+                if label not in turn.tools:
+                    turn.tools.append(label)
+                turn.counts[label] = turn.counts.get(label, 0) + 1
             self._status(chat, turn)
+        elif kind == "message.delta":
+            turn = self.turns.get(sid)
+            if turn is not None:
+                turn.draft += ev.get("text") or ""
+                self._status(chat, turn)
         elif kind == "approval.requested":
             what = tgformat.tool_label(ev.get("tool", ""))
             why = f"\n{ev['reason']}" if ev.get("reason") else ""
@@ -503,7 +520,13 @@ class Bot:
             raise EngineError(0, ev.get("code") or "stream_error")
 
     def _status(self, chat: int, turn: Turn) -> None:
-        text = "⏳ " + " · ".join(turn.tools[-6:])
+        shown = [f"{t} ×{turn.counts[t]}" if turn.counts.get(t, 0) > 1 else t for t in turn.tools[-6:]]
+        text = "⏳ " + (" · ".join(shown) or "…")
+        if turn.draft.strip():
+            # progressive answer (2026-11-27): the text as it is written, in the status message, within Telegram's
+            # limits (one edit per 2.5 s, the last 3 000 characters); the final message replaces it at the turn's end
+            d = turn.draft.strip()
+            text += "\n\n✍️ " + (("…" + d[-3000:]) if len(d) > 3000 else d)
         if text == turn.status_shown or time.time() - turn.status_at < 2.5:
             return
         turn.status_at = time.time()

@@ -105,8 +105,9 @@ async def subagent(args: dict, ex: Exec) -> Result:
                              cancel=lambda: eng.interrupt(child, "parent killed the job"),
                              meta={"agent_id": child.sid})
         return Result(f"Sub-agent {child.sid} started in the background as job {job.id} ({description}). "
-                      "End your turn if you have nothing else to do: you will be woken with its answer. "
-                      "send_message / interrupt_agent take its agent_id, job_output its job id.",
+                      "It does this part: do not redo it; meanwhile do only work it does not cover. When you need its "
+                      "answer, job_output(job_id, wait=true) waits for it without polling; with nothing else to do, end "
+                      "your turn: you will be woken with its answer. send_message / interrupt_agent take its agent_id.",
                       value={"agent_id": child.sid, "job_id": job.id})
     res = await eng.run_child(child, prompt, cancel=ex.cancel)
     head = f"[sub-agent {child.sid} · {res['status']}{' · ' + res['reason'] if res.get('reason') else ''}]"

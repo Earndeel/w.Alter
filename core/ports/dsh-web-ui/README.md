@@ -1,5 +1,7 @@
 # dsh-web-ui — Walter's face for the DSH web GUI
 
+> **Retour arrière seulement** (27/11/2026) : DSH a été désinstallé le 18/11/2026 ; le moteur natif `walter-engine` (`core/engine/walter_engine/`) fait ce travail depuis le 17/11. Ce dossier reste pour le retour arrière décrit dans `core/engine/docs/08-NATIF.md` § 8.
+
 A DSH plugin (host + browser halves) that gives the DeepSeek Harness web interface Walter's look, inspired by
 Hermes Desktop: the instance's name and mark in the sidebar, a large serif title and a greeting on the blank
 session, pure black surfaces (#000000) with neon-blue contrast (#01B7FF), a 2px neon-blue frame around the input

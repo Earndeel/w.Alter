@@ -136,7 +136,8 @@ def api_app(api: EngineApi, token: str) -> Starlette:
             api.row(sid)
             since = request.query_params.get("since_seq")
             stop = asyncio.Event()
-            return _sse(api.events(sid, None if since is None else int(since), stop), stop)
+            progress = request.query_params.get("progress") in ("1", "true")
+            return _sse(api.events(sid, None if since is None else int(since), stop, progress=progress), stop)
         except Exception as e:  # noqa: BLE001
             return err(e)
 

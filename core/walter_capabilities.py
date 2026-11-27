@@ -125,7 +125,9 @@ def register(mcp,client='unknown',*,local_control=True):
         try:
             from walter_platform import presentation
             if not path:return json.dumps(presentation.catalog(),ensure_ascii=False)
-            return presentation.document(path,depth.upper())
+            d=str(depth or 'D2').strip().upper()
+            d='D'+d if d.isdigit() else d        # depth=3 (observation 2026-11-27) means D3
+            return presentation.document(path,d)
         except ValueError as exc:
             return json.dumps({'ok':False,'path':path,'error':str(exc),
                                'hint':'module_guide("walter", depth="D2") lists every module with its path.'},ensure_ascii=False)

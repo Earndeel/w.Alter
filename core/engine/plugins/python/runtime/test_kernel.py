@@ -197,3 +197,25 @@ if __name__ == "__main__":
                 failed += 1
                 print(f"FAIL  {name}: {exc!r}")
     sys.exit(1 if failed else 0)
+
+
+def test_a_background_delegation_is_awaited_without_polling():
+    """Observation 2026-11-27: `await h` waits through the engine's job wait (one blocking call per 10 min slice)."""
+    import asyncio
+    import walter_kernel as wk
+    calls = []
+
+    class Tools:
+        async def job_output(self, **k):
+            calls.append(k)
+            if len(calls) == 1:
+                return {"job": {"status": "running"}}
+            return {"job": {"status": "completed", "result": "réponse entière"}, "output": "…fin", "truncated_before": 120}
+    old = wk.tools
+    wk.tools = Tools()
+    try:
+        h = wk.Delegation("agent-1", "job-1", "chercher")
+        assert asyncio.run(h.wait(60)) == "réponse entière" and h.status == "completed"
+        assert all(c["wait"] is True and c["job_id"] == "job-1" for c in calls) and len(calls) == 2
+    finally:
+        wk.tools = old

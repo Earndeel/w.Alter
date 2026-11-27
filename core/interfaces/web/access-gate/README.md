@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Rôle** | Entre le tunnel Cloudflare et Walter Web (`dsh-web`), pour l'adresse publique `portal.walter-ai.cloud` seulement : vérifie le jeton Cloudflare Access de chaque requête (HTTP et WebSocket) et connecte tout seul un navigateur nouveau. Cloudflare Access (code par e-mail) devient la seule connexion. |
+| **Rôle** | Entre le tunnel Cloudflare et Walter Web (le serveur web du moteur natif, :3080 ; `dsh-web` jusqu'au 17/11), pour l'adresse publique `portal.walter-ai.cloud` seulement : vérifie le jeton Cloudflare Access de chaque requête (HTTP et WebSocket) et connecte tout seul un navigateur nouveau. Cloudflare Access (code par e-mail) devient la seule connexion. |
 | **Propriétaire** | core/interfaces/web. |
 | **État** | En service depuis le 2026-11-15 (unité `walter-web-gate`, 127.0.0.1:3081). Tests : `node --test tests/` (8/8). |
-| **Ne fait pas** | Ne remplace pas Access (il s'appuie dessus) ; ne touche pas au noyau du moteur ; ne sert pas le tailnet (qui atteint `dsh-web` directement, avec son lien à jeton) ; ne garde aucun secret à lui. |
+| **Ne fait pas** | Ne remplace pas Access (il s'appuie dessus) ; ne touche pas au noyau du moteur ; ne sert pas le tailnet (qui atteint le serveur web :3080 directement, avec son lien à jeton) ; ne garde aucun secret à lui. |
 | **Contrats** | Entrée : requêtes du tunnel avec `Cf-Access-Jwt-Assertion`. Sortie : `127.0.0.1:3080`. Réglages : `@instance/config/core/web-gate.json` (hôte public, équipe et audience Access, e-mails admis, fichier `login-url`). |
 
 ## Fonctionnement

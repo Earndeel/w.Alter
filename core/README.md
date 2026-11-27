@@ -5,10 +5,10 @@
 | **Rôle** | Exposer les capacités Walter aux harnesses (serveur MCP `walter`, hooks, raccordements) et valider le registre des modules (`walter_platform`, `walter check`). Héberge le futur moteur unique ([engine/](engine/README.md)). |
 | **Propriétaire** | walter-core (`/walter/core`). |
 | **État** | **active** (constat du 09/11/2026) : serveur MCP (stdio), hooks des runtimes, `walter-standby.timer`. Moteur : lot E0 fait, lot E1 en cours. |
-| **Ne fait pas** | Posséder les données d'un autre module. La boucle d'exécution et les permissions des runtimes actuels (Hermes, DSH, Codex, Claude Code) restent les leurs. |
+| **Ne fait pas** | Posséder les données d'un autre module. La boucle d'exécution et les permissions des outils externes (Codex, Claude Code) restent les leurs ; celles de Walter sont dans `engine/` (moteur natif depuis le 17/11/2026 ; Hermes arrêté le 10/11, DSH désinstallé le 18/11). |
 | **Contrats** | [contracts/core.json](contracts/core.json), [contracts/schemas/](contracts/schemas/), [modules/registry.json](modules/registry.json) ; brouillons du moteur dans [engine/contracts/](engine/contracts/). |
 
-Walter owns reusable capabilities and their data; Hermes, DSH, Codex and Claude Code own their execution loops and permission gates. Optional modules load only when called, so one missing module does not prevent memory or skills from starting.
+Walter owns reusable capabilities and their data; its own execution loop is the native engine (`engine/`, since 2026-11-17); external dev tools (Codex, Claude Code) own their execution loops and permission gates (Hermes stopped 2026-11-10, DSH uninstalled 2026-11-18). Optional modules load only when called, so one missing module does not prevent memory or skills from starting.
 
 `modules/registry.json` declares 17 logical modules: source boundaries, interfaces, owned data, dependencies, backup paths, per-harness bindings and explicit limits. `walter_platform` validates this registry without importing a harness. The encrypted backup reads the same declared paths and fails if required anchors disappear.
 
@@ -21,7 +21,7 @@ Walter owns reusable capabilities and their data; Hermes, DSH, Codex and Claude 
 - `walter harness attach codex|claude-code|dsh [--home PATH]`: preview common MCP attachment. `--apply` backs up and writes atomically; identical state is a no-op, conflicting custom Walter configuration is refused. This installs the MCP connection only, not a new runtime, tokens, model provider or context engine. Existing full compositions remain separately managed and verified.
 - `walter backup-paths`: declared module paths for offsite coverage.
 - `walter deploy status|check [--json]`: deploy freshness (SOCLE A8, 2026-11-11). For every long-running service of the registry (contracts → `services`, timers excluded), `ActiveEnterTimestamp` vs the newest mtime of the code it loads: Python entries resolved from ExecStart (script, `-m`, uvicorn app, shell wrapper) and their first-party imports read statically and transitively (`walter-telegram` is not flagged for a `walter_memory` change it never imports); node services and composition files through `service_code` declared by any module contract (`{"<unit>": {"code_roots": [...], "code_files": [...]}}`). Per service: started_at, newest file + mtime, stale. `check` adds the repair plan and exits 1 when anything is stale. Code: [walter_platform/deploy.py](walter_platform/deploy.py).
-- `walter deploy restart <unit> [--dry-run] [--require-stale]`: the core guardian's allowed repair (`deploy:stale:<unit>`). Re-checks staleness, defers `dsh-web`/`walter-telegram` while an engine turn is in flight (open `dsh` run < 30 min in `walter-memory runs list`; unknown = busy), one restart per unit per hour (`@instance/state/guardians/deploy-restarts.json`), checks again after. Off unless `config/deploy.toml [repair] enabled = true` (instance override `@instance/config/core/deploy.toml`): off = reported as a warning, `defer:repair_disabled`, systemd untouched.
+- `walter deploy restart <unit> [--dry-run] [--require-stale]`: the core guardian's allowed repair (`deploy:stale:<unit>`). Re-checks staleness, defers `walter-engine`/`walter-telegram` while an engine turn is in flight (open engine run < 30 min in `walter-memory runs list`; unknown = busy), one restart per unit per hour (`@instance/state/guardians/deploy-restarts.json`), checks again after. Off unless `config/deploy.toml [repair] enabled = true` (instance override `@instance/config/core/deploy.toml`): off = reported as a warning, `defer:repair_disabled`, systemd untouched.
 - `walter-guardians check|status|list`: declared watchdogs, strict incident validation and persisted notification retries; see [GUARDIANS.md](GUARDIANS.md).
 - `walter-scenario run e2e-minimal --json`: recorded-run acceptance, including successful tasks and two distinct sourced JSON offers.
 - `walter matrix`: distinguishes availability, binding, observed use and current qualification. A qualification requires a matching scenario/source/version attestation and a passing run less than 14 days old.
@@ -75,7 +75,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$PWD" walter-python -m pytest -q -p no:cac
   tests/test_matrix_qualified.py tests/test_qualification_regressions.py
 ```
 
-### Échec d’un enfant DSH dans le banc
+### Échec d’un enfant DSH dans le banc (historique : DSH désinstallé le 18/11/2026)
 
 Le chemin d’erreur de DSH ne déclenche pas systématiquement Stop. Après la sortie échouée ou le timeout
 du processus enfant, le banc retrouve uniquement le run de sa session et appelle le port public Memory

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://walter.local/contracts/core/engine/engine-api.v1.json",
   "title": "Engine API v1",
-  "description": "Requests an interface (web, Telegram, API, MCP, command, schedule, webhook, Lab) sends to the Walter engine. Status: IMPLEMENTED (lot E4, 2026-11-10) by core/interfaces/api (host plugin of the engine). Transport: POST /v1 with this envelope, GET /v1/health, GET /v1/events?session_id=&since_seq= (SSE), loopback only, agent token in the Authorization header; the same execution policy applies whatever the door. Kernel sessions, the Run Plane and the bus are reused, never duplicated.",
+  "description": "Requests an interface (web, Telegram, API, MCP, command, schedule, webhook, Lab) sends to the Walter engine. Status: IMPLEMENTED (lot E4, 2026-11-10) by core/interfaces/api (host plugin of the engine). Transport: POST /v1 with this envelope, GET /v1/health, GET /v1/events?session_id=&since_seq=[&progress=1] (SSE; progress=1, additive 2026-11-27: also `tool.called` with `nested: true` and an optional `task` poste for capabilities called inside a Python cell, and live `message.delta` text, for doors that show progress), loopback only, agent token in the Authorization header; the same execution policy applies whatever the door. Kernel sessions, the Run Plane and the bus are reused, never duplicated.",
   "type": "object",
   "required": [
     "version",

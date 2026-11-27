@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Une seule politique pour tout ce qui exécute un outil (lot E3) : ce qu'un agent ne fait jamais, ce qu'une porte (web, Telegram, API, mode commande) autorise, demande ou refuse, et ce qu'un sous-agent peut au plus (jamais plus que son parent). |
 | **Propriétaire** | walter-core. Les classes de confidentialité restent fournies par Walter Memory (`/v1/privacy/classify`, contrôle de divulgation `/v1/disclosure/check`). |
-| **État** | Implémentée et testée le 10/11/2026. **Filet du serveur MCP actif** pour chaque nouveau processus `server.py` (tout client). Greffon du moteur prêt, interrupteur `[dsh.engine] policy = "off" \| "enforce"` ; en service : `off` jusqu'à l'activation d'E2/E3 sur `dsh-web`. |
+| **État** | Implémentée et testée le 10/11/2026. **Filet du serveur MCP actif** pour chaque nouveau processus `server.py` (tout client). **Moteur : appliquée à chaque appel d'outil par le moteur natif** (`core/engine/walter_engine/policy.py`, depuis le 17/11/2026, sans interrupteur). Le greffon DSH et `[dsh.engine] policy` ne servent qu'au retour arrière vers DSH (désinstallé le 18/11). |
 | **Ne fait pas** | Ne demande rien elle-même : `ask` passe par le répondant de la porte (dialogue web, boutons Telegram) via le mécanisme d'approbation du noyau, sans répondant = refus. Ne remplace pas le bac à sable du noyau (écritures confinées), qui décide encore après elle. Ne lit ni ne journalise la valeur des arguments sensibles. |
 | **Contrats** | `policy.json` (données) ; décision v1 (`../engine/contracts/policy-decision.v1.json`) : `allow` \| `check` (contrôle de divulgation) \| `ask` \| `deny`, avec la règle appliquée. |
 
@@ -47,6 +47,6 @@
 
 ## Retour arrière
 
-Moteur : `[dsh.engine] policy = "off"` puis `walter harness install dsh --apply` et redémarrage de `dsh-web` (le bac à
+Moteur natif : pas d'interrupteur (la politique est du code et des données). Ancien moteur DSH, retour arrière seulement : `[dsh.engine] policy = "off"` puis `walter harness install dsh --apply` et redémarrage de `dsh-web` (le bac à
 sable et l'approbation du noyau restent : jamais moins protégé qu'avant). Serveur MCP : retirer les trois lignes
 `mcp_guard` de `server.py` (sauvegarde : `@instance/backups/changes/2026-11-10-engine-E2-activation/code-before/`).

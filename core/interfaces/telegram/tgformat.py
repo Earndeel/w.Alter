@@ -81,6 +81,47 @@ TOOL_LABELS = {
 }
 
 
+# what the owner reads while a turn works (2026-11-27): the capability at work, never « python »; from the engine's
+# own events (progress=1 stream), no model call. None = internal bookkeeping, not shown.
+PROGRESS = (
+    (("memory_", "person_lookup", "tasks_list", "task_"), "🧠 mémoire"),
+    (("walter_browse", "browser_session", "browser_sites"), "🔎 recherche web"),
+    (("walter_web",), "💬 service web"),
+    (("skills_", "skill_read"), "📖 procédures"),
+    (("subagent", "send_message"), "🧩 délégation"),
+    (("audio_transcribe",), "🎙 transcription"),
+    (("vault_",), "🗂 fichiers du coffre"),
+    (("logs_", "context_recover"), "📜 journaux"),
+    (("module_guide", "module_index", "walter_modules", "walter_profile"), "📚 documentation"),
+    (("walter_health",), "🩺 état de Walter"),
+    (("computer_use",), "🖥 Mac"),
+    (("secret_",), "🔐 coffre-fort"),
+    (("beeper_",), "💬 messages"),
+    (("walter_route", "walter_plans", "walter_decide"), "🧭 Router"),
+    (("bash", "read", "grep", "glob", "write", "edit", "read_image"), "💻 fichiers et commandes"),
+)
+RUN_TASKS = {"image": "🎨 génération d'image", "video": "🎬 génération vidéo", "voice": "🎵 audio", "music": "🎵 audio",
+             "tts": "🎵 audio", "stt": "🎙 transcription", "front": "🖌 interface", "code": "🛠 code", "coding": "🛠 code"}
+SILENT = ("job_output", "job_list", "job_kill", "list_agents", "interrupt_agent", "present", "ask_user_question")
+
+
+def progress_label(name: str, task: str = "") -> str | None:
+    """A capability called during a turn as the owner reads it (`mcp__walter__walter_browse` → « 🔎 recherche web »;
+    walter_run on the image poste → « 🎨 génération d'image »). None: not worth showing."""
+    short = (name or "").split("__")[-1].lower()
+    if short in SILENT:
+        return None
+    if short == "python":
+        return "⚙️ analyse"
+    if short in ("walter_run",):
+        base = (task or "").split("/")[0]
+        return RUN_TASKS.get(base) or next((v for k, v in RUN_TASKS.items() if base.startswith(k)), "⚙️ modèle spécialisé")
+    for keys, label in PROGRESS:
+        if any(short == k or (k.endswith("_") and short.startswith(k)) for k in keys):
+            return label
+    return "⚙️ " + short.replace("_", " ")
+
+
 def tool_label(name: str) -> str:
     """A tool as the owner reads it: `mcp__walter__memory_search` → « mémoire »."""
     short = (name or "").split("__")[-1].lower()

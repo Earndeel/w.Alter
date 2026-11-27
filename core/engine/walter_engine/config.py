@@ -121,6 +121,9 @@ class Settings:
     # cached socle after the conduct at every level (L0 included); the preflight's pack then leaves them out. "pack" =
     # before: they come in the per-message pack (L1-L4 only).
     owner_rules: str = "pack"
+    # observation fixes (2026-11-27): "stub" = an earlier turn's <walter-context> pack is replaced in the history by
+    # a one-line reference (context_recover pack:<seq>); "keep" = the former behaviour (rollback)
+    past_packs: str = "stub"
     soul: str = ""
     conduct: str = ""
     operating: str = str(ENGINE_ROOT / "instructions" / "OPERATING.md")
@@ -194,7 +197,7 @@ def load(state: Path | None = None) -> Settings:
         exposure_kinds={str(k): str(v) for k, v in dict(n.get("exposure_kinds", {})).items()},
         doc_layer=str(n.get("doc_layer", "mcp")), skills_map=bool(n.get("skills_map", True)),
         communication=bool(n.get("communication", False)),
-        owner_rules=str(n.get("owner_rules", "pack")),
+        owner_rules=str(n.get("owner_rules", "pack")), past_packs=str(n.get("past_packs", "stub")),
         soul=_resolve(n.get("soul", "")), conduct=_resolve(n.get("conduct", "")),
         operating=_module_path(n.get("operating", "instructions/OPERATING.md")),
         resume_interrupted=bool(n.get("resume_interrupted", True)), python=n.get("python", "full"),

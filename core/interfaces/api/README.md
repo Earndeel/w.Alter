@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | La porte canonique du moteur Walter (lot E4) : toute interface — Telegram, web, modules Walter (one-shots du Router), tests et scénarios V1 — ouvre ou retrouve une conversation, soumet un message, suit son déroulé, lit le résultat d'un tour, l'interrompt et répond aux approbations par elle. |
 | **Propriétaire** | walter-core (moteur). |
-| **État** | Implémentée et prouvée le 10/11/2026 sur un hôte de test (7 contrôles de bout en bout, redémarrage compris ; délégation E5 : 6 contrôles, `scenarios/v1/engine_e5.py`). Interrupteur `[dsh.engine] api = "off" \| "on"` dans `@instance/config/core/engine.toml` ; en service : `off` jusqu'à l'activation d'E2/E3 sur `dsh-web`. |
+| **État** | Implémentée et prouvée le 10/11/2026 sur un hôte de test (7 contrôles de bout en bout, redémarrage compris ; délégation E5 : 6 contrôles, `scenarios/v1/engine_e5.py`). **En service, servie par le moteur natif** (`walter-engine`, `walter_engine/server.py` + `api.py`, `127.0.0.1:8895`, depuis le 17/11/2026, sans interrupteur). `[dsh.engine] api` ne concernait que DSH (désinstallé le 18/11). |
 | **Ne fait pas** | Pas de second système de sessions, de runs ou de bus : sessions du noyau (`sessionController`), Run Plane et bus ouverts par les greffons `intake`/`events` pour chaque tour quelle que soit la porte. Ne décide d'aucune permission : elle publie la porte de la session à la politique unique (`core/security`). Jamais hors loopback. |
 | **Contrats** | `../../engine/contracts/engine-api.v1.json` (opérations) ; événements client ci-dessous (vocabulaire de `engine-event.v1`). |
 
@@ -13,7 +13,7 @@
 - `POST /v1` avec l'enveloppe `{version: 1, op, …}` ; `GET /v1/health` ; `GET /v1/events?session_id=…[&since_seq=N]` (SSE).
 - `127.0.0.1:8895` (production) ; jeton d'agent dans l'en-tête `Authorization: Bearer …`, jamais dans l'URL. Le jeton
   est créé une fois (0600) dans `@instance/bootstrap/engine/api.token` ; les clients le lisent là.
-- Hébergée par le profil **web** du moteur (le processus durable `dsh-web`), jamais par une exécution headless.
+- Hébergée par le processus durable du moteur (`walter-engine`), jamais par une exécution headless.
 
 ## Opérations
 
@@ -58,5 +58,5 @@ production sauf demande explicite).
 
 ## Retour arrière
 
-`[dsh.engine] api = "off"`, `walter harness install dsh --apply`, redémarrage de `dsh-web` : le bloc `dsh-api` du
+Moteur natif : l'API fait partie du processus (pas d'interrupteur ; arrêter `walter-engine` l'arrête). Ancien moteur DSH, retour arrière seulement : `[dsh.engine] api = "off"`, `walter harness install dsh --apply`, redémarrage de `dsh-web` : le bloc `dsh-api` du
 profil web est retiré, le reste de la composition est inchangé. La table d'adresses reste (aucune session supprimée).

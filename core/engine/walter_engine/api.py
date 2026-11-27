@@ -119,7 +119,27 @@ def _preview(v, n: int) -> str:
     return s[:n] + "…" if len(s) > n else s
 
 
-def to_client_event(ev: dict, *, rich: bool = False) -> dict | None:
+PROGRESS_ARGS = ("task", "model")      # the poste a nested call names (walter_run task=image, subagent model=…)
+
+
+def _progress_call(base: dict, d: dict) -> dict:
+    """A capability called inside a cell, for a door that shows progress (`progress=1`): its name and, when its
+    arguments name one, the Router poste it runs on — never its arguments."""
+    out = {**base, "type": "tool.called", "turn": d.get("turn"), "name": d.get("name"), "call_id": d.get("callId"),
+           "nested": True}
+    try:
+        args = json.loads(d.get("arguments") or "{}")
+    except ValueError:
+        args = {}
+    for k in PROGRESS_ARGS:
+        v = args.get(k) if isinstance(args, dict) else None
+        if isinstance(v, str) and re.fullmatch(r"[a-z0-9_./-]{1,40}", v):
+            out["task"] = v
+            break
+    return out
+
+
+def to_client_event(ev: dict, *, rich: bool = False, progress: bool = False) -> dict | None:
     """One journal event → one client event (or None). `rich` adds what the web interface shows (previews, notices,
     deliverables, titles); the API stream keeps the contract's vocabulary."""
     d = ev.get("data") or {}
@@ -146,7 +166,7 @@ def to_client_event(ev: dict, *, rich: bool = False) -> dict | None:
                 **({"model": d.get("model")} if rich and d.get("model") else {})}
     if t == "tool/call":
         if d.get("nested") and not rich:
-            return None
+            return _progress_call(base, d) if progress else None
         return {**base, "type": "tool.called", "turn": d.get("turn"), "name": d.get("name"), "call_id": d.get("callId"),
                 **({"args_preview": _preview(d.get("arguments") or "", 300)} if rich else {})}
     if t == "tool/result":
@@ -623,9 +643,11 @@ class EngineApi:
             except Exception:  # noqa: BLE001
                 pass
 
-    async def events(self, sid: str, since_seq: int | None, stop: asyncio.Event, *, rich: bool = False):
+    async def events(self, sid: str, since_seq: int | None, stop: asyncio.Event, *, rich: bool = False,
+                     progress: bool = False):
         """Client events of one session: journal events after `since_seq` (live only when absent), the live-only
-        events of a running turn (web: text deltas), approval notices."""
+        events of a running turn (web: text deltas), approval notices. `progress` (a door that shows progress, e.g.
+        Telegram, 2026-11-27): also the capabilities called inside a cell (name + poste) and the answer's text deltas."""
         row = self.row(sid)
         a = self.agent(row)
         q: asyncio.Queue = asyncio.Queue()
@@ -635,12 +657,15 @@ class EngineApi:
         a.session.listeners.add(on_journal)
         if rich:
             a.live.add(on_live)
+        elif progress:
+            on_live = lambda ev: q.put_nowait(("l", ev)) if ev.get("type") == "message.delta" else None  # noqa: E731
+            a.live.add(on_live)
         self.listeners.add(on_notice)
         last = a.session.seq if since_seq is None else int(since_seq)
         try:
             if since_seq is not None:
                 for ev in a.session.since(last):
-                    ce = to_client_event(ev, rich=rich)
+                    ce = to_client_event(ev, rich=rich, progress=progress)
                     last = ev["seq"]
                     if ce:
                         yield ce
@@ -660,7 +685,7 @@ class EngineApi:
                     if ev["seq"] <= last:
                         continue
                     last = ev["seq"]
-                    ce = to_client_event(ev, rich=rich)
+                    ce = to_client_event(ev, rich=rich, progress=progress)
                     if ce:
                         yield ce
                 else:
