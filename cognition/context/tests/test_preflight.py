@@ -501,3 +501,18 @@ def test_set_3_reading_maps_plans_to_c_levels_with_the_floor():
     near = Request("t", "ok", previous=prev())                       # within the floor window: C0 becomes C1
     assert preflight.context_level("none", None, near) == "C1" and preflight.context_level("none", None) == "C0"
     assert preflight.context_level("thread_and_memory", 0.2) == "C3"
+
+
+def test_with_no_previous_exchange_there_is_nothing_to_approve_or_correct(fake_llm):
+    """Observation 2026-11-27 (replay): « correct » on the first message of a new conversation."""
+    calls, answers = fake_llm
+    cands = [{"id": "th-1", "title": "Lot B"}]
+    _full(answers, act={"choice": "correct", "confidence": 0.2}, thread={"choice": "new", "confidence": 0.9})
+    p = run(Request("t", "fais une recherche approfondie sur les modèles vidéo", candidates=cands))
+    assert p.act == "new" and p.decision["act_by"] == "no_previous_exchange"
+    _full(answers, act={"choice": "approve"}, thread={"choice": "th-1", "confidence": 0.9})
+    p = run(Request("t", "on reprend le lot B, vas-y", candidates=cands))
+    assert p.act == "continue" and p.thread.id == "th-1"
+    _full(answers, act={"choice": "correct"}, thread={"choice": "th-1", "confidence": 0.9})
+    p = run(Request("t", "non, ce n'est pas ce que je voulais pour le lot B, refais le résumé", previous=prev(), candidates=cands))
+    assert p.act == "correct" and "act_by" not in p.decision            # with a previous exchange: unchanged

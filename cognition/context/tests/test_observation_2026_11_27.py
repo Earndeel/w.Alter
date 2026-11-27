@@ -55,3 +55,4 @@ def test_act_question_is_about_the_previous_exchange_not_the_threads():
         assert "threads covers" not in criteria["new"] and "previous exchange" in criteria["new"]
         assert "stored thread" in criteria["continue"]
     assert "asked separately" in d["instructions"]
+

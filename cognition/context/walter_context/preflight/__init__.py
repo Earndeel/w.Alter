@@ -738,6 +738,11 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
     act = pick("act") if pick("act") in ACTS else "continue"
     by = None
     prev = req.previous
+    act_by = None
+    if act in ANSWERS_PREVIOUS and prev is None:
+        # observation 2026-11-27 (replay): « correct » (0.20 sure) on the first message of a conversation; approving or
+        # amending a previous result needs a previous exchange: without one the message opens or carries on a thread
+        act, act_by = ("continue" if thread.id and not thread.new else "new"), "no_previous_exchange"
     if (act in ANSWERS_PREVIOUS and prev and prev.thread_id and prev.age_s is not None
             and prev.age_s <= FLOOR_WINDOW_S and thread.id != prev.thread_id):
         # coherence (2026-11-12): « agrees, says go » and « amends the previous result » are about the previous
@@ -779,7 +784,7 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
                   **({"work": work} if work is not None else {}), "effort": effort(level, tier, work),
                   **({"resume": resume} if resume is not None else {}),
                   **({"samples": res["samples"]} if res.get("samples") else {}),
-                  **({"thread_by": by} if by else {}), **({"memory_by": memory_by} if memory_by else {}),
+                  **({"thread_by": by} if by else {}), **({"act_by": act_by} if act_by else {}), **({"memory_by": memory_by} if memory_by else {}),
                   "confidence": {k: conf(k) for k in ("thread", "act", "plan", "domain", "horizon", "task")
                                  if conf(k) is not None}, **({"anchors": named} if named else {})})
     rb = resolution_brief(res)
