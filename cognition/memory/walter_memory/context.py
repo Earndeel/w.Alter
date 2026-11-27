@@ -375,10 +375,12 @@ RECENT_CHARS = 200
 
 
 def _recent_exchanges(hours: float, budget: int, max_privacy: str) -> tuple[str, int, list[str]]:
-    """What others wrote to the owner lately (never his conversations with W.Alter's agents), newest first, one line
+    """What people wrote to the owner lately (human authors on any channel — never W.Alter, an agent, a bot or a
+    service: events.get_events(source="people")), newest first, one line
     each — local time, network, conversation, author, text — within `budget` tokens; what he sent in the same window
     is one line (how many, the last one), so a question about what came in does not read his own messages; the last
-    line says how many were left out and how to read the rest."""
+    line says how many were left out and how to read the rest. A messaging or e-mail source that is no longer
+    synchronised (ingestion.freshness) is said first."""
     from datetime import datetime, timedelta, timezone
     from .flows import tz
     zone = tz()
@@ -388,6 +390,20 @@ def _recent_exchanges(hours: float, budget: int, max_privacy: str) -> tuple[str,
     sent = events.get_events(source="people", event_types=["message.sent", "email.sent"], since=since, limit=1,
                              order="desc", max_privacy=max_privacy)
     lines, used, room = [], 0, budget * 4 - 260
+    # freshness first (27/11): a channel Memory no longer receives is said, so older messages are never read as the
+    # latest ones received
+    from . import ingestion
+    with connection() as conn:
+        channels = {r["source"] for r in conn.execute("select source from core.sources where kind in ('messaging', 'email')")}
+        fresh = ingestion.freshness(channels | {r["source"] for r in got}, conn=conn)
+    for s, f in sorted(fresh.items()):
+        if f["state"] == "live" or (s not in channels and f["state"] == "archived"):
+            continue
+        when = (f"le {datetime.fromisoformat(f['synced_at']).astimezone(zone):%d/%m à %H:%M}" if f.get("synced_at")
+                else "jamais")
+        line = (f"- ⚠ {s} n'est plus synchronisé (dernière synchronisation réussie {when}) : des messages plus récents "
+                "peuvent manquer, ceux listés ne sont pas forcément les derniers reçus.")
+        lines.append(line); used += len(line) + 1
     for r in got:
         p = r.get("payload") or {}
         chat = p.get("chat") or {}
@@ -399,12 +415,14 @@ def _recent_exchanges(hours: float, budget: int, max_privacy: str) -> tuple[str,
         files = p.get("attachments") or []
         text = (text[:RECENT_CHARS] + ("…" if len(text) > RECENT_CHARS else "")) + (
             f" (+{len(files)} fichier{'s' if len(files) > 1 else ''})" if files else "")
+        if fresh.get(r["source"], {}).get("state") == "archived":
+            where += " · archive"
         line = (f"- [{r['occurred_at'].astimezone(zone):%d/%m %H:%M} · {where} · {who}] {text or '(sans texte)'} "
                 f"(event:{r['event_id']})")
         if used + len(line) + 1 > room:
             break
         lines.append(line); used += len(line) + 1
-    shown = len(lines)
+    shown = len(lines) - len([x for x in lines if x.startswith("- ⚠")])
     if not got:
         lines.append(f"- Rien reçu d'autres personnes dans les {hours:g} dernières heures.")
     else:

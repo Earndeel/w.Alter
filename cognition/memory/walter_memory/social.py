@@ -44,7 +44,8 @@ class UF:
 
 def resolve_identities() -> dict:
     with connection() as conn:
-        ids = conn.execute("""select identity_id::text, source, account, external_id, display_name, phones, emails, is_self
+        ids = conn.execute("""select identity_id::text, source, account, external_id, display_name, phones, emails, is_self,
+                                     coalesce(attributes->>'author', 'human') author
                               from core.source_identities""").fetchall()
         uf, by_key = UF(), defaultdict(list)
         method: dict[str, str] = {}
@@ -57,7 +58,7 @@ def resolve_identities() -> dict:
             keys |= {f"email:{e.lower()}" for e in i["emails"] or []}
             if i["is_self"]:
                 keys.add("self:monsieur")
-            if i["external_id"] == "walter" or (i["account"] == "telegram" and (i["display_name"] or "").lower() == "w.alter"):
+            if i["author"] == "walter":          # W.Alter on any runtime or network (authors.py, 27/11)
                 keys.add("self:walter")
             for k in keys:
                 by_key[k].append(i["identity_id"])
@@ -85,12 +86,16 @@ def resolve_identities() -> dict:
             ent = next((existing[m["identity_id"]] for m in members if m["identity_id"] in existing), None)
             names = Counter(n for n in (_good_name(m["display_name"]) for m in members) if n)
             is_self = any(m["is_self"] for m in members)
-            is_walter = any(m["external_id"] == "walter" for m in members)
+            is_walter = any(m["author"] == "walter" for m in members)
+            kinds = {m["author"] for m in members}
             phones = [p for m in members for p in ([f"+{WA_PHONE.match(m['external_id']).group(1)}"]
                                                    if WA_PHONE.match(m["external_id"] or "") else []) + list(m["phones"] or [])]
             name = ("Monsieur" if is_self else "W.Alter" if is_walter else
                     names.most_common(1)[0][0] if names else phones[0] if phones else members[0]["external_id"])
-            etype = "agent" if is_walter else "person"
+            # an entry stands for a person unless none of its identities is human: W.Alter and other agents → agent,
+            # bots → bot, network and automatic accounts → service
+            etype = ("agent" if is_walter or kinds <= {"agent", "walter"} else "bot" if kinds == {"bot"} else
+                     "service" if kinds == {"service"} else "agent" if "human" not in kinds and not is_self else "person")
             if ent is None:
                 ent = conn.execute("""insert into core.entities (entity_type, canonical_name, aliases, attributes)
                                       values (%s, %s, %s, %s) returning entity_id::text""",
@@ -110,6 +115,18 @@ def resolve_identities() -> dict:
                                  (m["identity_id"], ent, 1.0 if how != "single_identity" else 0.9, how,
                                   '{"processor": "%s"}' % VERSION))
                     linked += 1
+        # a person entry none of whose identities is human (made before the author's nature was known): its type follows
+        # the nature — no event is rewritten, the entry, its links and its history stay
+        retyped = conn.execute("""
+            with k as (select l.entity_id, array_agg(distinct coalesce(si.attributes->>'author', 'human')) kinds,
+                              bool_or(si.is_self) self
+                       from core.identity_links l join core.source_identities si using (identity_id)
+                       where l.status = 'confirmed' group by 1)
+            update core.entities en set updated_at = now(), entity_type =
+                case when k.kinds <@ array['walter', 'agent'] then 'agent' when k.kinds = array['service'] then 'service'
+                     else 'bot' end
+            from k where k.entity_id = en.entity_id and en.entity_type = 'person' and not k.self
+                     and not ('human' = any(k.kinds))""").rowcount
         # Kardex contacts ↔ entities
         conn.execute("""update core.entities en set kardex_contact_id = substr(si.external_id, 16)::int
                         from core.source_identities si join core.identity_links l on l.identity_id = si.identity_id
@@ -126,7 +143,7 @@ def resolve_identities() -> dict:
             join core.identity_links l2 on l2.entity_id = e2.entity_id and l2.status = 'confirmed'
             on conflict do nothing""").rowcount
     return {"identities": len(ids), "clusters": len(clusters), "entities_created": created, "links": linked,
-            "name_proposals": proposals}
+            "retyped": retyped, "name_proposals": proposals}
 
 
 def sync_groups() -> dict:

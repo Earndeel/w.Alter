@@ -84,6 +84,8 @@ def main(argv=None) -> None:
     sq.add_argument("--no-derived", action="store_true"); sq.add_argument("--rerank", action="store_true")
     sq.add_argument("--cloud-safe", action="store_true", help="only rows allowed to leave the VM")
     sq.add_argument("--history", action="store_true", help="also pre-V1 interpretations (archived memory generations)")
+    au = sub.add_parser("authors", help="nature of every author (human, walter, agent, bot, service) on its identity")
+    au.add_argument("action", choices=["classify"]); au.add_argument("--dry-run", action="store_true")
     so = sub.add_parser("social", help="P4: resolve identities, groups, baselines, deviations; person cards")
     so.add_argument("action", choices=["refresh", "person", "deviations"]); so.add_argument("query", nargs="?")
     so.add_argument("--cloud-safe", action="store_true")
@@ -241,8 +243,11 @@ def main(argv=None) -> None:
             _print({"error": "invalid_filter", "message": str(err), "valid": err.valid})
             raise SystemExit(0)
         # compact reads fetch one row more than asked: a conversation longer than `limit` answers a cursor too
-        _print(events.compact(rows, a.text, a.compact, limit=a.limit) if a.compact else
+        out = (events.compact(rows, a.text, a.compact, limit=a.limit) if a.compact else
                events.with_refs(rows, max_privacy="cloud_allowed" if a.cloud_safe else "local_only"))
+        if isinstance(out, dict) and events.order_of(a.order) == "desc" and not a.event_id:
+            out.update(events.staleness(rows, a.source))     # « newest » is only as new as the last sync (27/11)
+        _print(out)
     elif a.cmd == "types":
         _print(types.list_types() if a.action == "list" else {"synced": types.sync_seed()})
     elif a.cmd == "objects":
@@ -315,6 +320,9 @@ def main(argv=None) -> None:
                  # object → vault_get), beside kind/ref_id which keep their meaning
                  **({"typed_ref": f"{r['kind']}:{r['ref_id']}"} if r.get("kind") in ("event", "derived", "object") else {})}
                 for r in res])
+    elif a.cmd == "authors":
+        from . import authors
+        _print(authors.classify_all(dry_run=a.dry_run))
     elif a.cmd == "social":
         from . import social
         if a.action == "refresh":

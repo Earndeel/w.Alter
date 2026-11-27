@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
-from . import privacy, types
+from . import authors, privacy, types
 from .logs import vault_scrub
 from .db import connection
 
@@ -25,7 +25,8 @@ def _ts(value: Any) -> datetime:
 
 
 def upsert_identity(conn, source: str, actor: dict) -> str:
-    """Record the actor as the source knows it (A4). Returns identity_id; no entity resolution here."""
+    """Record the actor as the source knows it (A4), with the nature of that author (authors.py: human, walter,
+    agent, bot, service — attributes.author). Returns identity_id; no entity resolution here."""
     key = (source, actor.get("account") or "", str(actor["external_id"]))
     if key in _identity_cache and not actor.get("display_name"):
         return _identity_cache[key]
@@ -39,11 +40,19 @@ def upsert_identity(conn, source: str, actor: dict) -> str:
              phones = coalesce((select array_agg(distinct p) from unnest(core.source_identities.phones || excluded.phones) p), '{}'),
              emails = coalesce((select array_agg(distinct e) from unnest(core.source_identities.emails || excluded.emails) e), '{}'),
              is_self = core.source_identities.is_self or excluded.is_self,
+             attributes = core.source_identities.attributes || excluded.attributes,
              last_seen = now()
-           returning identity_id""",
+           returning identity_id, source, account, external_id, display_name, handles, emails, is_self, attributes""",
         (key[0], key[1], key[2], actor.get("display_name"), json.dumps(actor.get("handles") or {}),
          actor.get("phones") or [], actor.get("emails") or [], bool(actor.get("is_self")),
          json.dumps(actor.get("attributes") or {}))).fetchone()
+    # the nature is decided on the identity as stored (all it is known by), not on this one message's view of it
+    kind, rule = authors.decide(source, row)
+    stored = row["attributes"] or {}
+    if (kind, rule) != (stored.get("author"), stored.get("author_rule")):
+        conn.execute("""update core.source_identities set attributes = attributes
+                            || jsonb_build_object('author', %s::text, 'author_rule', %s::text) where identity_id = %s""",
+                     (kind, rule, row["identity_id"]))
     _identity_cache[key] = str(row["identity_id"])
     return _identity_cache[key]
 
@@ -171,16 +180,26 @@ def get_events(*, source: str | None = None, event_types: list[str] | None = Non
     """Read events newest first (order="asc"/"oldest": oldest first, e.g. « the first event about X »). Retracted
     events are hidden unless include_retracted. max_privacy: 'cloud_allowed' returns only cloud_allowed rows (for
     callers that will ship them to a cloud model). event_types: exact names and/or families ('message.*'); an unknown
-    one raises UnknownFilter. source: one source, or a group — 'people' (conversations with others: every source but
-    W.Alter's agents) / 'agents' (the owner's conversations with W.Alter's agents)."""
+    one raises UnknownFilter. source: one technical source, or a group by the author's nature (authors.py) —
+    'people' (exchanges with humans, any channel: no agent runtime, no author that is W.Alter, an agent, a bot or a
+    service, no one-to-one conversation with one of them) / 'agents' (the conversations with W.Alter and other
+    agents, any channel). Each row says its author's nature (actor_kind)."""
     order = order_of(order)
     where, args = [], []
     if event_id:
         where.append("e.event_id = %s::uuid"); args.append(event_id)
-    if source in SOURCE_GROUPS:
-        from .search import AGENT_SOURCES
-        where.append("e.source <> all(%s)" if source == "people" else "e.source = any(%s)")
-        args.append(list(AGENT_SOURCES))
+    if source in SOURCE_GROUPS:   # by the author's nature, whatever the channel (authors.py, 27/11)
+        with connection() as conn:
+            others = authors.nonhuman_threads(conn)
+        machine = [t for t, k in others.items() if k in ("walter", "agent")]
+        if source == "people":
+            where.append("""e.source <> all(%s) and coalesce(i.attributes->>'author', 'human') = 'human'
+                            and (e.thread_id is null or e.thread_id <> all(%s))""")
+            args += [sorted(authors.agent_sources()), list(others)]
+        else:
+            where.append("""(e.source = any(%s) or i.attributes->>'author' in ('walter', 'agent')
+                             or e.thread_id = any(%s))""")
+            args += [sorted(authors.agent_sources()), machine]
     elif source:
         where.append("e.source = %s"); args.append(source)
     if event_types:
@@ -205,7 +224,8 @@ def get_events(*, source: str | None = None, event_types: list[str] | None = Non
                         and r.payload @> jsonb_build_object('target_event_id', e.event_id::text))""")
     sql = f"""select e.event_id::text, e.event_type, e.source, e.source_account, e.source_id, e.occurred_at,
                      e.thread_id, e.reply_to, e.content, e.payload, e.object_refs, e.privacy_class,
-                     i.display_name as actor_name, i.is_self as actor_is_self
+                     i.display_name as actor_name, i.is_self as actor_is_self,
+                     coalesce(i.attributes->>'author', 'human') as actor_kind
               from core.events e left join core.source_identities i on i.identity_id = e.actor_identity_id
               {'where ' + ' and '.join(where) if where else ''}
               order by e.occurred_at {order}, e.event_id {order} limit %s"""
@@ -216,6 +236,23 @@ def get_events(*, source: str | None = None, event_types: list[str] | None = Non
             for r in rows:
                 r["attachments"] = atts.get(r["event_id"], [])
         return rows
+
+
+def staleness(rows: list[dict], source: str | None = None) -> dict:
+    """{"freshness": {source: {state, synced_at, reason}}} for the sources of a newest-first read that Memory no longer
+    receives up to date (ingestion.freshness) — with the people group, every messaging and e-mail source, even one that
+    returned nothing — so a reader never takes older messages for the latest; {} when all are live."""
+    from . import ingestion
+    with connection() as conn:
+        wanted = {r["source"] for r in rows if r.get("source")}
+        if source == "people":
+            wanted |= {r["source"] for r in conn.execute(
+                "select source from core.sources where kind in ('messaging', 'email')")}
+        elif source and source not in SOURCE_GROUPS:
+            wanted.add(source)
+        late = {s: f for s, f in ingestion.freshness(wanted, conn=conn).items() if f["state"] != "live"}
+    return {"freshness": late, "freshness_note": "these sources are not synchronised up to now: newer events may be "
+            "missing"} if late else {}
 
 
 # ───────────────────────────── attachments (A5, 2026-11-11) ─────────────────────────────
@@ -374,6 +411,8 @@ def compact(rows: list[dict], text: str | None = None, width: int = 500, budget:
                     "text": content[:width] + ("…" if len(content) > width else "")}
             if r["event_type"] not in ("message.sent", "message.received"):
                 item["type"] = r["event_type"]
+            if r.get("actor_kind") not in (None, "human"):
+                item["kind"] = r["actor_kind"]           # W.Alter, an agent, a bot or a service (authors.py)
             if atts.get(str(r["event_id"])):
                 item["attachments"] = atts[str(r["event_id"])]
             size = len(json.dumps(item, ensure_ascii=False, default=str))
@@ -387,7 +426,8 @@ def compact(rows: list[dict], text: str | None = None, width: int = 500, budget:
         item = {"event_id": r["event_id"], "occurred_at": str(r["occurred_at"]), "source": r["source"],
                 "event_type": r["event_type"], "thread_id": r.get("thread_id"), "source_id": r.get("source_id"),
                 "actor": owner_label() if r.get("actor_is_self") else r.get("actor_name"),
-                "chars": len(content), "content": snippet}
+                "chars": len(content), "content": snippet,
+                **({"actor_kind": r["actor_kind"]} if r.get("actor_kind") not in (None, "human") else {})}
         if atts.get(str(r["event_id"])):
             item["attachments"] = atts[str(r["event_id"])]
         size = len(json.dumps(item, ensure_ascii=False, default=str))

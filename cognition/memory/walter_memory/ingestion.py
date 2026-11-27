@@ -50,6 +50,47 @@ def mark_success(connector: str) -> None:
         conn.execute("update ingestion.connectors set last_success_at = now() where connector = %s", (connector,))
 
 
+STALE_FACTOR = 3        # the same rule as health.check: no success for 3 × its freshness target = not synchronised
+
+
+def freshness(sources, *, conn=None) -> dict[str, dict]:
+    """source → {"state": "live" | "stale" | "archived", "synced_at": last success (iso) or None, "reason"} — whether
+    what Memory holds of a source is up to date, so a reader never presents old messages as the latest ones. A source's
+    connectors are those named after it (`beeper`, `hermes:wild`…), else every connector of that source. stale = its
+    last run failed after its last success, or no success for STALE_FACTOR × its freshness target; archived = no
+    enabled connector left (the history stays readable)."""
+    sources = sorted({s for s in sources if s})
+    if not sources:
+        return {}
+    sql = """select connector, source, enabled, freshness_target, last_success_at, last_error_at, now() as now
+             from ingestion.connectors where source = any(%s) and mode in ('push', 'pull', 'import')"""
+    if conn is None:
+        with connection() as c:
+            rows = c.execute(sql, (sources,)).fetchall()
+    else:
+        rows = conn.execute(sql, (sources,)).fetchall()
+    out = {}
+    for s in sources:
+        mine = [r for r in rows if r["source"] == s]
+        named = [r for r in mine if r["connector"] == s or r["connector"].startswith(s + ":")]
+        live = [r for r in (named or mine) if r["enabled"]]
+        last = max((r["last_success_at"] for r in (named or mine) if r["last_success_at"]), default=None)
+        info = {"synced_at": last.isoformat() if last else None}
+        if not live:
+            out[s] = {"state": "archived", **info, "reason": "no enabled connector"}
+            continue
+        late = [r for r in live if r["freshness_target"] and (not r["last_success_at"] or
+                r["now"] - r["last_success_at"] > STALE_FACTOR * r["freshness_target"])]
+        failing = [r for r in live if r["last_error_at"] and (not r["last_success_at"] or
+                   r["last_error_at"] > r["last_success_at"])]
+        if late or failing:
+            out[s] = {"state": "stale", **info,
+                      "reason": "last run failed" if failing else f"no successful sync for over {STALE_FACTOR} × its target"}
+        else:
+            out[s] = {"state": "live", **info}
+    return out
+
+
 def record_failure(connector: str, error: str, *, stream: str = "", item_ref: str = "", details: dict | None = None) -> None:
     with connection() as conn:
         conn.execute("""insert into ingestion.failures (connector, stream, item_ref, error, details) values (%s,%s,%s,%s,%s)""",

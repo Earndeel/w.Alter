@@ -14,7 +14,7 @@ write door (library or gateway). Privacy classes: `cloud_allowed`, `redacted_clo
 - `memory_search(query)`: knowledge + original evidence with source and date.
 - `memory_events(text, source, event_type, thread_id, since, until, order="newest"|"oldest", event_id, limit)`: the
   exact text of canonical events; `event_type` exact (`message.received` = written to Monsieur) or a family
-  (`message.*`), `source="people"` = his exchanges with others, not with W.Alter; a conversation in order with `thread_id` (about a hundred messages per read, continue with
+  (`message.*`), `source="people"` = his exchanges with humans on any channel (never W.Alter, an agent, a bot or a service: each event says `actor_kind`), `source="agents"` = with W.Alter and other agents; a newest-first read names any source not synchronised up to now (`freshness`); a conversation in order with `thread_id` (about a hundred messages per read, continue with
   `next`); `event_id` for one event in full. Messages with files carry `attachments` (voice-note transcript,
   document text…).
 - `person_lookup(name)`: a person's card (identities, relationship, `thread_id` of their conversations).
