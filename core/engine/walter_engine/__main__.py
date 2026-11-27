@@ -162,7 +162,7 @@ def capabilities_cmd(settings: config.Settings, args) -> int:
             if args.action == "list":
                 return reg.catalog(args.module or "")
             if args.action == "search":
-                return reg.search(args.query or "", args.limit)
+                return reg.search(args.query or "", args.limit or 8)
             if args.action == "describe":
                 name = args.query if args.query in reg.tools else "mcp__walter__" + str(args.query)
                 return reg.describe(name)
@@ -206,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
     cap.add_argument("action", choices=["list", "search", "describe", "stale", "refresh-cards"])
     cap.add_argument("query", nargs="?", default="")
     cap.add_argument("--module", default="")
-    cap.add_argument("--limit", type=int, default=8)
+    cap.add_argument("--limit", type=int, default=None, help="search: rows (8); refresh-cards: at most this many tools (all)")
     cap.add_argument("--poste", default="general/L1", help="Walter Router poste that writes the intents")
     cap.add_argument("--dry-run", action="store_true")
     cap.add_argument("--cards", default="", help="intents file (default: @instance/state/core/capabilities/cards.json)")
