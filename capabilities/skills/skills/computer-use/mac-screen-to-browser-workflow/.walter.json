@@ -1,0 +1,11 @@
+{
+ "created_at": "2026-11-25T04:15:59.086775+00:00",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "mac-computer-use-ssh",
+  "ssh-mac-remote-control",
+  "playwright-cdp-browser-control"
+ ]
+}

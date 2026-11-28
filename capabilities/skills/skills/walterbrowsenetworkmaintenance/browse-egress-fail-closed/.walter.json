@@ -1,0 +1,7 @@
+{
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
+ "reason": "The session uncovered a Browse-specific failover race not covered by the existing skills: the guardian observed a real wrong exit after the Mac left its France tunnel, while the selector retained primary during fallback startup. Two focused regression tests failed on the old code, and the unrelated extractor failure was reproduced separately on the baseline. The procedure captures how to distinguish an unanswered probe from confirmed wrong egress, prove transition ordering, and verify the live deployment. [session walter/vm/0c08b3ee-d076-40a7-a828-2502bf49f2f4]",
+ "store_sha": "ca91cffd987e88e1a3bab0f35cefc1708847e2dd85b422dbccb1272aba1c98e2"
+}

@@ -1,0 +1,1 @@
+Walter Memory is {{owner.address}}'s durable memory: what happened (messages, e-mails, calendar, conversations with W.Alter, files), what was learned from it, who the people are, and the owner's durable tasks.

@@ -1,0 +1,9 @@
+{
+  "_doc": "OpenAI-compatible providers whose live /models catalogue (with prices) is collected. The key is read at run time from the environment, else from the instance's vault (walter_router.instance.secret_value: Hermes .env, or walter-secrets declared keys) and sent as a header only. hermes_provider null = no Hermes provider: the Router runs it natively through walter-llm.",
+  "providers": [
+    {"provider": "arnict", "name": "Arnict AI", "api": "https://api.arnict.com/v1", "key_env": "ARNICT_API_KEY",
+     "hermes_provider": "arnict", "note": "Uncensored open-weights fine-tunes (GLM 5.3 Flash Uncensored...)"},
+    {"provider": "venice", "name": "Venice AI", "api": "https://api.venice.ai/api/v1", "key_env": "VENICE_API_KEY",
+     "hermes_provider": null, "note": "Venice inference (uncensored DeepSeek V4.1 Flash 1017, pay per token)."}
+  ]
+}

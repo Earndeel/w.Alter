@@ -1,0 +1,15 @@
+{
+ "archived_at": "2026-10-23T04:15:06+00:00",
+ "archived_reason": "not read for 87 days",
+ "content_since": "2026-05-11T17:48:19Z",
+ "domain": "creative",
+ "hermes": {
+  "path": "/root/.hermes/skills/creative/baoyu-infographic",
+  "sha": "834108fb249a0a1f41de6ac215828e67f534f4940eb13b6e977b4a5d5382a76a",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "834108fb249a0a1f41de6ac215828e67f534f4940eb13b6e977b4a5d5382a76a"
+}

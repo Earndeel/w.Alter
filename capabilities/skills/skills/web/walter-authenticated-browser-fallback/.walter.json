@@ -1,0 +1,11 @@
+{
+ "created_at": "2026-11-23T04:16:56.004406+00:00",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "authenticated-session-fallbacks",
+  "webtop-authenticated-browsing",
+  "mac-brave-walter"
+ ]
+}

@@ -1,0 +1,11 @@
+{
+ "created_at": "2026-11-03T04:16:22.597680+00:00",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "walter-browse-orchestrator",
+  "research-evidence-verification",
+  "kie-video-generation-operations"
+ ]
+}

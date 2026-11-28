@@ -1,0 +1,282 @@
+<!--
+  GSAP Landing Page Template — Vanilla HTML
+  Features: timeline entrance, ScrollTrigger stagger, pinned panels, parallax orbs,
+  smooth scroll nav, floating animations, gradient borders, film grain overlay.
+  Usage: Copy to project, customize text/colors, deploy.
+  Dependencies: GSAP 3.12+ (CDN) + ScrollTrigger + ScrollToPlugin
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GSAP Landing</title>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollToPlugin.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #050505;
+      --bg-elevated: #0a0a0a;
+      --text: #f0f0f0;
+      --text-muted: #666;
+      --accent-1: #8b5cf6;
+      --accent-2: #06b6d4;
+      --accent-3: #f472b6;
+    }
+    html { scroll-behavior: auto; }
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* Film grain */
+    body::after {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat: repeat; background-size: 256px 256px;
+    }
+
+    /* Aurora */
+    .aurora {
+      position: fixed; inset: 0; z-index: -2;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(139,92,246,0.12), transparent),
+        radial-gradient(ellipse 60% 40% at 80% 60%, rgba(6,182,212,0.08), transparent),
+        radial-gradient(ellipse 50% 30% at 50% 0%, rgba(244,114,182,0.06), transparent);
+      animation: aurora 20s ease-in-out infinite alternate;
+    }
+    @keyframes aurora {
+      0% { transform: translate(0,0) scale(1); }
+      33% { transform: translate(2%,-1%) scale(1.02); }
+      66% { transform: translate(-1%,2%) scale(0.98); }
+      100% { transform: translate(1%,-2%) scale(1.01); }
+    }
+
+    /* Scanlines */
+    .scanlines {
+      position: fixed; inset: 0; z-index: -1;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px);
+      pointer-events: none;
+    }
+
+    /* Nav */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 1.5rem 3rem; display: flex; justify-content: space-between; align-items: center;
+      background: rgba(5,5,5,0.7); border-bottom: 1px solid rgba(255,255,255,0.06);
+      backdrop-filter: blur(32px) saturate(140%);
+      transform: translateY(-100%);
+    }
+    nav .logo { font-weight: 700; font-size: 1.25rem; letter-spacing: -0.02em; }
+    nav .logo span { color: var(--accent-1); }
+    nav .links { display: flex; gap: 2rem; }
+    nav .links a { color: var(--text-muted); text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: color 0.3s; position: relative; }
+    nav .links a::after { content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 1px; background: var(--accent-2); transition: width 0.3s; }
+    nav .links a:hover { color: var(--text); }
+    nav .links a:hover::after { width: 100%; }
+
+    section { min-height: 100vh; position: relative; display: flex; align-items: center; justify-content: center; }
+
+    /* Hero */
+    .hero { flex-direction: column; text-align: center; padding: 0 2rem; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;
+      border-radius: 100px; border: 1px solid rgba(139,92,246,0.3);
+      background: rgba(139,92,246,0.05); font-size: 0.75rem; font-weight: 500;
+      color: var(--accent-1); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2rem; opacity: 0;
+    }
+    .hero-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-1); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .hero h1 { font-size: clamp(3rem, 8vw, 7rem); font-weight: 700; line-height: 1; letter-spacing: -0.04em; max-width: 900px; }
+    .hero h1 .line { display: block; overflow: hidden; }
+    .hero h1 .line span { display: inline-block; }
+    .hero h1 .gradient { background: linear-gradient(135deg, #fff 0%, #c4b5fd 40%, var(--accent-2) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { font-size: clamp(1rem, 2vw, 1.25rem); color: var(--text-muted); max-width: 500px; margin: 2rem 0 3rem; line-height: 1.6; opacity: 0; }
+    .hero-cta { display: flex; gap: 1rem; opacity: 0; }
+    .btn { padding: 1rem 2rem; border-radius: 12px; font-family: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; border: none; position: relative; overflow: hidden; transition: transform 0.2s; }
+    .btn:hover { transform: translateY(-2px); }
+    .btn-primary { background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); color: white; }
+    .btn-secondary { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid rgba(255,255,255,0.1); }
+
+    /* Orbs */
+    .orb { position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: -1; }
+    .orb-1 { width: 400px; height: 400px; background: rgba(139,92,246,0.15); top: 10%; left: -10%; }
+    .orb-2 { width: 300px; height: 300px; background: rgba(6,182,212,0.12); bottom: 10%; right: -5%; }
+    .orb-3 { width: 200px; height: 200px; background: rgba(244,114,182,0.1); top: 40%; right: 20%; }
+
+    /* Features */
+    .features { flex-direction: column; padding: 8rem 2rem; background: var(--bg-elevated); }
+    .features-header { text-align: center; margin-bottom: 6rem; }
+    .features-header h2 { font-size: clamp(2rem, 5vw, 4rem); font-weight: 700; margin-bottom: 1rem; }
+    .features-header p { color: var(--text-muted); font-size: 1.125rem; }
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; max-width: 1200px; width: 100%; }
+    .feature-card { padding: 2rem; border-radius: 20px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); position: relative; overflow: hidden; transition: border-color 0.3s; }
+    .feature-card::before { content: ''; position: absolute; inset: -1px; border-radius: 20px; padding: 1px; background: linear-gradient(135deg, rgba(139,92,246,0.3), rgba(6,182,212,0.2), transparent 60%); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+    .feature-card:hover::before { opacity: 1; }
+    .feature-card:hover { border-color: rgba(139,92,246,0.2); }
+    .feature-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1.5rem; background: rgba(139,92,246,0.1); }
+    .feature-card h3 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .feature-card p { color: var(--text-muted); font-size: 0.875rem; line-height: 1.6; }
+
+    /* Showcase */
+    .showcase { flex-direction: column; }
+    .showcase-panel { width: 100%; min-height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+    .showcase-panel:nth-child(1) { background: var(--bg); }
+    .showcase-panel:nth-child(2) { background: var(--bg-elevated); }
+    .showcase-panel:nth-child(3) { background: var(--bg); }
+    .showcase-content { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; max-width: 1200px; padding: 0 2rem; align-items: center; }
+    .showcase-text h2 { font-size: clamp(2rem, 4vw, 3.5rem); font-weight: 700; margin-bottom: 1.5rem; line-height: 1.1; }
+    .showcase-text p { color: var(--text-muted); font-size: 1.125rem; line-height: 1.7; }
+    .showcase-visual { aspect-ratio: 4/3; border-radius: 24px; background: linear-gradient(135deg, rgba(139,92,246,0.1), rgba(6,182,212,0.1)); border: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 4rem; position: relative; overflow: hidden; }
+    .showcase-visual::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 30% 30%, rgba(139,92,246,0.15), transparent 50%); }
+    .progress-bar { position: absolute; bottom: 0; left: 0; height: 3px; background: linear-gradient(90deg, var(--accent-1), var(--accent-2)); width: 0%; }
+
+    /* CTA */
+    .cta { flex-direction: column; text-align: center; padding: 8rem 2rem; }
+    .cta h2 { font-size: clamp(2.5rem, 6vw, 5rem); font-weight: 700; margin-bottom: 1.5rem; }
+    .cta h2 .gradient { background: linear-gradient(135deg, var(--accent-3), var(--accent-1)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .cta p { color: var(--text-muted); font-size: 1.25rem; margin-bottom: 3rem; }
+
+    footer { padding: 3rem; text-align: center; border-top: 1px solid rgba(255,255,255,0.05); color: var(--text-muted); font-size: 0.875rem; }
+
+    @media (max-width: 768px) {
+      .showcase-content { grid-template-columns: 1fr; }
+      nav .links { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="aurora"></div>
+  <div class="scanlines"></div>
+
+  <nav>
+    <div class="logo">BRAND.<span>NAME</span></div>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#showcase">Showcase</a>
+      <a href="#cta">Contact</a>
+    </div>
+  </nav>
+
+  <section class="hero" id="hero">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="hero-badge">Now Available</div>
+    <h1>
+      <span class="line"><span>Build the</span></span>
+      <span class="line"><span class="gradient">impossible</span></span>
+      <span class="line"><span>at scale</span></span>
+    </h1>
+    <p>Your product description here. Keep it short and punchy.</p>
+    <div class="hero-cta">
+      <button class="btn btn-primary">Get Started</button>
+      <button class="btn btn-secondary">View Demo</button>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="features-header">
+      <h2>Everything you need</h2>
+      <p>Powerful tools designed for creators who refuse to compromise.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card"><div class="feature-icon">🚀</div><h3>Feature One</h3><p>Describe your first key feature here.</p></div>
+      <div class="feature-card"><div class="feature-icon">⚡</div><h3>Feature Two</h3><p>Describe your second key feature here.</p></div>
+      <div class="feature-card"><div class="feature-icon">🔗</div><h3>Feature Three</h3><p>Describe your third key feature here.</p></div>
+      <div class="feature-card"><div class="feature-icon">🎨</div><h3>Feature Four</h3><p>Describe your fourth key feature here.</p></div>
+      <div class="feature-card"><div class="feature-icon">📊</div><h3>Feature Five</h3><p>Describe your fifth key feature here.</p></div>
+      <div class="feature-card"><div class="feature-icon">🔐</div><h3>Feature Six</h3><p>Describe your sixth key feature here.</p></div>
+    </div>
+  </section>
+
+  <section class="showcase" id="showcase">
+    <div class="showcase-panel">
+      <div class="progress-bar"></div>
+      <div class="showcase-content">
+        <div class="showcase-text"><h2>Scroll-driven storytelling</h2><p>Pin sections while content animates in sync with scroll progress.</p></div>
+        <div class="showcase-visual">🖼️</div>
+      </div>
+    </div>
+    <div class="showcase-panel">
+      <div class="progress-bar"></div>
+      <div class="showcase-content">
+        <div class="showcase-text"><h2>Complex timelines</h2><p>Chain animations with labels, relative positioning, and nested timelines.</p></div>
+        <div class="showcase-visual">⏳</div>
+      </div>
+    </div>
+    <div class="showcase-panel">
+      <div class="progress-bar"></div>
+      <div class="showcase-content">
+        <div class="showcase-text"><h2>SVG & Text effects</h2><p>Morph shapes, draw strokes, split characters. GSAP plugins unlock possibilities CSS cannot touch.</p></div>
+        <div class="showcase-visual">✨</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta" id="cta">
+    <h2>Ready to <span class="gradient">create</span>?</h2>
+    <p>Join thousands shipping faster with your product.</p>
+    <div class="hero-cta">
+      <button class="btn btn-primary">Start Free Trial</button>
+      <button class="btn btn-secondary">Read Docs</button>
+    </div>
+  </section>
+
+  <footer>Built with GSAP + intent.</footer>
+
+  <script>
+    gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
+
+    // Nav entrance
+    gsap.to("nav", { y: 0, duration: 0.8, ease: "power3.out", delay: 0.2 });
+
+    // Hero timeline
+    const heroTl = gsap.timeline({ delay: 0.4 });
+    heroTl.to(".hero-badge", { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" })
+          .from(".hero h1 .line span", { y: "100%", duration: 1, ease: "power4.out", stagger: 0.1 }, "-=0.3")
+          .to(".hero p", { opacity: 1, y: 0, duration: 0.8, ease: "power2.out" }, "-=0.5")
+          .to(".hero-cta", { opacity: 1, y: 0, duration: 0.8, ease: "power2.out" }, "-=0.5");
+
+    // Parallax orbs
+    gsap.to(".orb-1", { y: -150, scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: 1 } });
+    gsap.to(".orb-2", { y: -80, scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: 1.5 } });
+
+    // Features stagger
+    gsap.from(".feature-card", { y: 60, opacity: 0, duration: 0.8, ease: "power2.out", stagger: 0.1, scrollTrigger: { trigger: ".features-grid", start: "top 80%" } });
+
+    // Showcase pinned panels
+    gsap.utils.toArray(".showcase-panel").forEach((panel) => {
+      const text = panel.querySelector(".showcase-text");
+      const visual = panel.querySelector(".showcase-visual");
+      const progress = panel.querySelector(".progress-bar");
+      const tl = gsap.timeline({ scrollTrigger: { trigger: panel, start: "top top", end: "+=100%", scrub: 1, pin: true } });
+      tl.from(text, { x: -60, opacity: 0, duration: 0.3 }, 0)
+        .from(visual, { x: 60, opacity: 0, scale: 0.9, duration: 0.3 }, 0)
+        .to(progress, { width: "100%", duration: 0.5, ease: "none" }, 0)
+        .to(text, { x: 60, opacity: 0, duration: 0.2 }, 0.6)
+        .to(visual, { x: -60, opacity: 0, scale: 0.9, duration: 0.2 }, 0.6);
+    });
+
+    // CTA entrance
+    gsap.from(".cta h2, .cta p, .cta .hero-cta", { y: 40, opacity: 0, duration: 0.8, ease: "power2.out", stagger: 0.15, scrollTrigger: { trigger: ".cta", start: "top 70%" } });
+
+    // Smooth scroll nav
+    document.querySelectorAll("nav a").forEach(link => {
+      link.addEventListener("click", (e) => { e.preventDefault(); gsap.to(window, { duration: 1.2, scrollTo: { y: link.getAttribute("href"), offsetY: 80 }, ease: "power3.inOut" }); });
+    });
+
+    // Floating orbs
+    gsap.to(".orb-1", { x: 30, y: -30, duration: 8, ease: "sine.inOut", repeat: -1, yoyo: true });
+    gsap.to(".orb-2", { x: -20, y: 20, duration: 10, ease: "sine.inOut", repeat: -1, yoyo: true });
+    gsap.to(".orb-3", { x: 15, y: -15, duration: 6, ease: "sine.inOut", repeat: -1, yoyo: true });
+  </script>
+</body>
+</html>

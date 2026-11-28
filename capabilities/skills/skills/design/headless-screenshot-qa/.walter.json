@@ -1,0 +1,14 @@
+{
+ "content_since": "2026-09-03T15:29:15Z",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/headless-screenshot-qa",
+  "sha": "2c6082d95fd72a3a894bdfd32f2d88cee9cd20ffefe3f8f79fa057e397df0394",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "read by an agent",
+ "restored_at": "2026-11-17T15:20:39+00:00",
+ "store_sha": "2c6082d95fd72a3a894bdfd32f2d88cee9cd20ffefe3f8f79fa057e397df0394"
+}

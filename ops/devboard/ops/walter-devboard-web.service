@@ -1,0 +1,13 @@
+[Unit]
+Description=walter-devboard web: the development board page + read API + live stream (tailnet only, listen_host:port from the instance settings)
+After=network-online.target docker.service tailscaled.service
+Wants=tailscaled.service
+
+[Service]
+ExecStart=/usr/local/bin/walter-devboard serve
+Restart=on-failure
+RestartSec=10
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

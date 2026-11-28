@@ -1,0 +1,14 @@
+{
+ "content_since": "2026-07-22T12:55:55Z",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/kie-image-generation-operations",
+  "sha": "52c5cbd96fea974b103a8c587bc44ef12d7e87fb2a02e816b62f9a5c7b54969c",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "read by an agent",
+ "restored_at": "2026-11-24T11:58:59+00:00",
+ "store_sha": "52c5cbd96fea974b103a8c587bc44ef12d7e87fb2a02e816b62f9a5c7b54969c"
+}

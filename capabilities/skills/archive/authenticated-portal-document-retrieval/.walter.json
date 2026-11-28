@@ -1,0 +1,17 @@
+{
+ "archived_at": "2026-11-28T04:15:09+00:00",
+ "archived_reason": "not read for 32 days",
+ "content_since": "2026-08-08T11:44:34Z",
+ "domain": "web",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/authenticated-portal-document-retrieval",
+  "sha": "ea30d7db92aa3c7012df9fec6192aefe7a6b089d60f0012ea0d24f1f8d0c91d5",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "reserve": true,
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "ea30d7db92aa3c7012df9fec6192aefe7a6b089d60f0012ea0d24f1f8d0c91d5"
+}

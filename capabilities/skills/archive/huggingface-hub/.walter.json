@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-24T04:13:58+00:00",
+ "archived_reason": "not read for 43 days",
+ "content_since": "2026-07-26T19:35:12Z",
+ "domain": "gpu",
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/huggingface-hub",
+  "sha": "d6dd4e8baefab2af0cc419a196a5feb1fe59e1e40c0710f6a68fbd668c9b82f4",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-hub",
+ "owner": "upstream",
+ "reserve": true,
+ "store_sha": "d6dd4e8baefab2af0cc419a196a5feb1fe59e1e40c0710f6a68fbd668c9b82f4"
+}

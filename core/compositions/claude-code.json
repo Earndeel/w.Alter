@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "scope": "composition bindings; host runtime/environment provisioning is a prerequisite",
+  "fallback": "explicit failure; no silent replacement of a configured Walter capability",
+  "modules": [
+    "soul",
+    "memory",
+    "logs",
+    "skills",
+    "secrets",
+    "browse",
+    "computer",
+    "router",
+    "raw-vault"
+  ],
+  "id": "claude-code",
+  "native": [
+    "agent_loop",
+    "permissions",
+    "model",
+    "compression"
+  ],
+  "identity_source": "/opt/walter-profiles/claude-code/CLAUDE.md",
+  "identity_scope": "workspace",
+  "mcp": true,
+  "skill_source": "/opt/walter-core/skills/walter-skills/SKILL.md",
+  "hooks": {
+    "SessionStart": 10,
+    "UserPromptSubmit": 12,
+    "PreCompact": 30,
+    "Stop": 30,
+    "SessionEnd": 10,
+    "PostToolUse": 5,
+    "PostToolUseFailure": 5
+  }
+}

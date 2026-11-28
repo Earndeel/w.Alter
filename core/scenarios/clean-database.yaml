@@ -1,0 +1,14 @@
+# Walter Clean, database (addendum 2026-10-29, C.3/C.5 / lot 3): the modules' migrations plus the reference rows they
+# declare (contracts/data-classes.json) build a database on a disposable PostgreSQL without network; every reference
+# table must hold exactly the exported rows and no row of any table may contain a private marker of the instance.
+# Rows the migrations write themselves (software defaults) are reported and must name nobody. Counts only.
+name: clean-database
+milestone: clean-L3
+steps:
+  - cmd: {name: data, shell: "walter-ops install data-check", timeout: 900}
+  - cmd: {name: database, shell: "walter-ops install clean-db-check", timeout: 1800}
+assertions:
+  - {step: data, path: ok, equals: true}
+  - {step: data, path: unclassified, equals: []}
+  - {step: database, path: ok, equals: true}
+  - {step: database, path: mismatched, equals: []}

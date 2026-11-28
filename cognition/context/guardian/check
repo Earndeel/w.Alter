@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""walter-context watchdog in Incident v1 (2026-10-28): preflight service, its latency (healthy plans only) and, since
+2026-11-11 (SOCLE A8), the share of plans decided without their model (`preflight:degraded`)."""
+import json, subprocess, sys, time, urllib.request
+
+
+def sh(*cmd, timeout=60):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(cmd, 124, "", str(exc))
+
+
+def active(unit):
+    return sh("systemctl", "is-active", unit).stdout.strip() == "active"
+
+
+def http_json(url, timeout=5):
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return json.loads(r.read())
+    except Exception as exc:  # noqa: BLE001
+        return {"_error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+
+
+def inc(module, key, kind, severity, summary, evidence=None, level="G0"):
+    return {"version": 1, "module": module, "key": key, "kind": kind, "severity": severity, "summary": summary,
+            "evidence": evidence or {}, "suggested_level": level}
+
+
+def units_down(module, units, severity="high"):
+    return [inc(module, f"service:{u}", "service_down", severity, f"Le service {u} n'est pas actif.", {"unit": u}, "G1")
+            for u in units if not active(u)]
+
+
+import glob, os, re, statistics
+out = units_down("context", ["walter-context-preflight"], "warning")
+h = http_json("http://127.0.0.1:8897/health")
+if h.get("_error") or not h.get("ok"):
+    out.append(inc("context", "preflight:health", "service_unhealthy", "warning", "Le preflight :8897 ne répond pas (fantôme, rien d injecté).", h, "G1"))
+inst = os.environ.get("WALTER_INSTANCE") or (open("/etc/walter/instance").read().strip() if os.path.exists("/etc/walter/instance") else "")
+files = sorted(glob.glob(f"{inst}/state/context/shadow/preflight-*.jsonl"))[-2:]
+rows = []
+for f in files:
+    for line in open(f).read().splitlines():
+        try:
+            rows.append(json.loads(line))
+        except ValueError:
+            pass
+
+
+def degraded(row):
+    """A plan decided without its model (2026-11-11: `plan.decision.error`; soon also `degraded: true`)."""
+    d = ((row.get("plan") or {}).get("decision") or {}) if isinstance(row, dict) else {}
+    return bool(d.get("degraded") or d.get("error"))
+
+
+# latency: healthy plans only — degraded ones return in a few ms and were pulling the median down
+ms = [r["plan_ms"] for r in rows[-50:] if isinstance(r.get("plan_ms"), (int, float)) and not degraded(r)]
+if len(ms) >= 5 and statistics.median(ms) > 3000:
+    out.append(inc("context", "preflight:latency", "latency", "warning", f"Preflight lent : médiane {statistics.median(ms):.0f} ms sur {len(ms)} plans.", {"median_ms": statistics.median(ms)}, "G0"))
+
+# degraded plans (SOCLE A8): >= DEGRADED_MIN and >= DEGRADED_RATIO of the plans of the last DEGRADED_WINDOW_S
+DEGRADED_WINDOW_S, DEGRADED_MIN, DEGRADED_RATIO = 1800, 2, 0.30
+from datetime import datetime, timezone
+now = time.time()
+
+
+def ts(row):
+    try:
+        dt = datetime.fromisoformat(str(row.get("at")).replace("Z", "+00:00"))
+    except ValueError:
+        return 0.0
+    return (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).timestamp()
+
+
+recent = [r for r in rows if -60 <= now - ts(r) <= DEGRADED_WINDOW_S]
+bad = [r for r in recent if degraded(r)]
+if len(bad) >= DEGRADED_MIN and len(bad) >= DEGRADED_RATIO * len(recent):
+    cause = ((bad[-1].get("plan") or {}).get("decision") or {}).get("error") or "degraded"
+    cause = re.sub(r"(?:https?://|/)[^\s'\"]+", "<path>", str(cause))[:80]
+    stale = sh("walter", "deploy", "restart", "walter-context-preflight", "--dry-run", timeout=120)
+    try:
+        stale_now = json.loads(stale.stdout).get("stale")
+    except ValueError:
+        stale_now = None
+    out.append(inc("context", "preflight:degraded", "preflight_degraded", "high",
+                   f"Preflight dégradé : {len(bad)} plans sur {len(recent)} en 30 min décidés sans modèle ({cause}).",
+                   {"degraded": len(bad), "plans": len(recent), "ratio": round(len(bad) / len(recent), 2),
+                    "cause": cause, "unit": "walter-context-preflight", "service_stale": stale_now}, "G1"))
+print(json.dumps(out, ensure_ascii=False))

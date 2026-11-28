@@ -1,0 +1,11 @@
+[Unit]
+Description=Walter Memory: history catch-up of the L3 extraction, one slice oldest first (stops over the Codex quota; switch organic.toml [stages] catchup)
+After=network-online.target docker.service walter-llm.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/walter/cognition/memory
+Environment=PGPASSFILE=/root/.pgpass
+ExecStart=/usr/local/bin/walter-memory extract2 catchup --events 120
+TimeoutStartSec=2h
+Nice=10

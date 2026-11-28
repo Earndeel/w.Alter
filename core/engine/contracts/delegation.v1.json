@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://walter.local/contracts/core/engine/delegation.v1.json",
+  "title": "Delegation v1",
+  "description": "A sub-agent request. Same field names as today's walter_run so the tool keeps its name and shape. Status: DRAFT (E0), implemented at E5. Children never exceed the parent's rights minus the NEVER list.",
+  "type": "object",
+  "required": [
+    "version",
+    "goal",
+    "parent"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context": {
+      "type": "string",
+      "description": "Caller-provided facts; the child's starting dossier itself is a ChildContextSpec served by walter-context"
+    },
+    "toolsets": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "walter-web",
+          "web",
+          "skills",
+          "memory",
+          "file",
+          "vision",
+          "shell"
+        ]
+      },
+      "description": "shell = the engine's sandboxed shell (never the removed walter_run terminal); file = the child's own workspace"
+    },
+    "budget_seconds": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 3600
+    },
+    "max_turns": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 120
+    },
+    "task": {
+      "type": "string"
+    },
+    "level": {
+      "enum": [
+        "L1",
+        "L2",
+        "L3"
+      ]
+    },
+    "model": {
+      "type": "string"
+    },
+    "require": {
+      "type": "string"
+    },
+    "output_contract": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "JSON schema the child's answer must satisfy"
+    },
+    "persist": {
+      "enum": [
+        "none",
+        "observations"
+      ],
+      "default": "none"
+    },
+    "parent": {
+      "type": "object",
+      "required": [
+        "run_id",
+        "session_id",
+        "depth"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^(web|telegram|api|mcp|command|schedule|webhook|lab)/[A-Za-z0-9._:@/-]{1,200}$",
+          "description": "Stable engine session id: <interface>/<account or caller>/<conversation>. Fixed by intake, never by the model."
+        },
+        "task_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "0 = the turn itself; a request at the maximum depth is refused"
+        },
+        "reuse_plan": {
+          "type": "boolean",
+          "description": "True when the delegated goal is the owner's message: the run's ContextPlan is reused"
+        }
+      }
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 200,
+      "description": "Idempotency key: same key = same effect, never applied twice"
+    }
+  }
+}

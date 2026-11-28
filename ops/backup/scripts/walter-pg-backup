@@ -1,0 +1,20 @@
+#!/bin/bash
+# Daily logical backup of Walter's PostgreSQL database (all schemas), custom format, verified before it is kept.
+# Ported into walter/ops on 2026-10-29 from the host script of 2026-10-01: same steps and retention; every location
+# comes from the instance's backup configuration (`walter-ops backup env pg`), none is written here.
+# Keeps keep_daily newest dumps + keep_weekly Sunday copies (hard links to the day's dump: no second copy on disk). Restore: pg_restore -d <database> --clean --if-exists <file>
+set -euo pipefail
+umask 077
+eval "$(walter-ops backup env pg)"
+DIR="$WALTER_BACKUP_DIR"
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+OUT="$DIR/${WALTER_BACKUP_PREFIX}${TS}${WALTER_BACKUP_SUFFIX}"
+docker exec "$WALTER_PG_CONTAINER" pg_dump -U "$WALTER_PG_USER" -d "$WALTER_PG_DATABASE" -Fc -Z 6 > "$OUT.partial"
+# Integrity check: the archive must list its table of contents
+docker exec -i "$WALTER_PG_CONTAINER" pg_restore -l < "$OUT.partial" > /dev/null
+mv "$OUT.partial" "$OUT"
+if [ "$(date -u +%u)" = 7 ]; then ln -f "$OUT" "$DIR/weekly-${WALTER_BACKUP_PREFIX}${TS}${WALTER_BACKUP_SUFFIX}"; fi
+ls -1t "$DIR"/"${WALTER_BACKUP_PREFIX}"*"${WALTER_BACKUP_SUFFIX}" | tail -n +"$((WALTER_BACKUP_KEEP_DAILY + 1))" | xargs -r rm -f
+find "$DIR" -name "weekly-${WALTER_BACKUP_PREFIX}*${WALTER_BACKUP_SUFFIX}" -printf "%T@ %p\n" | sort -rn \
+  | tail -n +"$((WALTER_BACKUP_KEEP_WEEKLY + 1))" | cut -d" " -f2- | xargs -r rm -f
+echo "backup ok: $OUT ($(du -h "$OUT" | cut -f1))"

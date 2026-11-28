@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; background: #000; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #13232c; border-radius: 4px; }
+
+/* Markdown documents (VISION, DECISIONS, reports…) */
+.md { color: #d7e3ea; line-height: 1.6; max-width: 860px; }
+.md h1 { font-size: 20px; font-weight: 600; color: #fff; margin: 0 0 14px; }
+.md h2 { font-size: 16px; font-weight: 600; color: #fff; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #13232c; }
+.md h3 { font-size: 14px; font-weight: 600; color: #e6f0f5; margin: 16px 0 6px; }
+.md h4 { font-size: 13px; font-weight: 600; color: #e6f0f5; margin: 12px 0 4px; }
+.md p, .md ul, .md ol, .md table, .md pre, .md blockquote { margin: 0 0 10px; }
+.md ul { list-style: disc; padding-left: 20px; }
+.md ol { list-style: decimal; padding-left: 20px; }
+.md li { margin: 2px 0; }
+.md a { color: #01B7FF; }
+.md strong { color: #fff; }
+.md code { background: #0b161c; border: 1px solid #13232c; border-radius: 4px; padding: 0 4px; font-size: 12px; }
+.md pre { background: #050b0f; border: 1px solid #13232c; border-radius: 6px; padding: 10px; overflow: auto; }
+.md pre code { background: none; border: 0; padding: 0; }
+.md blockquote { border-left: 2px solid #01B7FF; padding-left: 10px; color: #8aa3b0; }
+.md table { border-collapse: collapse; font-size: 12px; }
+.md th, .md td { border: 1px solid #13232c; padding: 4px 8px; text-align: left; vertical-align: top; }
+.md th { color: #fff; background: #050b0f; }
+.md hr { border: 0; border-top: 1px solid #13232c; margin: 16px 0; }

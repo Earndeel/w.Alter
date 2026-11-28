@@ -1,0 +1,19 @@
+{
+  "computer_use": {
+    "ax_max_elements": 100,
+    "capture_strategy": "safe-window",
+    "walter": {
+      "observer": {
+        "enabled": true
+      }
+    }
+  },
+  "device_lock_path": "/run/walter-computer/main-mac.lock",
+  "vision": {
+    "enabled": false,
+    "poste": "vision",
+    "endpoint": "http://127.0.0.1:8894/v1/chat/completions",
+    "timeout_seconds": 45,
+    "max_image_bytes": 2097152
+  }
+}

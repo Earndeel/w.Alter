@@ -1,0 +1,31 @@
+# Nature of an event's author (27/11/2026, Monsieur): human | walter | agent | bot | service.
+# A property of the source identity (core.source_identities.attributes.author), decided by walter_memory/authors.py with
+# these deterministic rules, in this order; anything they do not recognise is a human. The instance adds its own
+# accounts in @instance/config/memory/authors.toml: its lists are added to these, never replace them.
+# Technical source (core.sources.kind), channel (payload.chat.network / source_account) and author stay separate fields.
+
+[walter]
+# identities of W.Alter itself in the agent sources (core.sources.kind = 'agent')
+external_ids = ["walter", "engine", "hermes:main"]
+# W.Alter's own accounts on messaging networks (usernames, any case) — the instance lists them
+handles = []
+
+[human]
+# the owner in the agent sources (his prompts to W.Alter's agents)
+external_ids = ["monsieur"]
+
+[agent]
+# an AI assistant of a network, seen through a messaging source (display name, exact)
+display_names = ["Meta AI"]
+
+[service]
+# Beeper bridge bots (@<network>bot:beeper.local) and Telegram's own service account (777000)
+external_id_patterns = ['^@[a-z]+bot:beeper\.local$', '^@telegram_777000:']
+# a network's own account writing in a chat (display name, exact)
+display_names = ["Telegram", "WhatsApp", "Messenger", "Instagram", "Facebook"]
+# automatic senders by address
+email_patterns = ['^(no-?reply|do-?not-?reply|notifications?|mailer-daemon|newsletters?|bounces?|alerts?)[^@]*@']
+
+[bot]
+# Telegram guarantees that a bot's username ends in "bot"
+telegram_handle_suffix = "bot"

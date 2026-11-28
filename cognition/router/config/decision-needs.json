@@ -1,0 +1,129 @@
+{
+  "about": "Walter Decision — needs declared by the modules that ask typed decisions (llm/decision.py). A caller names its need in the request (walter_memory.llm.decide sends its processor). Policy only: the Router's decision chain chooses and orders the models. memo_ttl_s = window in which the same state + questions + chain reuse the answer already given (0 = never); escalate_below = confidence under which a question is asked again to the next model of the chain (null = off until a bench sets it); max_timeout_s = cap on the caller's timeout per call (null = the caller's). assign (18/11) = \"native_whole\": the whole set in one call to the first model of the chain that carries it all natively, hedge_after_ms = a second call only past that, failover_after_ms = the per-question split starts past that or on an error (first complete answer wins); media_fallback \"text\" = a medium no usable model reads is left out of the split rather than the question (the state says it in words); settle_after_ms = past it, parts of the split that carry only optional questions are no longer waited for (said late). types = the question kinds the need asks today (noul, choice, score, multiple = choice of several options, text, number, date, estimate = number with a range, spans, box, boxes); new_kinds = kinds that fit its purpose and that a route can carry since 17/11, with where (not asked yet: the owning module adopts them). Each kind is checked against the decision chain by `walter-router decision-needs` (llm/decision.py capabilities: native, Extractions route, emulated, or refused).",
+  "needs": {
+    "walter-context-preflight": {
+      "owner": "cognition/context",
+      "purpose": "plan of each owner message: thread, act, context level, tier, modules",
+      "latency_ms": 1500,
+      "memo_ttl_s": 120,
+      "escalate_below": null,
+      "max_timeout_s": null,
+      "types": [
+        "choice",
+        "noul",
+        "multiple",
+        "spans"
+      ],
+      "new_kinds": {
+        "multiple": "since 18/11 native on Liquid's own API (independent probabilities, one call): `needs` and `personal`; emulated as one noul per option only on the failover split (Drex Max, OpenRouter)",
+        "spans": "since 18/11 asked in the same native call as the judgements (dates, people, places, amounts); on the failover split, OpenRouter's Extractions route"
+      },
+      "assign": "native_whole",
+      "hedge_after_ms": 700,
+      "failover_after_ms": 1500,
+      "media_fallback": "text",
+      "policy_18_11": "owner decision 18/11 (mission « préflight natif »): native_whole on Liquid's own API, hedge past 700 ms, split failover past 1.5 s or on error, media_fallback text. Bench preflight_native (65 cases, 2 independent runs): decision p50/p95 0.44/0.60 s (was 0.57/0.79), ~1 call per message (was 2.9), same act/needs, personal/pack/readings now read; outage drill without Liquid: 11/11 answered. Rollback = remove these four keys.",
+      "settle_after_ms": 2500
+    },
+    "triage": {
+      "owner": "cognition/memory",
+      "purpose": "incoming event: ignore / remember / notify / prepare a reply",
+      "latency_ms": 5000,
+      "memo_ttl_s": 3600,
+      "escalate_below": null,
+      "max_timeout_s": null,
+      "types": [
+        "choice",
+        "noul",
+        "number",
+        "date"
+      ],
+      "new_kinds": {
+        "number": "since 17/11 (2.0): the amount of the last incoming message (EUR), read by Walter when the model finds it without its value",
+        "date": "since 17/11: the deadline, read by Walter against the message's day (order dmy)",
+        "text": "the person to answer (not asked yet)"
+      }
+    },
+    "views": {
+      "owner": "cognition/memory",
+      "purpose": "organic memory views: subject / episode / period assignment",
+      "latency_ms": 10000,
+      "memo_ttl_s": 3600,
+      "escalate_below": null,
+      "max_timeout_s": null,
+      "types": [
+        "choice"
+      ]
+    },
+    "disclosure.commitment": {
+      "owner": "cognition/memory",
+      "purpose": "does an outgoing message commit the owner",
+      "latency_ms": 3000,
+      "memo_ttl_s": 600,
+      "escalate_below": null,
+      "max_timeout_s": null,
+      "types": [
+        "choice",
+        "spans",
+        "number"
+      ],
+      "new_kinds": {
+        "spans": "since 17/11 (2.0): the days an outgoing message commits to (resolved by Walter); every piece of personal data (17/11: 13/13 found on Walter cases) not asked yet",
+        "number": "since 17/11: the amount it commits to"
+      }
+    },
+    "documents.verify": {
+      "owner": "cognition/memory",
+      "purpose": "check a fact drawn from a document against it",
+      "latency_ms": 10000,
+      "memo_ttl_s": 3600,
+      "escalate_below": null,
+      "max_timeout_s": null,
+      "types": [
+        "choice",
+        "noul"
+      ],
+      "new_kinds": {
+        "text": "the value a fact claims, read from the document with its span",
+        "number": "idem",
+        "date": "idem, order dmy"
+      }
+    },
+    "sourced-observation/1.verify": {
+      "owner": "cognition/memory",
+      "purpose": "check an observation against its source",
+      "latency_ms": 10000,
+      "memo_ttl_s": 3600,
+      "escalate_below": null,
+      "max_timeout_s": null,
+      "types": [
+        "choice",
+        "noul"
+      ]
+    },
+    "context-intent-bench": {
+      "owner": "cognition/context",
+      "purpose": "bench of the intent questions (never reused: each sample counts)",
+      "latency_ms": 5000,
+      "memo_ttl_s": 0,
+      "escalate_below": null,
+      "max_timeout_s": null,
+      "types": [
+        "choice",
+        "noul"
+      ]
+    },
+    "memory.reconcile": {
+      "owner": "cognition/memory",
+      "purpose": "consolidation: how each statement extracted from a conversation relates to current knowledge (target item + new / confirms / enriches / corrects / replaces / contradicts / ignore), up to 12 statements per decision",
+      "latency_ms": 8000,
+      "memo_ttl_s": 86400,
+      "escalate_below": null,
+      "max_timeout_s": null,
+      "types": [
+        "choice"
+      ],
+      "since": "2026-11-19"
+    }
+  }
+}

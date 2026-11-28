@@ -1,0 +1,15 @@
+# Instance face of the DSH web profile, rendered by walter-core (`walter harness install dsh`) from
+# `walter instance config core engine.toml` [dsh.web]. Values are inserted as JSON scalars; edit the instance file,
+# never the rendered block (it is fenced and fingerprinted, a hand edit is refused).
+# Browser sign-in lifetime: access is tailnet-only plus this cookie.
+- id: connection
+  config:
+    trustedHosts: !!js ctx.webRuntime.trustedHosts
+    cookieMaxAgeDays: ${cookie_max_age_days}
+# The face: software in core/ports/dsh-web-ui (neutral); its name and greeting are the instance's.
+- insert:
+  - id: walter-ui
+    name: ${ui_port}
+    config:
+      name: ${name}
+      tagline: ${tagline}

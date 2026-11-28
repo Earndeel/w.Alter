@@ -1,0 +1,23 @@
+[Unit]
+Description=Walter Memory — événements du Beeper Server natif
+Wants=network-online.target beeper-server.service
+After=network-online.target beeper-server.service docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/walter/cognition/memory
+Environment=PYTHONUNBUFFERED=1
+Environment=PGPASSFILE=/root/.pgpass
+ExecStart=/usr/local/bin/walter-python connectors/beeper_watch.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+Nice=10
+UMask=0077
+MemoryMax=768M
+TasksMax=64
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

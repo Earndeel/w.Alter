@@ -1,0 +1,41 @@
+#!/bin/bash
+# Monthly proof that the offsite backups are restorable: download the newest of each kind, decrypt with the recovery
+# key, restore PostgreSQL into a scratch database and print restored vs live row counts, integrity-check the
+# runtime state snapshot, the config bundle and the vault export. Scratch data is deleted afterwards.
+# Ported into walter/ops on 2026-10-29 from walter-memory's ops/walter-offsite-restore-test (2026-10-01/16): same
+# steps; locations, tables compared and the vault threshold come from the instance (`walter-ops backup env restore_test`).
+set -euo pipefail
+umask 077
+eval "$(walter-ops backup env restore_test)"
+KEY="$WALTER_OFFSITE_IDENTITY"
+REMOTE="$WALTER_OFFSITE_REMOTE"
+C="$WALTER_PG_CONTAINER"; U="$WALTER_PG_USER"; LIVE="$WALTER_PG_DATABASE"; SCRATCH="$WALTER_RESTORE_SCRATCH_DB"
+WORK=$(mktemp -d "$WALTER_OFFSITE_WORKDIR/walter-restore.XXXXXX")
+cleanup() { rm -rf "$WORK"; docker exec "$C" dropdb -U "$U" --if-exists "$SCRATCH" >/dev/null 2>&1 || true; }
+trap cleanup EXIT
+latest() { rclone lsf "$REMOTE/$1/" | sort | tail -1; }
+
+f=$(latest pg); rclone copyto "$REMOTE/pg/$f" "$WORK/$f"; age -d -i "$KEY" -o "$WORK/pg.dump" "$WORK/$f"
+docker exec "$C" dropdb -U "$U" --if-exists "$SCRATCH"
+docker exec "$C" createdb -U "$U" "$SCRATCH"
+docker exec -i "$C" pg_restore -U "$U" -d "$SCRATCH" --no-owner < "$WORK/pg.dump"
+for t in $WALTER_RESTORE_COMPARE; do
+  q="select count(*) from $t"
+  rest=$(docker exec "$C" psql -v ON_ERROR_STOP=1 -U "$U" -d "$SCRATCH" -Atc "$q")
+  live=$(docker exec "$C" psql -U "$U" -d "$LIVE" -Atc "$q" 2>/dev/null || echo "?")
+  echo "pg $f: $t restored=$rest live=$live"
+done
+
+f=$(latest statedb); rclone copyto "$REMOTE/statedb/$f" "$WORK/$f"; age -d -i "$KEY" "$WORK/$f" | zstd -q -d -o "$WORK/state.db"
+python3 - "$WORK/state.db" <<'PY'
+import sqlite3, sys
+c = sqlite3.connect(sys.argv[1]); ok = c.execute("pragma quick_check").fetchone()[0]
+print(f"statedb: quick_check={ok} sessions={c.execute('select count(*) from sessions').fetchone()[0]} messages={c.execute('select count(*) from messages').fetchone()[0]}")
+if ok != "ok": sys.exit(1)
+PY
+f=$(latest config); rclone copyto "$REMOTE/config/$f" "$WORK/$f"
+echo "config $f: checking module + integration coverage and all checksums"
+age -d -i "$KEY" "$WORK/$f" | zstd -q -d | walter-python -m walter_memory.backup_bundle verify - --check-current
+f=$(latest bitwarden); rclone copyto "$REMOTE/bitwarden/$f" "$WORK/$f"
+age -d -i "$KEY" "$WORK/$f" | python3 -c 'import sys,json; n=len(json.load(sys.stdin)["items"]); m=int(sys.argv[2]); print(f"vault {sys.argv[1]}: {n} items"); sys.exit(0 if n >= m else 1)' "$f" "$WALTER_RESTORE_MIN_VAULT_ITEMS"
+echo "offsite restore test OK"

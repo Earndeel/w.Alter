@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://walter.local/contracts/core/engine/turn-intake.v1.json",
+  "title": "TurnIntake v1",
+  "description": "What the intake seam hands to the rest of the engine for one turn. Status: DRAFT (E0), implemented at E2. One turn = one ContextPlan, obtained once from walter-context /preflight; later steps of the turn never ask again.",
+  "type": "object",
+  "required": [
+    "version",
+    "session_id",
+    "interface",
+    "principal",
+    "channel",
+    "run_id",
+    "owner_text",
+    "plan"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^(web|telegram|api|mcp|command|schedule|webhook|lab)/[A-Za-z0-9._:@/-]{1,200}$",
+      "description": "Stable engine session id: <interface>/<account or caller>/<conversation>. Fixed by intake, never by the model."
+    },
+    "interface": {
+      "enum": [
+        "web",
+        "telegram",
+        "api",
+        "mcp",
+        "command",
+        "schedule",
+        "webhook",
+        "lab"
+      ]
+    },
+    "principal": {
+      "type": "object",
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "owner",
+            "machine",
+            "test"
+          ],
+          "description": "owner = the instance's person; machine = a Walter module or schedule; test = Lab/bench (never production data writes)"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Instance-relative identity (never a path, never a secret)"
+        }
+      }
+    },
+    "channel": {
+      "enum": [
+        "owner",
+        "machine",
+        "test"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Run Plane run (runs.start through the Memory gateway); exactly one per turn"
+    },
+    "owner_text": {
+      "type": "string",
+      "description": "The owner's message alone, separated from runtime notices (owner-turn)"
+    },
+    "plan": {
+      "$ref": "https://walter.local/contracts/context/context-plan.v2.json"
+    },
+    "fast_path_answer": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Set when the plan's fast_path is served without a model; the turn then ends"
+    },
+    "thread_hint": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "ThreadHint v1 from walter-context (threads belong to Memory)"
+    },
+    "observation": {
+      "type": "boolean",
+      "default": false,
+      "description": "Shadow/observation mode: computes and records under a shadow marker, writes nothing to business data or the production bus"
+    }
+  }
+}

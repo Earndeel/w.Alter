@@ -1,0 +1,83 @@
+{
+  "_doc": "Name links added by the 48 h analysis agent (or the owner) through `walter-router alias-add`, each with its evidence. Merged into aliases.json \"*\" at load. Remove with `walter-router alias-remove <key>`.",
+  "aliases": {
+    "riverflow-v2-5-pro": {
+      "model_id": "riverflow-2-5-pro",
+      "reason": "Riverflow 2.5 Pro (Sourceful) : le modèle sourceful/riverflow-v2.5-pro est désigné Riverflow 2.5 Pro ; même modèle, seule l’écriture v2.5 varie. https://replicate.com/sourceful/riverflow-v2.5-pro",
+      "origin": "agent",
+      "added_at": "2026-10-04T03:38:40+00:00"
+    },
+    "gpt-3-5-turbo": {
+      "model_id": "gpt-35-turbo",
+      "reason": "Microsoft Azure désigne gpt-35-turbo comme le modèle GPT-3.5 Turbo ; identifiant Azure raccourci du même modèle. https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure",
+      "origin": "agent",
+      "added_at": "2026-10-04T03:38:46+00:00"
+    },
+    "recraft-v4-1-pro-vector": {
+      "model_id": "recraftv-4-1-pro-vector",
+      "reason": "Les docs officielles Recraft listent un unique modèle Recraft V4.1 Pro Vector ; recraftv est une variante d’écriture compacte, pas une variante de modèle. https://www.recraft.ai/docs/api-reference/getting-started",
+      "origin": "agent",
+      "added_at": "2026-10-04T03:38:52+00:00"
+    },
+    "recraft-v4-pro-vector": {
+      "model_id": "recraftv-4-pro-vector",
+      "reason": "Les docs officielles Recraft listent un unique modèle Recraft V4 Pro Vector ; recraftv est une variante d’écriture compacte, pas une variante de modèle. https://www.recraft.ai/docs/api-reference/getting-started",
+      "origin": "agent",
+      "added_at": "2026-10-04T03:38:56+00:00"
+    },
+    "recraft-v4-vector": {
+      "model_id": "recraftv-4-vector",
+      "reason": "Les docs officielles Recraft listent un unique modèle Recraft V4 Vector ; recraftv est une variante d’écriture compacte, pas une variante de modèle. https://www.recraft.ai/docs/api-reference/getting-started",
+      "origin": "agent",
+      "added_at": "2026-10-04T03:38:59+00:00"
+    },
+    "kling-v3-0-pro": {
+      "model_id": "kling-v3-pro",
+      "reason": "Les pages provider décrivent Kling V3.0 Pro et Kling v3 Pro comme le même niveau Pro de la génération V3 ; différence de notation 3.0/V3 uniquement. https://runware.ai/docs/models/klingai-video-3-0-pro.md ; https://www.atlascloud.ai/models/kwaivgi/kling-v3.0-pro/image-to-video",
+      "origin": "agent",
+      "added_at": "2026-10-06T03:39:52+00:00"
+    },
+    "qwen-3-8b": {
+      "model_id": "qwen-3-8",
+      "reason": "La carte officielle Qwen identifie Qwen3-8B (8,2B paramètres) ; l’ID qwen-3-8 omet seulement le suffixe B de la même taille. https://huggingface.co/Qwen/Qwen3-8B",
+      "origin": "agent",
+      "added_at": "2026-10-08T03:40:24+00:00"
+    },
+    "mixtral-8x22b-instruct": {
+      "model_id": "mistral-8x22b-instruct",
+      "reason": "La documentation officielle Mistral identifie le modèle comme Mixtral 8x22B Instruct ; l’ID non classé omet le préfixe Mixtral, il ne s’agit pas d’un autre modèle Mistral 8x22B. https://legal.mistral.ai/ai-governance/models/mixtral-8-22b",
+      "origin": "agent",
+      "added_at": "2026-10-08T03:40:24+00:00"
+    },
+    "mistral-small-3-1-24b-instruct": {
+      "model_id": "mistral-small-3-1-24b-instruct-2503",
+      "reason": "La fiche officielle identifie Mistral Small 3.1 v25.03, sorti en mars 2025, et ses variantes base/instruct ; le suffixe 2503 date ce même modèle instruct. https://docs.mistral.ai/models/model-cards/mistral-small-3-1-25-03",
+      "origin": "agent",
+      "added_at": "2026-10-08T03:40:25+00:00"
+    },
+    "seedream-v4": {
+      "model_id": "seedream-4",
+      "reason": "BytePlus ModelArk identifie le modèle comme Seedream 4.0 (version seedream-4-0-250828) ; seedream-v4 et seedream-4 sont deux écritures de cette même génération. https://docs.byteplus.com/en/docs/ModelArk/1824718",
+      "origin": "agent",
+      "added_at": "2026-10-10T03:40:19+00:00"
+    },
+    "gemini-3-1-flash-image": {
+      "model_id": "gemini-3-1-flash-image-gen",
+      "reason": "Google's Gemini API documents gemini-3.1-flash-image as Gemini 3.1 Flash Image; Google's official Gemini notebook describes the same model as image generation/editing. The -gen suffix is descriptive, not a distinct version. https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-image ; https://github.com/GoogleCloudPlatform/generative-ai/blob/main/gemini/getting-started/intro_gemini_3_1_flash_image_gen.ipynb",
+      "origin": "agent",
+      "added_at": "2026-10-12T03:40:00+00:00"
+    },
+    "seedance-1-5-pro": {
+      "model_id": "seedance-v1-5-pro",
+      "reason": "ByteDance présente sous un nom canonique unique « Seedance 1.5 pro » le modèle audio-vidéo concerné ; les identifiants seedance-1-5-pro et seedance-v1-5-pro ne diffèrent que par la notation de la version V1.5. https://seed.bytedance.com/en/seedance1%5F5%5Fpro",
+      "origin": "agent",
+      "added_at": "2026-10-16T03:46:51+00:00"
+    },
+    "recraft-v4-1": {
+      "model_id": "recraftv-4-1",
+      "reason": "La documentation officielle de Recraft identifie la famille comme Recraft V4.1 et l’ID API canonique recraftv4_1 ; les deux formes diffèrent seulement par le découpage typographique de recraftv, sans variation de version ni de suffixe de variante. https://www.recraft.ai/docs/api-reference/models/recraft-v4-1",
+      "origin": "agent",
+      "added_at": "2026-10-16T03:46:56+00:00"
+    }
+  }
+}

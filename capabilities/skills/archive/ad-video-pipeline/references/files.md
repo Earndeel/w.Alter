@@ -1,0 +1,26 @@
+## Files
+- `/root/projects/ad-video-pipeline/` — project root
+  - `models/` — **Model Registry (V5)**
+    - `kling_v3/config.json` — model config (name + endpoint only)
+    - `kling_v3/prompt.md` — LLM preprompt for payload generation
+    - `kling_v3/schema.md` — API schema reference (renamed from .json)
+  - `modules/` — individual module scripts
+    - `model_runner.py` — **Generic multi-model runner** (generate/submit/sync)
+    - `kling_payload_gen.py` — Legacy Kling-only generator (superseded by model_runner)
+    - `video_analyzer_v3.py` — direct video input analysis
+    - `video_analyzer_v2.py` — legacy frame-based analysis
+    - `video_analyzer.py` — legacy v1
+  - `app/` — Flask blueprints\n    - `models.py` — Generic model API routes (replaces kling.py) — CRUD for models + generate/submit/sync
+    - `kling.py` — Legacy Kling routes (backward compat)
+    - `main.py` — Dashboard + cards API
+    - `analysis.py` — Analysis + prompt management
+    - `config.py` — Paths config
+    - `database.py` — SQLite helpers
+    - `__init__.py` — Flask app init (registers all blueprints)
+  - `templates/index.html` — Dashboard UI (model selector, generate tab)
+  - `prompts/`
+    - `video_analysis_prompt.md` — dynamic template for video analysis
+    - `kling_prompt.md` — legacy copy (canonical is in models/kling_v3/)
+    - `kling_api_schema.json` — legacy copy
+  - `output/` — per-video output dirs
+  - `pipeline.db` — SQLite database (18 columns on video_analysis)

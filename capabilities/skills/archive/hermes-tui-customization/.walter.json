@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-16T17:03:19+00:00",
+ "archived_reason": "Hermes removed from the VM (2026-11-16, Monsieur)",
+ "content_since": "2026-06-05T09:57:09Z",
+ "domain": "hermes",
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/hermes-tui-customization",
+  "sha": "92fb0943a27e20bc9ee1bcd3a55fb72f6935539ab5a85b80363e0316436ae65d",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "retired": "hermes",
+ "store_sha": "92fb0943a27e20bc9ee1bcd3a55fb72f6935539ab5a85b80363e0316436ae65d"
+}

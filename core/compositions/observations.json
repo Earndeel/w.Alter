@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "generated_at": "2026-10-18T11:11:04.167861+00:00",
+  "private_content_exported": false,
+  "observations": [
+    {
+      "runtime": "dsh",
+      "tool": "mcp__walter__skill_read",
+      "last_seen": "2026-10-10 22:13:10.336000+00:00",
+      "calls": 2,
+      "capability": "skills",
+      "source": "walter_logs events metadata, trailing 14 days",
+      "scope": "Historical invocation, successful result and current implementation revision not established"
+    },
+    {
+      "runtime": "claude_code",
+      "tool": "mcp__walter__skill_read",
+      "last_seen": "2026-10-17 11:34:46.752000+00:00",
+      "calls": 24,
+      "capability": "skills",
+      "source": "walter_logs events metadata, trailing 14 days",
+      "scope": "Historical invocation, successful result and current implementation revision not established"
+    },
+    {
+      "runtime": "claude_code",
+      "tool": "mcp__walter__person_lookup",
+      "last_seen": "2026-10-15 19:23:29.493000+00:00",
+      "calls": 3,
+      "capability": "memory",
+      "source": "walter_logs events metadata, trailing 14 days",
+      "scope": "Historical invocation, successful result and current implementation revision not established"
+    },
+    {
+      "runtime": "claude_code",
+      "tool": "mcp__walter__memory_search",
+      "last_seen": "2026-10-16 12:15:28.736000+00:00",
+      "calls": 4,
+      "capability": "memory",
+      "source": "walter_logs events metadata, trailing 14 days",
+      "scope": "Historical invocation, successful result and current implementation revision not established"
+    },
+    {
+      "runtime": "claude_code",
+      "tool": "mcp__walter__logs_search",
+      "last_seen": "2026-10-16 12:14:12.291000+00:00",
+      "calls": 5,
+      "capability": "logs",
+      "source": "walter_logs events metadata, trailing 14 days",
+      "scope": "Historical invocation, successful result and current implementation revision not established"
+    },
+    {
+      "runtime": "claude_code",
+      "tool": "mcp__walter__skills_search",
+      "last_seen": "2026-10-16 12:14:50.645000+00:00",
+      "calls": 2,
+      "capability": "skills",
+      "source": "walter_logs events metadata, trailing 14 days",
+      "scope": "Historical invocation, successful result and current implementation revision not established"
+    },
+    {
+      "runtime": "claude_code",
+      "tool": "mcp__walter__logs_get",
+      "last_seen": "2026-10-16 11:38:45.609000+00:00",
+      "calls": 1,
+      "capability": "logs",
+      "source": "walter_logs events metadata, trailing 14 days",
+      "scope": "Historical invocation, successful result and current implementation revision not established"
+    },
+    {
+      "runtime": "claude_code",
+      "tool": "mcp__walter__memory_retain",
+      "last_seen": "2026-10-16 12:24:54.758000+00:00",
+      "calls": 4,
+      "capability": "memory",
+      "source": "walter_logs events metadata, trailing 14 days",
+      "scope": "Historical invocation, successful result and current implementation revision not established"
+    },
+    {
+      "runtime": "claude_code",
+      "tool": "mcp__walter__logs_timeline",
+      "last_seen": "2026-10-10 16:12:46.684000+00:00",
+      "calls": 1,
+      "capability": "logs",
+      "source": "walter_logs events metadata, trailing 14 days",
+      "scope": "Historical invocation, successful result and current implementation revision not established"
+    },
+    {
+      "runtime": "claude_code",
+      "tool": "mcp__walter__skill_patch",
+      "last_seen": "2026-10-17 11:35:22.549000+00:00",
+      "calls": 4,
+      "capability": "skills",
+      "source": "walter_logs events metadata, trailing 14 days",
+      "scope": "Historical invocation, successful result and current implementation revision not established"
+    },
+    {
+      "runtime": "claude_code",
+      "capability": "logs",
+      "last_seen": "2026-10-17 11:36:45.873000+00:00",
+      "calls": 3732,
+      "source": "walter_logs joined native session runtime",
+      "scope": "Canonical raw-log collection observed; completeness not established"
+    },
+    {
+      "runtime": "codex",
+      "capability": "logs",
+      "last_seen": "2026-10-18 11:07:57.872000+00:00",
+      "calls": 740,
+      "source": "walter_logs joined native session runtime",
+      "scope": "Canonical raw-log collection observed; completeness not established"
+    },
+    {
+      "runtime": "dsh",
+      "capability": "logs",
+      "last_seen": "2026-10-10 22:13:10.336000+00:00",
+      "calls": 4,
+      "source": "walter_logs joined native session runtime",
+      "scope": "Canonical raw-log collection observed; completeness not established"
+    },
+    {
+      "runtime": "hermes",
+      "capability": "logs",
+      "last_seen": "2026-10-18 04:00:45.638967+00:00",
+      "calls": 4266,
+      "source": "walter_logs joined native session runtime",
+      "scope": "Canonical raw-log collection observed; completeness not established"
+    }
+  ]
+}

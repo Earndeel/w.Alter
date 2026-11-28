@@ -1,0 +1,11 @@
+{
+ "created_at": "2026-11-18T04:14:39.834243+00:00",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "cloudflare-pages-deploy",
+  "design-frontend-specialization",
+  "headless-screenshot-qa"
+ ]
+}

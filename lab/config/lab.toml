@@ -1,0 +1,5 @@
+# walter-lab mode (module default, neutral). An instance overrides it in @instance/config/lab/lab.toml.
+# paused: no experiment on Lab's own initiative; `walter-lab run` needs the owner's explicit request
+#         (--requested-by owner --reason "..."). The bench, sandbox, history and reports stay available.
+# active: experiments may run (after the instance's move to production).
+mode = "paused"

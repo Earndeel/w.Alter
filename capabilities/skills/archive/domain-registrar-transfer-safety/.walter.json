@@ -1,0 +1,17 @@
+{
+ "archived_at": "2026-11-28T04:15:09+00:00",
+ "archived_reason": "not read for 30 days",
+ "content_since": "2026-10-28T08:55:02Z",
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/domain-registrar-transfer-safety",
+  "sha": "abde921f45c94eab2a6bc5ab73f96f374f331197315fe10354c29ef6cb362c72",
+  "state": "active"
+ },
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "proposed_by": "hermes",
+ "reason": "created by the Hermes agent (skill_manage)",
+ "reserve": true,
+ "store_sha": "abde921f45c94eab2a6bc5ab73f96f374f331197315fe10354c29ef6cb362c72"
+}

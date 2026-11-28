@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "scope": "Reviewed source allowlist; personal configuration, skills content, credentials and runtime data are restored separately.",
+  "excluded_test_reason": "Credential-masking test fixtures contain literal token-shaped sentinels; omitted from deployable source, no scanner bypass.",
+  "modules": {
+    "browse": [
+      "walter_browse",
+      "runtime",
+      "ports",
+      "bin",
+      "tests",
+      "README.md"
+    ],
+    "computer": [
+      "walter_computer",
+      "bin",
+      "ops",
+      "tests",
+      "check_hermes.py",
+      "pyproject.toml",
+      "UPSTREAM.json",
+      "LICENSE.hermes",
+      "README.md"
+    ],
+    "context": [
+      "walter_context",
+      "ports",
+      "bin",
+      "tests",
+      "bench/acceptance.py",
+      "bench/replay.py",
+      "bench/quality.py",
+      "config/walter-context.toml",
+      "docs",
+      "README.md"
+    ],
+    "core": [
+      "walter_platform",
+      "server.py",
+      "walter_capabilities.py",
+      "browser_auth.py",
+      "bin",
+      "hooks",
+      "modules",
+      "compositions",
+      "skills/walter-skills",
+      "tests",
+      "docs",
+      "README.md"
+    ],
+    "memory": [
+      "walter_memory",
+      "connectors",
+      "migrations",
+      "event_types",
+      "hermes-plugins",
+      "ports",
+      "systemd",
+      "ops",
+      "tests",
+      "README.md"
+    ],
+    "llm": [
+      "gateway.py",
+      "walter-llm.service"
+    ],
+    "raw-vault": [
+      "rawvault.py"
+    ],
+    "router": [
+      "walter_router",
+      "research",
+      "analysis",
+      "interface",
+      "plan",
+      "serve",
+      "store",
+      "cli.py",
+      "instance.py",
+      "paths.py",
+      "config",
+      "contracts",
+      "docs",
+      "bin",
+      "hermes-plugins",
+      "tests",
+      "README.md"
+    ],
+    "secrets": [
+      "walter_secrets",
+      "bin",
+      "compat",
+      "tests",
+      "pyproject.toml",
+      "README.md"
+    ],
+    "skills": [
+      "walter_skills",
+      "bin",
+      "migrations",
+      "tests",
+      "config/walter-skills.toml",
+      "README.md"
+    ],
+    "soul": [
+      "bin"
+    ],
+    "colab": [
+      "bridge.py",
+      "cache_runtime.py",
+      "drive_store.py",
+      "on_demand.py",
+      "run.py",
+      "transfer.py",
+      "RUNBOOK.md",
+      "mcp/src",
+      "mcp/pyproject.toml",
+      "mcp/uv.lock"
+    ],
+    "runtime": [
+      "README.md",
+      "requirements.lock",
+      "requirements-dev.lock",
+      "bin"
+    ]
+  },
+  "restored_module_anchors": {
+    "soul": [
+      "identity.md",
+      "rules.md"
+    ]
+  },
+  "exclude_module_paths": {
+    "core": [
+      "tests/test_capabilities.py"
+    ],
+    "memory": [
+      "tests/test_logs.py"
+    ],
+    "secrets": [
+      "tests/test_secrets.py"
+    ]
+  }
+}

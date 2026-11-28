@@ -1,0 +1,643 @@
+#!/usr/bin/python3
+"""walter-guardian — the shared engine of a module's guardian (2026-10-30; GUARDIANS.md § Guardian agent).
+
+Owner, 2026-10-30: « Les guardians sont censés être des agents intelligents qui doivent comprendre les situations et les
+régler d'eux-mêmes ». The supervisor (walter-guardians) no longer tells the owner what a watchdog saw: it hands each
+new high/critical incident to the module's guardian first. This engine is that guardian for every module that
+declares `"guardian": ["walter-guardian", "run", "--module", "<id>"]` in its maintenance.json, driven by the module's
+own `guardian/playbook.json` (what is normal, what to look at, which actions it may take). It holds no knowledge of
+any module.
+
+One run, per incident:
+  1. Evidence   read-only commands declared by the playbook for the incident's kind (no model).
+  2. Decide     a model through walter-llm (Walter Router poste, never a hardcoded model) reads notes, incidents,
+                evidence and history and answers JSON: act / expected / external / needs_owner, and a French message.
+                Without a model: the playbook's deterministic fallback action, else `unknown`.
+  3. Act        only declared actions, level <= the module's max_level, parameters from the declared allow-list,
+                at most MAX_ROUNDS action rounds per incident per ROUND_WINDOW (gates in code, not in the prompt).
+  4. Verify     the module's check again after `settle_seconds`: gone = fixed. Still there and rounds exhausted =
+                needs_owner, with what was tried.
+  5. Repair     (2026-11-20, Monsieur: « les guardians doivent pouvoir agir comme moi je le ferais » — an alert on
+                Telegram, one message to Opus in Claude Code, problem solved) whatever would otherwise reach the owner
+                (needs_owner, failed, unknown) goes first to the repair agent: one Walter Engine delegation by the
+                machine caller `guardian-<module>` (policy interface `maintenance` = the dev preset of a Claude Code
+                session: shell and files, outgoing messages never), poste REPAIR_TASK/REPAIR_LEVEL (Router: coding/L3),
+                in its own transient unit; the incident stays `pending` meanwhile. Its verdict decides: fixed (the
+                module check confirms), external, needs_owner (only then is the owner told, with its words). At most
+                REPAIR_RUNS runs per incident per REPAIR_WINDOW.
+
+  walter-guardian run --module M [--dry-run]   stdin {"incidents": [Incident v1...]} -> stdout {"verdicts": {key: …}}
+  walter-guardian playbook --module M          the validated playbook
+  walter-guardian repair --module M --incident-file F [--wait]   the repair agent on one incident (5.)
+
+Outcomes: fixed · pending (an asynchronous action is running) · expected · external · needs_owner · failed · unknown.
+Standard library, system python3. Secrets: evidence is masked before it reaches a model; the walter-llm token is read
+from the instance state (0600), never printed.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from urllib.request import Request, urlopen
+
+LEVELS = ("G0", "G1", "G2", "G3")
+MAX_ROUNDS = 2                 # action rounds per incident per window, then the owner is told
+ROUND_WINDOW = 12 * 3600
+MAX_ACTIONS_PER_RUN = 3
+EVIDENCE_CHARS = 2500
+POSTE = os.environ.get("WALTER_GUARDIAN_POSTE", "general/L2")
+LLM_URL = os.environ.get("WALTER_LLM_URL", "http://127.0.0.1:8894/v1/chat/completions")
+OUTCOMES = ("act", "expected", "external", "needs_owner")
+REPAIR_TASK = os.environ.get("WALTER_GUARDIAN_REPAIR_TASK", "coding")     # Router poste coding/L3 (20/11: Opus 5.5 high)
+REPAIR_LEVEL = os.environ.get("WALTER_GUARDIAN_REPAIR_LEVEL", "L3")
+REPAIR_BUDGET = 2700           # seconds of work per run (the engine caps a delegation at 3600)
+REPAIR_RUNS = 2                # runs per incident per window, then the owner is told with the agent's words
+REPAIR_WINDOW = 24 * 3600
+REPAIR_GAP = 3600              # between two runs on the same incident
+ENGINE_URL = os.environ.get("WALTER_ENGINE_API_URL", "http://127.0.0.1:8895")
+SAFE_PARAM = re.compile(r"^[A-Za-z0-9@._:+-]{1,80}$")
+SECRET_PATTERNS = [
+    (re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]{12,}"), r"\1***"),
+    (re.compile(r"(?i)((?:password|passwd|secret|token|api[_-]?key|session)[\"']?\s*[:=]\s*[\"']?)[^\s\"',;]{4,}"), r"\1***"),
+    (re.compile(r"\b(?:sk|wllm|ghp|gho|xox[abp]|AKIA)[A-Za-z0-9_-]{12,}"), "***"),
+    (re.compile(r"\b[A-Za-z0-9+/_-]{40,}={0,2}"), "***"),
+]
+
+
+def sh(*cmd: str, timeout: float = 60) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(cmd, 124, "", str(exc))
+
+
+def mask(text: str) -> str:
+    for pat, rep in SECRET_PATTERNS:
+        text = pat.sub(rep, text)
+    return text
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def state_dir() -> Path:
+    root = os.environ.get("WALTER_INSTANCE")
+    if not root:
+        try:
+            root = Path("/etc/walter/instance").read_text().strip()
+        except OSError:
+            root = "/var/lib/walter"
+    d = Path(root) / "state" / "guardians"
+    (d / "agent").mkdir(parents=True, exist_ok=True, mode=0o700)
+    return d
+
+
+# ---- the module: root, declaration, playbook ------------------------------------------------------------------
+
+def module_root(module: str) -> Path:
+    r = sh("walter", "modules", timeout=60)
+    for m in (json.loads(r.stdout or "{}").get("modules") or []):
+        if m.get("id") == module:
+            return Path(m["root"])
+    raise ValueError(f"unknown module {module}")
+
+
+def load(module: str, root: Path | None = None) -> tuple[dict, dict]:
+    """(maintenance declaration, validated playbook). Raises ValueError on anything malformed."""
+    root = root or module_root(module)
+    decl = json.loads((root / "contracts" / "maintenance.json").read_text())
+    pb = json.loads((root / "guardian" / "playbook.json").read_text())
+    if pb.get("version") != 1 or pb.get("module") != decl.get("module"):
+        raise ValueError("playbook: version 1 and the declaration's module required")
+    if not isinstance(pb.get("notes", []), list) or not isinstance(pb.get("evidence", {}), dict):
+        raise ValueError("playbook: notes list / evidence map")
+    for kind, cmds in pb.get("evidence", {}).items():
+        if not isinstance(cmds, list) or any(not isinstance(c, list) or not c or any(not isinstance(a, str) for a in c)
+                                             for c in cmds):
+            raise ValueError(f"playbook: evidence {kind} must be a list of commands")
+    for aid, a in (pb.get("actions") or {}).items():
+        if (a.get("level") not in LEVELS or not isinstance(a.get("command"), list) or not a["command"]
+                or any(not isinstance(x, str) for x in a["command"])
+                or not isinstance(a.get("params", {}), dict)
+                or any(not isinstance(v, list) or any(not SAFE_PARAM.match(str(x)) for x in v) for v in a.get("params", {}).values())):
+            raise ValueError(f"playbook: action {aid} malformed")
+        for name in re.findall(r"\{(\w+)\}", " ".join(a["command"])):
+            if name not in a.get("params", {}):
+                raise ValueError(f"playbook: action {aid} uses {{{name}}} without an allow-list")
+    for kind, fb in (pb.get("fallback") or {}).items():
+        if fb.get("action") not in (pb.get("actions") or {}):
+            raise ValueError(f"playbook: fallback {kind} names an unknown action")
+    return decl, pb
+
+
+def allowed_actions(decl: dict, pb: dict) -> dict:
+    cap = LEVELS.index(decl.get("max_level", "G0"))
+    return {k: a for k, a in (pb.get("actions") or {}).items() if LEVELS.index(a["level"]) <= cap}
+
+
+# ---- 1. evidence ------------------------------------------------------------------------------------------------
+
+def _fill(cmd: list[str], values: dict) -> list[str] | None:
+    out = []
+    for arg in cmd:
+        for name in re.findall(r"\{(\w+)\}", arg):
+            v = str(values.get(name, ""))
+            if not SAFE_PARAM.match(v):
+                return None
+            arg = arg.replace("{" + name + "}", v)
+        out.append(arg)
+    return out
+
+
+def evidence(pb: dict, incident: dict, decl: dict | None = None) -> list[dict]:
+    values = {k: v for k, v in (incident.get("evidence") or {}).items() if isinstance(v, (str, int))}
+    cmds = (pb.get("evidence") or {}).get(incident["kind"], []) + (pb.get("evidence") or {}).get("*", [])
+    if incident["kind"] == "guardian_unreachable" and decl:   # the watchdog itself: what does it answer now?
+        cmds = [decl["check"]] + cmds
+    out = []
+    for cmd in cmds[:6]:
+        filled = _fill(cmd, values)
+        if not filled:
+            continue
+        r = sh(*filled, timeout=60)
+        text = mask(((r.stdout or "") + ("\n" + r.stderr if r.stderr else "")).strip())
+        out.append({"command": " ".join(filled), "rc": r.returncode, "output": text[-EVIDENCE_CHARS:]})
+    return out
+
+
+# ---- 2. decide ----------------------------------------------------------------------------------------------------
+
+PROMPT = """You are the guardian of the W.Alter module « {module} » on the owner's VM (the owner is addressed as
+« Monsieur », he speaks French). Your job: keep the module working WITHOUT bothering him. He wants to hear about a
+problem only when you could not fix it or when only he can act (payment, password, physical action, a decision).
+
+Module notes (what is normal here, what incidents mean):
+{notes}
+
+Actions you may take (anything else is refused by code):
+{actions}
+
+Incidents to handle now, each with read-only evidence and what was already tried:
+{incidents}
+
+For each incident decide one outcome:
+- "act": a listed action can plausibly fix it -> give the actions (id + params from the allowed values).
+- "expected": a normal, known situation per the notes; nothing to do and nobody to tell.
+- "external": the cause is outside W.Alter (provider outage, network, the owner's machine asleep) and should
+  recover by itself; nothing to tell yet. Not when only OUR route to it is closed (an exit or browser engine
+  closed, the owner's machine asleep or on its VPN, one address blocked) while another route W.Alter controls
+  works: then "act" with a listed action, else "needs_owner" (the repair agent then makes the module take it).
+- "needs_owner": only Monsieur can resolve it, or the actions already tried did not work.
+Never repeat an action that already failed for this incident unless the evidence shows a different cause.
+
+Answer with ONE JSON object and nothing else:
+{{"incidents": [{{"key": "<incident key>", "outcome": "act|expected|external|needs_owner",
+  "diagnosis_fr": "<one short French sentence: what is really going on>",
+  "actions": [{{"id": "<action id>", "params": {{"<name>": "<allowed value>"}}}}],
+  "message_fr": "<only for needs_owner: 2-3 short plain French sentences for Monsieur: what happened, what you
+  tried, what you need from him. No commands, no jargon.>"}}]}}"""
+
+
+def llm_token() -> str | None:
+    try:
+        for line in (state_dir() / "llm.env").read_text().splitlines():
+            if line.startswith("WALTER_LLM_TOKEN="):
+                return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return None
+
+
+def ask_model(prompt: str, timeout: float = 240) -> tuple[dict | None, dict]:
+    """(parsed answer or None, call metadata). Never raises."""
+    token = llm_token()
+    meta = {"poste": POSTE}
+    if not token:
+        return None, {**meta, "error": "no_token"}
+    try:
+        req = Request(LLM_URL, data=json.dumps({"model": POSTE, "messages": [{"role": "user", "content": prompt}]}).encode(),
+                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"})
+        with urlopen(req, timeout=timeout) as resp:
+            meta["route"] = resp.headers.get("x-walter-route")
+            content = json.loads(resp.read())["choices"][0]["message"].get("content") or ""
+    except Exception as exc:  # noqa: BLE001 — the token never appears in the error kept
+        return None, {**meta, "error": type(exc).__name__}
+    decoder = json.JSONDecoder()
+    for m in reversed(list(re.finditer(r"\{", content))):
+        try:
+            obj, _ = decoder.raw_decode(content[m.start():])
+        except ValueError:
+            continue
+        if isinstance(obj, dict) and isinstance(obj.get("incidents"), list):
+            return obj, meta
+    return None, {**meta, "error": "no_json"}
+
+
+def _describe(actions: dict) -> str:
+    return "\n".join(f"- {k} (level {a['level']}): {a.get('describe', '')}"
+                     + (f" params: {json.dumps(a.get('params'), ensure_ascii=False)}" if a.get("params") else "")
+                     + (" [asynchronous: its effect is checked on a later pass]" if a.get("async") else "")
+                     for k, a in actions.items()) or "- none: you can only diagnose"
+
+
+# ---- 3. act -----------------------------------------------------------------------------------------------------
+
+def run_action(actions: dict, req: dict) -> dict:
+    """Execute one declared action if the code gates allow it."""
+    a = actions.get(req.get("id"))
+    params = req.get("params") if isinstance(req.get("params"), dict) else {}
+    if not a:
+        return {"id": req.get("id"), "ok": False, "refused": "not_allowed"}
+    for name, allowed in (a.get("params") or {}).items():
+        if str(params.get(name)) not in [str(x) for x in allowed]:
+            return {"id": req["id"], "params": params, "ok": False, "refused": f"param_{name}"}
+    cmd = _fill(a["command"], params)
+    if not cmd:
+        return {"id": req["id"], "params": params, "ok": False, "refused": "params"}
+    r = sh(*cmd, timeout=float(a.get("timeout_seconds", 120)))
+    return {"id": req["id"], "params": {k: params[k] for k in (a.get("params") or {})}, "ok": r.returncode == 0,
+            "rc": r.returncode, "async": bool(a.get("async")), "at": now_iso()}
+
+
+def module_check(decl: dict) -> set[str] | None:
+    r = sh(*decl["check"], timeout=float(decl.get("timeout_seconds", 120)))
+    try:
+        return {f"{i['module']}:{i['key']}" for i in json.loads(r.stdout)} if r.returncode == 0 else None
+    except (ValueError, TypeError, KeyError):
+        return None
+
+
+# ---- the run --------------------------------------------------------------------------------------------------
+
+def _history(module: str) -> tuple[Path, dict]:
+    p = state_dir() / "agent" / f"{module}.json"
+    try:
+        h = json.loads(p.read_text())
+    except (OSError, ValueError):
+        h = {}
+    cutoff = time.time() - 7 * 86400
+    return p, {k: v for k, v in h.items() if v.get("updated", 0) >= cutoff}
+
+
+def _tried_text(rounds: list[dict]) -> str:
+    done = [f"{a['id']}({', '.join(f'{k}={v}' for k, v in (a.get('params') or {}).items())})"
+            for r in rounds for a in r.get("actions", []) if a.get("ok")]
+    return ", ".join(done)
+
+
+def run(module: str, incidents: list[dict], dry_run: bool = False, root: Path | None = None) -> dict:
+    decl, pb = load(module, root)
+    actions = allowed_actions(decl, pb)
+    hist_path, hist = _history(module)
+    t = time.time()
+    blocks, verdicts = [], {}
+    for i in incidents:
+        key = f"{i['module']}:{i['key']}"
+        h = hist.setdefault(key, {"rounds": []})
+        recent = [r for r in h["rounds"] if t - r.get("t", 0) < ROUND_WINDOW]
+        i["_ev"] = evidence(pb, i, decl)
+        blocks.append(json.dumps({"key": key, "severity": i["severity"], "kind": i["kind"], "summary": i["summary"],
+                                  "watchdog_evidence": i.get("evidence"), "evidence": i["_ev"],
+                                  "already_tried": recent[-4:], "rounds_left": MAX_ROUNDS - len(recent)},
+                                 ensure_ascii=False, default=str))
+    prompt = PROMPT.format(module=module, notes="\n".join(f"- {n}" for n in pb.get("notes", [])) or "- (none)",
+                           actions=_describe(actions), incidents="\n".join(blocks))
+    answer, meta = ask_model(mask(prompt))
+    decided = {d.get("key"): d for d in (answer or {}).get("incidents", []) if isinstance(d, dict)}
+    did_act = False
+    for i in incidents:
+        key = f"{i['module']}:{i['key']}"
+        h = hist[key]
+        recent = [r for r in h["rounds"] if t - r.get("t", 0) < ROUND_WINDOW]
+        d = decided.get(key)
+        if d and d.get("outcome") in OUTCOMES:
+            v = {"outcome": d["outcome"], "diagnosis_fr": str(d.get("diagnosis_fr") or "")[:300],
+                 "message_fr": str(d.get("message_fr") or "")[:600], "by": meta.get("route") or POSTE}
+            reqs = [a for a in (d.get("actions") or []) if isinstance(a, dict)][:MAX_ACTIONS_PER_RUN]
+        else:   # no model (or no usable answer): the playbook's deterministic fallback for this kind
+            fb = (pb.get("fallback") or {}).get(i["kind"])
+            params = {n: (i.get("evidence") or {}).get(src) for n, src in (fb or {}).get("params", {}).items()}
+            v = {"outcome": "act" if fb else "unknown", "diagnosis_fr": "", "message_fr": "",
+                 "by": "fallback", "model_error": meta.get("error")}
+            reqs = [{"id": fb["action"], "params": params}] if fb else []
+        if v["outcome"] == "act":
+            if not reqs:
+                v["outcome"] = "failed"
+            elif len(recent) >= MAX_ROUNDS:
+                tried = _tried_text(recent)
+                v["outcome"] = "needs_owner"
+                v["message_fr"] = v["message_fr"] or (f"{i['summary']} J'ai déjà tenté {tried or 'des réparations'}"
+                                                      f" sans succès ; il faut votre regard.")
+            elif dry_run:
+                v["planned"] = reqs
+            else:
+                done = [run_action(actions, r) for r in reqs]
+                v["actions"] = done
+                recent.append({"t": t, "at": now_iso(), "actions": done})
+                h["rounds"] = (h["rounds"] + [recent[-1]])[-10:]
+                did_act = did_act or any(a.get("ok") for a in done)
+                if not any(a.get("ok") for a in done):
+                    v["outcome"] = "failed"
+                with open(state_dir() / "actions.jsonl", "a") as f:
+                    f.write(json.dumps({"at": now_iso(), "key": key, "actions": done,
+                                        "diagnosis_fr": v["diagnosis_fr"]}, ensure_ascii=False) + "\n")
+        h.update(updated=t, last=v)
+        verdicts[key] = v
+    if did_act:   # 4. verify
+        time.sleep(float(pb.get("settle_seconds", 20)))
+        still = module_check(decl)
+        for key, v in verdicts.items():
+            if not v.get("actions"):
+                continue
+            ok = [a for a in v["actions"] if a.get("ok")]
+            if still is not None and key not in still:
+                v["outcome"] = "fixed"
+            elif ok and all(a.get("async") for a in ok):
+                v["outcome"] = "pending"
+            else:
+                v["outcome"] = "failed"
+            hist[key]["last"] = v
+    for i in incidents:                  # 5. what would reach the owner goes to the repair agent first
+        key = f"{i['module']}:{i['key']}"
+        if verdicts[key].get("outcome") in ("needs_owner", "failed", "unknown"):
+            verdicts[key] = escalate(module, i, verdicts[key], dry_run)
+            hist[key]["last"] = verdicts[key]
+    if not dry_run:
+        tmp = hist_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(hist, ensure_ascii=False, indent=1, default=str))
+        tmp.replace(hist_path)
+    return {"module": module, "at": now_iso(), "model": meta, "verdicts": verdicts}
+
+
+# ---- 5. repair agent ----------------------------------------------------------------------------------------------
+
+IDENTITY_FALLBACK = """Tu es l'agent de maintenance du module W.Alter « {module} », sur la VM de Monsieur : un sous-agent
+de Walter spécialisé dans ce module."""
+
+REPAIR_BRIEF = """## Mission : réparer
+Un contrôle automatique du module « {module} » a trouvé le problème ci-dessous et les gestes simples n'ont pas suffi. Monsieur veut que tu le règles toi-même, comme il
+le ferait en t'écrivant depuis une session Claude Code : trouver la vraie cause, la corriger, prouver que ça marche.
+Tu ne lui parles pas ; tu termines par un verdict JSON que le guardian lit.
+
+## Le module
+- Dossier : {root} (lis d'abord son README.md, puis RUNBOOK/docs utiles ; `walter path <module>` pour un autre module).
+- Ce qui est normal ici (playbook du guardian) :
+{notes}
+
+## L'incident
+```json
+{incident}
+```
+Déjà tenté :
+{tried}
+
+## Comment travailler (les règles de la VM, CLAUDE.md, s'appliquent)
+1. Cause avant correction : reproduis, lis les journaux (`journalctl -u <unité>`), montre la preuve.
+2. Avant de modifier : sauvegarde dans `@instance/backups/changes/<date>-guardian-{module}-<sujet>/` (rends le chemin avec
+   `walter instance path`). Corrige la cause, pas le symptôme, dans le style du code voisin ; ajoute ou adapte le test qui
+   reproduit le cas ; ne supprime jamais une assertion, ne saute jamais un test.
+3. Vérifie : tests du module, puis le contrôle réel (le service, la source relue, la commande qui échouait). Redémarre
+   un service dont tu as changé le code avec `systemctl restart <unité>`, puis vérifie qu'il répond. Jamais
+   `walter-engine` ni `walter-telegram` : tu tournes dans le moteur ; s'il faut les redémarrer, mets-les dans
+   `"restart"` du verdict et le guardian le fera après toi, quand aucun tour n'est en cours.
+4. Git : commite seulement TES fichiers (`git -c user.name=W.Alter -c user.email=lucas.jouvencon@gmail.com commit
+   <fichiers>`) avec un message qui dit cause et correction. Un fichier où quelqu'un a du travail non commité : n'y touche
+   pas, verdict `needs_owner` en le disant.
+5. Jamais : afficher ou lire un secret (passer par `walter-secret exec`), envoyer un message, changer un choix de
+   Monsieur (favoris, préférences, abonnements, configuration de l'instance), supprimer des données, purger, toucher à
+   l'historique mémoire, réécrire git. Dépense : rien de payant au-delà de quelques centimes de test.
+6. Une cause extérieure ne dispense pas de réparer. Distingue « la chose est en panne » de « notre chemin vers elle
+   est fermé » (sortie réseau ou navigateur fermée, Mac en veille ou sur VPN, une adresse bloquée, un fournisseur
+   parmi d'autres) : s'il existe un autre chemin que Walter contrôle (autre moteur ou sortie de Browse, autre
+   fournisseur, autre source de la même donnée) et qui marche, fais en sorte que le module le prenne tout seul la
+   prochaine fois (repli dans le code, avec son test), prouve-le en relisant pour de bon, et c'est `fixed`.
+   `external` seulement quand la chose elle-même est en panne (5xx, 429, site indisponible par tous nos chemins) et
+   que le module continue déjà sans elle ; dis alors dans `evidence` quels chemins tu as essayés. Crédit épuisé, clé
+   refusée, paiement, mot de passe, geste physique, décision de Monsieur : `needs_owner` avec la question précise.
+
+## Verdict (fin de ta réponse, un seul objet JSON)
+{{"outcome": "fixed | external | needs_owner | failed",
+ "cause": "la cause en une phrase technique",
+ "changes": ["fichier ou geste : ce qui a changé"],
+ "evidence": "ce qui prouve la cause et la correction",
+ "commit": "hash ou null",
+ "restart": ["walter-engine ou walter-telegram, seulement si ton changement l'exige"],
+ "summary_fr": "deux phrases simples pour Monsieur, sans jargon ni commande : ce qui n'allait pas, ce qui est fait",
+ "question_fr": "seulement pour needs_owner : ce qu'il doit faire ou décider"}}"""
+
+
+def module_agent(module: str, root: Path) -> str:
+    """Who the repair agent is: the module's own agent when it declares one (maintenance.json `agent`: `identity` =
+    a file of the module, text after its first « --- » line, rendered for the instance; `rules` = the owner's rules
+    for it, an instance config file of the module, lines « - … »), else a neutral line. The same identity opens every
+    mission of that agent, here and in the module."""
+    try:
+        decl = json.loads((root / "contracts" / "maintenance.json").read_text()).get("agent") or {}
+        text = (root / decl["identity"]).read_text().split("\n---\n", 1)[-1].strip()
+    except (OSError, ValueError, KeyError, TypeError):
+        return IDENTITY_FALLBACK.format(module=module)
+    r = subprocess.run(["walter", "instance", "render"], input=text, capture_output=True, text=True, timeout=30)
+    text = r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else text
+    rules = []
+    if decl.get("rules"):
+        p = sh("walter", "instance", "config", module, str(decl["rules"]), timeout=30).stdout.strip()
+        try:
+            rules = [ln.strip() for ln in Path(p).read_text().splitlines() if ln.strip().startswith("- ")
+                     and len(ln.strip()) > 2] if p else []
+        except OSError:
+            rules = []
+    if rules:
+        text += "\n\n## Règles du propriétaire pour toi (elles priment sur tout le reste)\n" + "\n".join(rules)
+    return text
+
+
+def _repair_dir(module: str) -> Path:
+    d = state_dir() / "repair" / re.sub(r"[^A-Za-z0-9_.-]", "_", module)
+    d.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return d
+
+
+def _repair_file(module: str, key: str) -> Path:
+    import hashlib
+    return _repair_dir(module) / (hashlib.sha256(key.encode()).hexdigest()[:16] + ".json")
+
+
+def _engine_token() -> str:
+    root = os.environ.get("WALTER_INSTANCE") or Path("/etc/walter/instance").read_text().strip()
+    return (Path(root) / "bootstrap" / "engine" / "api.token").read_text().strip()
+
+
+def verdict_of(output: str) -> dict:
+    """The agent's closing JSON: the last object carrying an `outcome`."""
+    decoder = json.JSONDecoder()
+    for m in reversed(list(re.finditer(r"\{", output or ""))):
+        try:
+            obj, _ = decoder.raw_decode(output[m.start():])
+        except ValueError:
+            continue
+        if isinstance(obj, dict) and obj.get("outcome"):
+            return obj
+    return {"outcome": "failed", "summary_fr": "", "cause": (output or "")[-400:]}
+
+
+def delegate(module: str, goal: str, key: str, budget: int = REPAIR_BUDGET) -> dict:
+    """One Walter Engine delegation as `guardian-<module>` (policy interface `maintenance`)."""
+    body = {"version": 1, "op": "delegate", "caller": f"guardian-{re.sub(r'[^A-Za-z0-9_-]', '-', module)}"[:60],
+            "delegation": {"version": 1, "goal": goal, "task": REPAIR_TASK, "level": REPAIR_LEVEL,
+                           "budget_seconds": budget, "idempotency_key": key, "parent": {"depth": 0}}}
+    req = Request(ENGINE_URL.rstrip("/") + "/v1", data=json.dumps(body).encode(),
+                  headers={"Authorization": "Bearer " + _engine_token(), "Content-Type": "application/json"})
+    try:
+        with urlopen(req, timeout=budget + 120) as r:
+            out = json.load(r)
+    except Exception as exc:  # noqa: BLE001 — engine down: a failed run, said as such
+        return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:200]}"}
+    res = out.get("result") or out
+    return {"ok": bool(res.get("ok")), "output": res.get("output") or "", "status": res.get("status"),
+            "reason": res.get("reason"), "error": res.get("error"), "tools": len(res.get("tools") or []),
+            "walter_session": res.get("walter_session")}
+
+
+AFTER_UNITS = ("walter-engine", "walter-telegram")   # the agent runs inside them: restarted after its run
+
+
+def restart_after(units) -> dict:
+    """Units the agent could not restart itself, restarted once its run is over and no engine turn is in flight
+    (`walter_platform.deploy.turns_in_flight`; unknown = busy, then left to the core guardian's stale-code check)."""
+    out = {}
+    for unit in [u for u in (units or []) if u in AFTER_UNITS]:
+        busy = sh("walter-python", "-c", "from walter_platform import deploy; print(deploy.turns_in_flight())", timeout=60)
+        if busy.returncode or busy.stdout.strip() != "0":
+            out[unit] = "deferred:busy"
+            continue
+        r = sh("systemctl", "restart", unit, timeout=120)
+        out[unit] = "restarted" if r.returncode == 0 else f"failed:{r.returncode}"
+    return out
+
+
+def repair(module: str, incident: dict, tried: str = "", root: Path | None = None) -> dict:
+    """Run the repair agent on one incident (blocking) and record its verdict."""
+    root = root or module_root(module)
+    try:
+        pb = load(module, root)[1]
+    except (OSError, ValueError):
+        pb = {}
+    key = f"{incident.get('module', module)}:{incident.get('key')}"
+    path = _repair_file(module, key)
+    rec = json.loads(path.read_text()) if path.exists() else {"key": key, "runs": []}
+    started = time.time()
+    rec.update(running={"since": started, "pid": os.getpid(), "unit": os.environ.get("INVOCATION_ID")})
+    path.write_text(json.dumps(rec, ensure_ascii=False, indent=1, default=str))
+    goal = module_agent(module, root) + "\n\n---\n\n" + REPAIR_BRIEF.format(module=module, root=root,
+                               notes="\n".join(f"  - {n}" for n in pb.get("notes", [])) or "  - (aucune)",
+                               incident=mask(json.dumps({k: v for k, v in incident.items() if not k.startswith("_")},
+                                                        ensure_ascii=False, indent=1, default=str))[:6000],
+                               tried=tried or "- rien encore")
+    ran = delegate(module, goal, f"guardian-{module}-{incident.get('key')}-{int(started)}"[:200])
+    v = verdict_of(ran.get("output") or "") if ran.get("ok") or ran.get("output") else \
+        {"outcome": "failed", "cause": ran.get("error") or ran.get("reason") or "no answer", "summary_fr": ""}
+    v["restarted"] = restart_after(v.get("restart"))
+    run_rec = {"t": started, "at": now_iso(), "seconds": round(time.time() - started), "verdict": v,
+               "engine": {k: ran.get(k) for k in ("ok", "status", "reason", "error", "tools", "walter_session")},
+               "poste": f"{REPAIR_TASK}/{REPAIR_LEVEL}"}
+    rec = json.loads(path.read_text()) if path.exists() else rec
+    rec.pop("running", None)
+    rec["runs"] = (rec.get("runs") or [])[-9:] + [run_rec]
+    path.write_text(json.dumps(rec, ensure_ascii=False, indent=1, default=str))
+    with open(state_dir() / "actions.jsonl", "a") as f:
+        f.write(json.dumps({"at": now_iso(), "key": key, "repair_agent": run_rec}, ensure_ascii=False, default=str) + "\n")
+    return {"key": key, **run_rec}
+
+
+def _running(rec: dict) -> bool:
+    r = rec.get("running")
+    if not r:
+        return False
+    if time.time() - float(r.get("since", 0)) > REPAIR_BUDGET + 900:     # a run that never wrote its end
+        return False
+    try:
+        os.kill(int(r.get("pid") or 0), 0)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def launch_repair(module: str, incident: dict, tried: str) -> bool:
+    """Start the repair agent in its own transient unit (the supervisor never waits for it)."""
+    key = f"{incident.get('module', module)}:{incident.get('key')}"
+    f = _repair_dir(module) / (_repair_file(module, key).stem + ".incident.json")
+    f.write_text(json.dumps({"incident": incident, "tried": tried}, ensure_ascii=False, default=str))
+    unit = f"walter-guardian-repair-{re.sub(r'[^A-Za-z0-9]', '-', module)}-{_repair_file(module, key).stem[:8]}"
+    r = sh("systemd-run", f"--unit={unit}", "--collect", "--quiet", "--property=TimeoutStopSec=60",
+           f"--setenv=WALTER_INSTANCE={state_dir().parents[1]}", sys.executable, os.path.abspath(__file__),
+           "repair", "--module", module, "--incident-file", str(f), "--wait", timeout=30)
+    return r.returncode == 0
+
+
+def escalate(module: str, incident: dict, v: dict, dry_run: bool = False) -> dict:
+    """What would reach the owner goes to the repair agent first; the owner hears only its verdict."""
+    key = f"{incident.get('module', module)}:{incident.get('key')}"
+    path = _repair_file(module, key)
+    rec = json.loads(path.read_text()) if path.exists() else {"runs": []}
+    if _running(rec):
+        return {**v, "outcome": "pending", "repair": "running"}
+    t = time.time()
+    runs = [r for r in rec.get("runs") or [] if t - float(r.get("t", 0)) < REPAIR_WINDOW]
+    last = (runs[-1] if runs else {}).get("verdict") or {}
+    if last.get("outcome") in ("needs_owner", "external"):
+        return {**v, "outcome": last["outcome"], "by": "repair-agent",
+                "diagnosis_fr": str(last.get("cause") or v.get("diagnosis_fr") or "")[:300],
+                "message_fr": " ".join(x for x in (last.get("summary_fr"), last.get("question_fr")) if x)[:600]
+                or v.get("message_fr", "")}
+    if len(runs) >= REPAIR_RUNS:
+        said = " ".join(x for x in (last.get("summary_fr"), last.get("question_fr")) if x)
+        return {**v, "outcome": "needs_owner", "by": "repair-agent",
+                "message_fr": (f"{incident.get('summary')} Je l'ai traité {len(runs)} fois sans réussir à le régler. "
+                               + (said or str(last.get("cause") or ""))).strip()[:600]}
+    if runs and t - float(runs[-1].get("t", 0)) < REPAIR_GAP:
+        return {**v, "outcome": "pending", "repair": "waiting"}
+    if dry_run:
+        return {**v, "outcome": "pending", "repair": "would_start"}
+    tried = "\n".join(f"- {r.get('at')}: {(r.get('verdict') or {}).get('outcome')} — "
+                      f"{str((r.get('verdict') or {}).get('cause') or '')[:200]}" for r in runs) or \
+        (v.get("diagnosis_fr") or "")
+    if launch_repair(module, incident, tried):
+        return {**v, "outcome": "pending", "repair": "started"}
+    return v
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("action", choices=["run", "playbook", "repair"])
+    p.add_argument("--module", required=True)
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--incident-file", help="repair: {incident, tried} (JSON)")
+    p.add_argument("--wait", action="store_true", help="repair: run the agent here and print its verdict")
+    a = p.parse_args()
+    try:
+        if a.action == "playbook":
+            out = load(a.module)[1]
+        elif a.action == "repair":
+            data = json.loads(Path(a.incident_file).read_text()) if a.incident_file else json.load(sys.stdin)
+            inc, tried = data.get("incident") or data, data.get("tried") or ""
+            out = repair(a.module, inc, tried) if a.wait else {"started": launch_repair(a.module, inc, tried)}
+        else:
+            data = json.load(sys.stdin)
+            out = run(a.module, [i for i in data.get("incidents", []) if isinstance(i, dict)], a.dry_run)
+    except (OSError, ValueError, KeyError) as exc:
+        print(json.dumps({"error": f"{type(exc).__name__}: {str(exc)[:200]}"}))
+        return 1
+    print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

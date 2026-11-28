@@ -1,0 +1,1 @@
+Walter Router chooses the model and provider for each task — text levels, code, images, video, voice, specialised domains — from benchmarks, prices and {{owner.address}}'s subscriptions, and runs sub-tasks on them.

@@ -1,0 +1,10 @@
+{
+  "name": "walter-engine-kernel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Frozen engine kernel of Walter (lot E1): exact DSH/Cordis version, installed from the lockfile only.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.2.0-rc.2"
+  }
+}

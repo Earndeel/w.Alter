@@ -1,0 +1,369 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://walter.local/contracts/context/context-plan.v4.json",
+  "title": "ContextPlan v4",
+  "description": "What the preflight decides for one owner message (walter-context output, traced). v3 (2026-11-17): observations read in the message, apart from the judgements. v4 (2026-11-18): personal (the owner's situation the answer depends on, even implied), places and amounts read, assessment (urgency, clarity), media (what an attached image shows); a v1/v2/v3 plan reads as v4 without them.",
+  "type": "object",
+  "required": [
+    "version",
+    "turn_id",
+    "thread",
+    "act",
+    "level"
+  ],
+  "properties": {
+    "version": {
+      "const": 4
+    },
+    "turn_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "thread": {
+      "type": "object",
+      "required": [
+        "id",
+        "new"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "new": {
+          "type": "boolean"
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "alternates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "act": {
+      "enum": [
+        "new",
+        "continue",
+        "approve",
+        "correct",
+        "inform"
+      ]
+    },
+    "level": {
+      "enum": [
+        "L0",
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "description": "L0: nothing beyond the message: the assistant's tools suffice; L1: the last exchange of its thread; L2: its thread at overview depth (card, recent exchanges); L3: its thread at synthesis depth plus targeted memory (people, decisions, other sources); L4: its thread at synthesis depth plus deep memory reaching months or years back"
+    },
+    "domains": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "projects",
+          "profile",
+          "activities",
+          "relations",
+          "agenda",
+          "decisions",
+          "goals",
+          "walter"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "horizons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "instant",
+          "day",
+          "medium",
+          "long",
+          "stable"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "tools",
+          "skills",
+          "memory",
+          "web",
+          "browser",
+          "delegation",
+          "secrets"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "model_profile": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "L1",
+            "L2",
+            "L3"
+          ]
+        },
+        "require": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Asked of Walter Router; the Router alone picks the concrete model."
+    },
+    "fast_path": {
+      "enum": [
+        "short_reply",
+        "trivial",
+        null
+      ]
+    },
+    "escalated": {
+      "type": "boolean"
+    },
+    "answer": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "trivial fast path only: the exact answer"
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "read in the message and checkable against it (Walter Decision 2.0 signals context.dates and context.people): each date passage as written, the calendar day Walter reads it as (`end` = the last day of a period, `past`/`past_end` = the same words read as already gone, `ambiguous` = the words leave a choice, `approx` = no exact bounds, `duration` = a length of time that names no day), the people named",
+      "properties": {
+        "dates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "text"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "end": {
+                "type": "string"
+              },
+              "past": {
+                "type": "string"
+              },
+              "past_end": {
+                "type": "string"
+              },
+              "time": {
+                "type": "string"
+              },
+              "ambiguous": {
+                "type": "boolean"
+              },
+              "approx": {
+                "type": "boolean"
+              },
+              "duration": {
+                "type": "string"
+              },
+              "found": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "people": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "text"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "found": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "places": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "text"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "found": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "amounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "text"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "found": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "personal": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "location",
+          "preferences",
+          "history",
+          "people",
+          "projects",
+          "tasks",
+          "agenda"
+        ]
+      },
+      "uniqueItems": true,
+      "description": "the owner's own situation the answer depends on, said or implied: location → Context adds the position block (last known position, its age and the known home); the others → owner memory"
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "urgency": {
+          "enum": [
+            "low",
+            "normal",
+            "high"
+          ]
+        },
+        "clarity": {
+          "enum": [
+            "clear",
+            "ambiguous",
+            "missing_info"
+          ]
+        }
+      }
+    },
+    "media": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "enum": [
+            "photo",
+            "screenshot",
+            "document",
+            "other"
+          ]
+        },
+        "audio": {
+          "type": "boolean"
+        }
+      },
+      "description": "what an attached image shows (the main model then needs vision); audio = the voice note itself was read by the decision model, beside its transcript"
+    },
+    "decision": {
+      "type": "object",
+      "description": "trace only; degraded = true with error (exception class + short scrubbed reason) when the decision failed and the plan is the prudent default (SOCLE A2, 2026-11-11)",
+      "properties": {
+        "degraded": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "work": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "the decision model's judgement that the message asks for work to carry out and follow (>= 0.5: the Run Plane keeps it as a durable task, SOCLE A3, 2026-11-12)"
+        },
+        "resume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "asked only when a thread shows an open or suspended task: the judgement that the message carries on, resumes or finishes it (>= 0.5: the Run Plane attaches the run to the thread's task instead of opening another, 2026-11-13)"
+        },
+        "effort": {
+          "enum": [
+            "L0",
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "description": "the level whose ceilings the engine gives the turn (SOCLE A7): the context level raised to the difficulty asked (text tier) and to L4 for work to carry out; absent (fast path, degraded plan) = the plan's level, or the general ceilings when degraded"
+        }
+      }
+    }
+  }
+}

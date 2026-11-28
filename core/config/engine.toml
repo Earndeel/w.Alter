@@ -1,0 +1,71 @@
+# Engine composition values (walter harness install dsh), neutral defaults. An instance overrides any of them in
+# @instance/config/core/engine.toml (merged key by key over this file).
+
+[dsh.web]
+# Rendered into the fenced `dsh-face` block of the web profile (template: core/engine/compositions/dsh-face.patch.yml).
+name = "Walter"
+tagline = "Que puis-je faire pour vous ?"
+cookie_max_age_days = 30          # DSH's own default
+
+[dsh.model_names]
+# Display names of the Walter Router tasks DSH offers (auto, coding, general, document, summarization).
+# A task without a name here is shown as "Walter <task>".
+
+[dsh.budget]
+# Ceilings of one engine turn (plugin `budget`). General ones: a turn without a plan, with a degraded plan, or a
+# delegated mission. `levels`: an owner request the preflight understood, by the EFFORT its plan states (`decision.effort`
+# = the text tier asked, L4 for work to carry out or a deep search; never the context level since 27/11; A7 11-12/11):
+# checkpoint = steps after which the agent is told once where it stands; then the same two stages as the general
+# ceilings (told to conclude, refused after the grace). A level never exceeds the general ceilings.
+max_steps = 80
+max_turn_min = 45
+grace_steps = 3
+grace_min = 5
+
+[dsh.budget.levels]
+L0 = { checkpoint = 4, max_steps = 12, max_turn_min = 5 }
+L1 = { checkpoint = 8, max_steps = 20, max_turn_min = 10 }
+L2 = { checkpoint = 14, max_steps = 36, max_turn_min = 20 }
+L3 = { checkpoint = 24, max_steps = 60, max_turn_min = 35 }
+L4 = { checkpoint = 36, max_steps = 80, max_turn_min = 45 }
+
+# ── Walter Engine natif (2026-11-17, mission « Walter Native Engine ») ──────────────────────────────────────────────
+# Le moteur de production en Python (core/engine/walter_engine), sans DSH/Cordis : boucle, sessions, outils, Python
+# persistant, sous-agents, tâches, réveils, Engine API v1 et porte web. Les plafonds de tour restent ceux de
+# [dsh.budget] (mêmes niveaux d'effort, lus par le moteur natif) tant que le moteur DSH sert de retour arrière.
+[native]
+api_host = "127.0.0.1"
+api_port = 8895
+web_host = "127.0.0.1"
+web_port = 3080
+trusted_hosts = []                # Host headers the web door accepts besides loopback (an instance adds its own)
+workspace = "@instance/workspace"
+instructions = "@instance/profiles/engine/AGENTS.md"   # Walter's identity, rendered by walter-soul (target `engine`); "" = none
+model = "auto"                    # Walter Router poste of an owner turn (walter-llm plans it from the run)
+models = ["auto", "coding", "general", "document", "summarization"]
+max_depth = 3                     # sub-agents: a child never goes deeper
+approval_timeout_min = 10
+tool_result_chars = 8192          # a longer tool result is cut for the model (head + tail), the original stays
+tool_result_head = 4096
+tool_result_tail = 1024
+system_order = "socle_first"      # system text: shared parts first, this session's lines last (cache); "legacy" = before 23/11
+system_blocks = true              # system text in two blocks, the shared socle marked as a cache point for Claude (24/11); false = one text
+prompt_layout = "v1"              # lot 3a (24/11): "v1" = the one `instructions` profile; "v2" = soul + operating + conduct
+prompt_layout_test = ""           # the layout of test accounts only ("" = prompt_layout): measure before switching everyone
+prompt_layout_accounts = {}       # test account id → layout (the bench's A/B arms)
+soul = "@instance/profiles/engine/SOUL.md"         # walter-soul target `engine`: the Soul alone
+conduct = "@instance/profiles/engine/CONDUCT.md"   # walter-soul target `engine-conduct`: the owner's conduct
+operating = "instructions/OPERATING.md"           # the engine's own operating rules (relative to core/engine)
+context_window = 200000           # tokens the main model accepts (walter-context decides the window inside it)
+resume_interrupted = true         # a turn cut by a restart resumes from its journal (never re-running a done action)
+python = "full"                   # full = the engine's own rights; sandbox = the old walter-sandbox bubble
+capability_map = "tiers"          # python door's map (27/11): everyday capabilities with their signature, the others named by module; "full" = every signature (rollback), "off" = none
+# the everyday capabilities: signature + purpose in the map, called without a lookup (measured: the most used in the
+# engine's sessions over 14 days, + the everyday doors of memory and tasks); every other tool is named, its contract on demand
+map_common = ["walter_browse", "memory_search", "memory_events", "memory_context", "person_lookup", "tasks_list",
+              "task_create", "task_update", "vault_search", "logs_search", "skills_search", "skill_read",
+              "module_guide", "context_recover", "walter_run", "browser_session", "secret_search",
+              "bash", "read", "write", "edit", "grep", "glob", "read_image", "present"]
+python_idle_min = 30
+python_interpreter = "/services/python/engine-python/bin/python"
+web_cookie_days = 30

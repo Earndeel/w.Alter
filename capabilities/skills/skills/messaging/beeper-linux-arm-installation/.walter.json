@@ -1,0 +1,7 @@
+{
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "codex",
+ "reason": "Installation réelle du 16/11/2026 sur Ubuntu 24.04 ARM64 : distribution officielle ARM64 confirmée dans la page Linux ; plantage natif SystemError résolu en créant le dossier de cache avant le démarrage ; connexion e-mail réussie et vérification inter-appareils encore nécessaire. Évite la copie des secrets et du même appareil cryptographique du Mac.",
+ "store_sha": "b8873406b69576ff440f557c7dc33efd85631d9bc5476c62c5d6ab1eabab0c82"
+}

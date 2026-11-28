@@ -1,0 +1,14 @@
+{
+ "content_since": "2026-10-11T16:44:54Z",
+ "hermes": {
+  "path": "/root/.hermes/skills/cloud/colab-external-gpu",
+  "sha": "41c78c844d3e67e62e896d0034865c36157d0359835b68f3c658acf533452de7",
+  "state": "active"
+ },
+ "imported_at": "2026-10-10T04:11:29+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "restore_reason": "read by an agent",
+ "restored_at": "2026-11-24T10:01:58+00:00",
+ "store_sha": "41c78c844d3e67e62e896d0034865c36157d0359835b68f3c658acf533452de7"
+}

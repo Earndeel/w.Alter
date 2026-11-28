@@ -1,0 +1,371 @@
+# walter-context — the ONLY place for tunables (code holds no magic numbers).
+# Profiles are priors: the replay bench (bench/replay.py) is what justifies changing them.
+
+[projection]
+keep_turns = 1               # completed turns kept verbatim after a boundary, besides the live turn
+live_keep_steps = 4          # emergency mid-turn cut: last assistant steps of the live turn kept verbatim
+tool_keep_chars = 600        # compact zone: tool outputs up to this size stay verbatim (a digest would not pay)
+excerpt_chars = 280          # compact zone: excerpt kept from a compacted tool output
+args_chars = 240             # compact zone: tool-call arguments longer than this are clipped
+text_clip_chars = 6000       # compact zone: assistant text longer than this keeps head + tail (owner text: never)
+brief_answer_chars = 160     # record, one-line level: the answer kept beside the owner's full request
+user_label = "User"
+assistant_label = "Assistant"
+
+[policy]
+horizon_calls = 12           # prior for cached reuses after a boundary; replaced by the session's own calls-per-turn
+min_gain_tokens = 6000       # a boundary must remove at least this much
+compact_share = 0.4          # fold the compact zone into the record when it exceeds this share of the effective budget
+record_share = 0.3           # condense the record beyond this share (oldest turns to one line, owner text kept), down to half
+regret_tokens = 4000         # mid-turn, weigh moves again only after the payload grew this much over budget
+emergency_share = 0.92       # host-side compression only above this share of the context window (should never fire)
+
+# Window of an owner turn (compress/window.py, decision A1 of 2026-11-11): decided when a new owner message arrives,
+# before it enters the session. Relevance first (thread of the message, recency), size second, provider cache third.
+[relevance]
+keep_turns = 1               # completed turns left verbatim (tool outputs included), only while recent and small
+recent_s = 1800              # "recent": a turn that ended less than this ago stays verbatim, or at least a full entry
+verbatim_budget_tokens = 8000  # verbatim turns heavier than this become full record entries (payloads behind their refs)
+thread_full_turns = 6        # turns of the message's thread (and recent ones) kept as full entries; older: one line
+record_budget_tokens = 6000  # whole record; past it oldest full entries go to one line, then oldest lines leave (said)
+min_gain_cold_tokens = 1000  # cache cold (idle past the model's cache_ttl_s): a boundary must free at least this
+                             # (cache warm: policy.min_gain_tokens; under pressure: any gain)
+frame_tokens = 60            # the host's own framing around a record, counted against the gain
+# Rattachement indépendant de la conversation visible (Monsieur, 26/11) : le détail des tours passés dépend de leur
+# récence seule, jamais du fil auquel Decision rattache le message. Mesure avant bascule (17–25/11) : 120 fenêtres
+# appliquées, 206 tours mis en registre, aucun de plus de 30 min : rien n'aurait changé. Retour arrière : true (lu à
+# chaque fenêtre, sans redémarrage).
+by_thread = false
+
+# Model profiles: first `match` (fnmatch on the lower-cased model id) wins; the last one is the default.
+# effective_budget = where quality starts to suffer (not the advertised window); hard_budget = never exceed.
+# cache: prefix (automatic prefix cache) | breakpoints (explicit markers) | none.  Costs are relative to input = 1.
+# Walter Engine: the model is a Router alias (`walter/auto`, `walter/<task>`), resolved per call by walter-llm among the
+# engine tiers (GPT-6 / Claude today). Budgets = the smallest of those profiles; without this entry the engine fell to
+# the 64k default and compacted (and lost its cache) every few calls on a 40-60k conversation (2026-11-10).
+[[model]]
+match = "walter/*"
+effective_budget = 96000
+hard_budget = 160000
+cache = "prefix"
+cache_ttl_s = 300
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "gpt-6*"
+effective_budget = 96000
+hard_budget = 160000
+cache = "prefix"
+cache_ttl_s = 900
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "gpt-5*"
+effective_budget = 80000
+hard_budget = 140000
+cache = "prefix"
+cache_ttl_s = 900
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "claude-*"
+effective_budget = 120000
+hard_budget = 180000
+cache = "breakpoints"
+cache_ttl_s = 300
+cached_cost = 0.10
+write_cost = 1.25
+
+[[model]]
+match = "gemini-*"
+effective_budget = 64000
+hard_budget = 200000
+cache = "prefix"
+cache_ttl_s = 300
+cached_cost = 0.25
+write_cost = 1.0
+
+[[model]]
+match = "*deepseek*"
+effective_budget = 64000
+hard_budget = 110000
+cache = "prefix"
+cache_ttl_s = 3600
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "*glm*"
+effective_budget = 64000
+hard_budget = 160000
+cache = "prefix"
+cache_ttl_s = 600
+cached_cost = 0.20
+write_cost = 1.0
+
+[[model]]
+match = "*"
+effective_budget = 64000
+hard_budget = 100000
+cache = "prefix"
+cache_ttl_s = 300
+cached_cost = 0.25
+write_cost = 1.0
+
+# Trusted, bounded capability notes; unchanged within an owner turn. No model call.
+[capabilities]
+router_enabled = true
+timeout_seconds = 10
+max_chars = 6000
+# Module layer: every agent-facing module's level-0 brief (walter present notes), composed once per owner turn.
+modules_enabled = true
+layer_max_chars = 20000
+
+# Entrance: a large tool output reduced when it enters the context (Claude Code PostToolUse), before the model reads
+# it. shadow = record what would be cut (numbers only, @instance/state/context/shadow/entrance-<day>.jsonl);
+# off = nothing. "on" is refused until the hook journals originals itself (walter_logs keeps what the model saw).
+[entrance]
+mode = "shadow"
+min_chars = 8000             # outputs below this stay verbatim (2.3 % of outputs = 26 % of the volume, 14 days, 06/11)
+head_chars = 1000            # kept from the start
+tail_chars = 800             # kept from the end (exit status, final lines)
+signal_lines = 8             # at most this many middle lines matching signal_words, with their line numbers
+signal_line_chars = 160
+signal_words = ["error", "erreur", "failed", "échec", "exception", "traceback", "warning", "denied", "fatal",
+                "panic", "not found", "refused", "timeout"]
+exempt_tools = ["Edit", "Write", "MultiEdit", "NotebookEdit", "TodoWrite", "Skill", "mcp__walter__skill_read",
+                "mcp__walter__module_guide", "mcp__visualize__read_me"]   # instructions the model needs whole
+chars_per_token = 3.5        # report only: estimated tokens from characters
+
+# Preflight (walter_context.preflight): one decision per owner message, explicit degraded plan when it fails (SOCLE A2).
+[preflight]
+decision_samples = 2                # parallel calls of the decision model per turn
+decision_sampling = "first"         # "first" = hedged, the first answer kept; "mean" = averaged (2026-11-09: one call
+                                    # flipped memory on 2 messages in 7). 17/11 bench, 48 cases: Drex Max's plans are
+                                    # identical with mean of 3 and first of 2 (0 difference), first of 2 is faster
+                                    # (judgements p50 0.52 s / p95 0.71 s against 0.66 / 0.85)
+decision_timeout_s = 15             # per decision call (the Router chain's own fallbacks run inside it)
+reply_window_s = 7200               # past that, « ok, regarde X » opens a subject rather than answering one
+floor_window_s = 1800               # a message this close to the previous exchange needs at least that exchange
+router_ttl_s = 600                  # cached Walter Router answers (chat tasks, decision chain) refreshed past that
+degraded_min_similarity = 0.55      # degraded plan: the closest subject (local embeddings) is claimed only above this
+degraded_profile_max_age_s = 1800   # degraded plan: the session's previous model profile is reused if this recent
+previous_chars = 1200               # previous exchange read from walter_logs when the caller sends none: chars per side
+previous_timeout_s = 1.0            # … within this time, else the plan is made without it (noted in the journal)
+# The plan and its pack are answered within this time. A caller that says how long it waits (`answer_within_ms`, the
+# engine's own timeout) gets the shorter of the two, minus the margin (journal write, the answer's way back). A pack
+# source not ready by then is left out and the pack says so (13/11: three sub-agent turns at once lost their whole
+# plan because the pack, read source after source, came 1.5 s after the engine had stopped waiting).
+answer_within_s = 5.5
+answer_margin_s = 1.0
+pack_reserve_s = 1.0                # the decision stops this long before the answer is due: past it, the degraded plan
+                                    # (said to the model, on the run and on the bus) instead of no answer at all
+# Where the turn's questions come from (Walter Decision 2.0, 2026-11-17): "registry" = composed from the signals the
+# modules declare (`walter decisions`; Context, Router, Memory), "questions" = the preflight's own set 2 (rollback).
+signals = "registry"                # activated 2026-11-17 (Walter Decision 2.0; bench decision2: same judgements as set 2,
+                                    # plan p50/p95 0.71/1.29 s against 0.86/1.29 s, dates and people read); rollback = "questions"
+# The turn's readings (dates, people named: signals of layer observation) asked apart from its judgements and in
+# parallel: the plan does not wait for them, the pack's `now` and `people` blocks do ([pack] readings_wait_s).
+# false = one call carrying both (the plan then waits for the slower extraction route).
+# 18/11 (préflight natif d1.2-ultra, switched on with the need policy `assign: native_whole`): the readings ride in the
+# same native call as the judgements (Liquid's own API answers every kind at once, ~0.45 s); rollback = true.
+readings_apart = false
+# Calls of the readings: passages are never averaged, so more than 1 = hedged, the first answer kept (17/11, 60
+# messages each: 1 call 54/60 under 1 s, max 2.1 s; 2 hedged 59/60, max 1.7 s; +0.00003 $ a message).
+readings_samples = 2
+
+# Images and voice notes of a message, read by the preflight's decision model itself (18/11, walter_context.media):
+# files named by the doors' markers or the request's `attachments`, only under these roots and size limits.
+[media]
+enabled = true
+audio = true                        # the voice note itself beside its transcript (Liquid reads OGG natively)
+image_max_bytes = 3000000
+audio_max_bytes = 2000000
+roots = ["@instance/state/core/telegram", "@instance/state/context/bench"]
+
+# Per-message pack (walter_context.assembly / retrieval). Budgets in tokens (chars / 4), header included.
+# Measured 07-11/11 (741 packs): median L0 115, L1 1588, L2 2983, L3 2889, L4 4666; max 7257.
+[pack]
+# Owner 2026-11-26: the rules layer goes 350 → 2 500 tokens (below); every level but L0 is raised by the same 2 150 so
+# memory and the other blocks are never cut to make room (report 2026-11-26-activation-et-etudes § 3).
+# Rollback: { L0 = 800, L1 = 1200, L2 = 2000, L3 = 3000, L4 = 4500 }, restart walter-context-preflight.
+budget = { L0 = 800, L1 = 3350, L2 = 4150, L3 = 5150, L4 = 6650 }
+# Over budget, blocks are shrunk (whole lines kept) then dropped in this order, least relevant first; a block id not
+# listed is cut last; `now` and the degraded-plan line are never cut. Every cut is recorded in the pack's `cuts`.
+cut_order = ["subjects_board", "records", "tool_cards", "recent_exchanges", "memory", "people", "experience", "subject",
+             "session_state", "tasks"]
+min_block_tokens = 80               # a block that would shrink below this is dropped instead
+chronological_levels = ["L0"]      # see [pack.chronological_hours] below
+prefetch_gate_s = 8                 # the early memory read waits this long for the plan before its rerank call (27/11)
+board_tokens = 200                  # subjects board: active subjects only (before: the whole table, 17 lines, ~350)
+board_max_lines = 6
+board_recent_hours = 48             # recent = last activity within this (instant: 6 h, day: 24 h, from the plan horizon)
+board_states = ["en_cours", "attend_le_proprietaire"]   # states shown besides the plan's own thread
+subject_tokens = 900
+horizon_max_age_s = { instant = 3600, day = 43200 }     # plan horizon → MemoryViewQuery.max_age_s of the subject view
+recent_exchanges = 3
+unsure_plan = 0.5                   # below this plan confidence, the cheap records lookup is added (calibration 28/10)
+tasks_tokens = 250                  # Memory POST /v1/tasks/list: the thread's objectives + others, one line each
+tasks_others = 3
+experience_tokens = 400             # Memory POST /v1/experience: attempts, failures, validated solutions of the thread
+experience_items = 4
+experience_recent_days = 7          # below L2 the block appears only for a failed/partial attempt this recent
+gateway_timeout_s = 1.5             # per Memory gateway call of the pack (tasks, experience); past it the block is dropped
+workers = 16                        # threads asking the pack's sources together (up to 9 sources per message)
+late_grace_s = 0.25                 # a source is given at least this long once the answer's deadline has passed
+people_tokens = 300                 # people the message names (preflight observation, Walter Decision 2.0): their cards
+readings_wait_s = 1.0               # the most `now` / `people` wait for readings asked apart, counted from the message
+                                    # (never past the deadline); 17/11 bench, cal split: readings p95 0.75 s
+
+# Chronological questions (owner 2026-11-27, « quels sont mes derniers messages reçus ? »): a plan with personal
+# « history » on these horizons, naming no day and no person, reads the owner's latest exchanges with others in order
+# (Memory get_context recent_hours: deterministic, no search, no rerank) within this many hours; the memory block is
+# then only that, `[pack.memory_budget.chronological]`. The level budgets above are unchanged. Rollback: remove the
+# chronological table (the plan then reads its level's sections as before).
+#   levels: the light plans only (L0 = the message and tools suffice); a heavier plan keeps its level's memory.
+[pack.chronological_hours]
+instant = 24
+day = 48
+
+[pack.memory_budget.chronological]
+profile = 0
+rules = 0
+working = 0
+people = 0
+records = 0
+knowledge = 0
+evidence = 400
+views = 0
+periods = 0
+tasks = 0
+experience = 0
+
+[pack.memory_budget.L3]             # Memory get_context sections (tasks/experience come from their own routes: 0 here)
+profile = 0
+rules = 0
+working = 0
+people = 300
+knowledge = 600
+evidence = 300
+views = 200
+tasks = 0
+experience = 0
+
+[pack.memory_budget.L4]
+profile = 0
+rules = 0
+working = 0
+people = 600
+knowledge = 1200
+evidence = 800
+views = 300
+tasks = 0
+experience = 0
+
+[pack.memory_budget.targeted]       # 2026-11-27: a taste of the owner alone (personal « preferences ») — the knowledge
+profile = 0                         # that matches the message, a little evidence; no people, views or thread. Rollback:
+rules = 0                           # remove this table (preferences then follow personal_needs_memory again, with the
+working = 0                         # relation's « preferences » restored in manifest/decisions.json)
+people = 0
+knowledge = 500
+evidence = 200
+views = 0
+tasks = 0
+experience = 0
+
+[pack.records_budget]
+profile = 0
+rules = 0
+working = 0
+people = 0
+records = 900
+knowledge = 0
+evidence = 0
+views = 0
+tasks = 0
+experience = 0
+
+[pack.state_budget]                 # layer 2 (Memory V1 P1.1): every level but L0 without a thread
+# Owner 2026-11-26 (budget bench of 26/11, 91 messages): at 350 Walter saw 31 % of the consignes that apply to the
+# message (2/91 complete), at 2 500 99.8 % (88/91); answers slightly better, +0.8 s median. Rollback: 350.
+rules = 2500
+working = 1200
+
+# Long owner messages (walter_context/longtext.py, 2026-11-17): the decision model reads head + tail + every sentence
+# holding an instruction / negation / constraint / date / amount / question, with the omitted ranges said — it used to
+# read the first 1500 characters only. enabled = false: the old cut (rollback). Restart walter-context-preflight.
+[longtext]
+enabled = true
+inline_chars = 1500          # a message up to this stays whole (whitespace collapsed)
+head_chars = 500
+tail_chars = 600
+signal_chars = 1200          # budget of the middle's key sentences
+signal_sentence_chars = 280
+
+# Living state (walter_context/state.py) and DecisionState (decision_state.py), 2026-11-17. The HTTP routes
+# /v1/state, /v1/state/event, /v1/reassess are always available; these two switches only change the PREFLIGHT:
+#   decision_state = true  → the facts sent to /v1/decisions and the plan's `decision_state` summary come from the DecisionState
+#   living_state   = true  → … and the DecisionState reads the session's WorkingState (needs decision_state = true)
+# Both off = the preflight behaves as before. Restart walter-context-preflight after changing them.
+[state]
+# Critical-path bench 17/11 (bench/critical_path.py, report critical-path-20261117T1614): with the WorkingState read
+# into the turn decision the plan is no better (quality 0.524 against 0.556 without, same 21 synthetic cases, within
+# noise; same latency) — a more complex preflight with no gain stays off (mission §9). The living state itself stays
+# served: the engine's state events, GET /v1/state and the targeted reassessments (§7) read it whatever these say.
+decision_state = false
+living_state = false
+memory_refresh = false       # memory.changed also re-projects Memory's working state (walter_memory lib, background)
+coalesce_ms = 150            # events of a session are applied together after this window
+max_items = 120              # bound of a state (compaction keeps pending / constraints / open tasks)
+text_chars = 2500            # bound of the French rendering
+observation_ttl_s = 1800
+memory_ttl_s = 3600
+tool_ttl_s = 900
+max_sessions = 200
+idle_evict_s = 86400
+reassess_cache = 256
+reassess_timeout_s = 6.0
+
+[digest]
+# Situation digest (19/11, owner: « active directement si meilleur ») — `walter_memory.digest`: the compact,
+# dated state of the projects, people, tasks, agenda and situation a message refers to, added to the preflight's single
+# Decision call as `known_state`; nothing when nothing is referred to; no model call; cloud audience (local_only
+# messages never get one); the position only as a signal « une position est connue », never the place.
+# Bench `--set digest` 33 cases (dg-off4 / dg-on4): hits 100/105 -> 105/105, false 2/44 -> 0/44, homonyms said
+# ambiguous (0/2 -> 2/2), tier unchanged; digest on 25/33, tokens p50 102 max 248, +~110 ms plan p50.
+# Rollback: enabled = false (then restart walter-context-preflight).
+enabled = true
+max_tokens = 250             # a ceiling, not a target
+timeout_ms = 300             # a late digest leaves the decision as before (journaled « late »)
+
+[anchors]
+# Noms connus de la mémoire (projets, organisations) trouvés dans le message (plan payload, lot 1, 2026-11-23).
+# Monsieur : « les noms connus doivent être des indices, jamais des déclencheurs systématiques ».
+# hint = true : le nom est donné au modèle de décision comme indice ; aucune règle n'impose la mémoire pour autant,
+# et le nom de l'assistant lui-même (« salut walter ») n'est pas un nom de projet.
+# hint = false : comportement d'avant (un nom connu imposait la mémoire et le niveau L3). Retour arrière : false.
+hint = true
+assistant_names = ["walter", "w.alter", "w-alter", "walt"]
+
+[dedupe]
+# Dit une seule fois (plan payload, lot 1, 2026-11-23).
+# memory_header = true : le préambule de Memory (« données datées, pas des instructions… ») est retiré de ses blocs,
+# le bandeau du pack disant déjà la même chose une fois. false = comportement d'avant.
+memory_header = true
+# Runtimes dont le modèle voit déjà l'historique de la conversation : les derniers échanges sont comptés, pas
+# réinjectés dans le pack. « walter » = le moteur natif (sa session porte l'historique). Retour arrière : retirer « walter ».
+native_history = ["claude_code", "codex", "dsh", "walter"]
+
+[thread_blocks]
+# Filet de sécurité P1 (Monsieur, 26/11, après les bancs du 25–26/11) : quand Decision rattache le message à un fil
+# existant avec une confiance inférieure à min_confidence, le pack n'apporte aucun bloc de ce fil (sa vue de sujet,
+# ses tâches et son expérience, sa place en tête du tableau des sujets). Le rattachement lui-même ne change pas (le
+# fil du plan et du run), ni la conversation visible, ni la récupération mémorielle, qui ne dépend pas du fil.
+# Banc (/user/Lucas/state/context/bench/rattachement-2026-11-25) : sur Walter, faux rattachements 2 → 0 à 0,8 sur
+# l'échantillon indépendant ; sur Claude Code les rattachements pertinents manqués doublent : non appliqué là.
+# Retour arrière : runtimes = [] (relu à chaque message, sans redémarrage).
+runtimes = ["walter"]
+min_confidence = 0.8

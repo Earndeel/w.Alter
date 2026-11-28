@@ -1,0 +1,8 @@
+{"_doc": "Intent eval (eval/intents_fr.json, 30 French requests) per decision model: tasks correct / video roles correct. Updated by hand after each eval run.",
+ "jev-1-13": {"date": "2026-10-14", "tasks": "30/30", "video_roles": "6/7"},
+ "microsoft-decision-1": {"date": "2026-10-14", "tasks": "30/30", "video_roles": "6/7"},
+ "mercury-decide": {"date": "2026-10-14", "tasks": "30/30", "video_roles": "6/7"},
+ "pplx-decider-v1-1-27b": {"date": "2026-10-14", "tasks": "30/30", "video_roles": "6/7"},
+ "clef": {"date": "2026-10-14", "tasks": "30/30", "video_roles": "6/7"},
+ "d1": {"date": "2026-10-14", "tasks": "29/30", "video_roles": "5/7"},
+ "d1-ultra": {"date": "2026-10-16", "tasks": "30/30", "video_roles": "6/7"}}

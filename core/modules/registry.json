@@ -1,0 +1,4844 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "id": "browse",
+      "root": "/walter/capabilities/browse",
+      "anchors": [
+        "/walter/capabilities/browse/contracts/browse.json",
+        "/walter/capabilities/browse/runtime/universal_router.py",
+        "/walter/capabilities/browse/walter_browse/facade.py",
+        "/walter/capabilities/browse/ops/walter-browse-display.service",
+        "/walter/capabilities/browse/ops/browse-display-container.sh",
+        "/walter/capabilities/browse/ops/camoufox-max-display.conf",
+        "/walter/capabilities/browse/ops/walter-exit-mac.service",
+        "/walter/capabilities/browse/ops/camoufox-max-identity.conf",
+        "/walter/capabilities/browse/ops/cloakbrowser-max.service",
+        "/walter/capabilities/browse/ops/walter-exit-default.service",
+        "/walter/capabilities/browse/network/exit-default/bin/walter-exit-default"
+      ],
+      "requires": [],
+      "external": [
+        "Scrapling isolated environment",
+        "Camoufox :9377 (display :101, Selkies walter-browse-display, Tailscale :3011)",
+        "CloakBrowser Chromium :9378 (free v146 linux-arm64 build, ~/.cloakbrowser; same display :101)",
+        "WireGuard France exit (walter-wg-exit freebox-fr, docker), fallback of the default exit",
+        "optional Webtop CDP",
+        "NordVPN per-country exits (walter-wg-exit nordvpn-<cc>, docker, on demand; settings /services/nordvpn-proxy, grant nordvpn)"
+      ],
+      "data": [
+        "shared session state",
+        "learned route profiles",
+        "result cache",
+        "conversation state (tab, conversation URL, last requests)"
+      ],
+      "core_paths": [
+        "/walter/capabilities/browse/walter_browse",
+        "/walter/capabilities/browse/runtime/universal_router.py",
+        "/walter/capabilities/browse/runtime/browse_session.py",
+        "/walter/capabilities/browse/runtime/profile_index.py",
+        "/walter/capabilities/browse/runtime/result_cache.py",
+        "/walter/capabilities/browse/runtime/search_lite.py",
+        "/walter/capabilities/browse/runtime/conversation.py",
+        "/walter/capabilities/browse/walter_browse/converse.py"
+      ],
+      "backup_paths": [
+        "/walter/capabilities/browse",
+        "/user/Lucas/state/browse"
+      ],
+      "interfaces": [
+        "shared request contract",
+        "CLI",
+        "MCP",
+        "Hermes plugin",
+        "public client (walter_browse.converse)"
+      ],
+      "bindings": {
+        "hermes": "native walter-browse adapter to shared facade",
+        "dsh": "common MCP",
+        "codex": "common MCP",
+        "claude-code": "common MCP"
+      },
+      "limitations": [
+        "Authenticated HTTP uses managed server-side cookies and refuses cross-origin redirects or anonymous fallback.",
+        "Authenticated interactive browser routes are not qualified by the HTTP fixture.",
+        "Conversational recipes are validated on the local fixture chat UI; a real service needs its own recipe run and its owner's authorization (web_services table of the Router).",
+        "NordVPN exits use the Walter Secrets grant `nordvpn`; Chromium refuses third-party exits; a NordVPN session never receives owner cookies."
+      ],
+      "services": [
+        "camoufox-max",
+        "cloakbrowser-max",
+        "walter-browse-display",
+        "walter-exit-mac",
+        "walter-exit-default"
+      ],
+      "optional": [
+        "secrets",
+        "llm"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "browse",
+        "kind": "capability",
+        "purpose": "Rechercher, extraire et gérer les parcours web avec un moteur commun.",
+        "target_root": "/walter/capabilities/browse",
+        "config_paths": [
+          "/user/Lucas/bootstrap/browse-search.env"
+        ],
+        "permissions": [
+          "sessions de navigateur gérées",
+          "cookies et valeurs de coffre hors résultats"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "walter_browse/browser_session",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "browse-sessions",
+            "role": "owner",
+            "owner": "browse",
+            "durability": "ephemeral"
+          },
+          {
+            "id": "browse-route-profiles",
+            "role": "owner",
+            "owner": "browse",
+            "durability": "configuration"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "public-extraction",
+            "assertion": "Une extraction publique passe par le noyau partagé sans processus agent Hermes.",
+            "scope": "live"
+          },
+          {
+            "id": "managed-auth",
+            "assertion": "Une session gérée permet un parcours autorisé sans divulguer ses identifiants.",
+            "scope": "live"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Browse",
+        "order": 50,
+        "summary": "/walter/capabilities/browse/manifest/SUMMARY.md",
+        "manifest": "/walter/capabilities/browse/manifest/MANIFEST.md",
+        "guide": "/walter/capabilities/browse/manifest/GUIDE.md",
+        "tools": [
+          "walter_browse",
+          "browser_session",
+          "browser_sites"
+        ],
+        "capabilities": {
+          "walter_browse": {
+            "effects": [
+              "external_state"
+            ],
+            "concurrency": {
+              "resource": "browser-session",
+              "key": "session_id"
+            },
+            "consumes": [
+              "browser_session"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "browser_session": {
+            "effects": [
+              "external_state"
+            ],
+            "concurrency": {
+              "resource": "browser-session",
+              "key": "session",
+              "key_default": "{site}-me"
+            },
+            "produces": [
+              "browser_session"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "session": {
+                  "type": "string"
+                },
+                "authenticated": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "browser_sites": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      },
+      "components": [
+        {
+          "id": "library",
+          "path": "/walter/capabilities/browse/walter_browse",
+          "role": "Web search and page reading (the walter_browse facade)",
+          "status": "active",
+          "readme": "/walter/capabilities/browse/README.md",
+          "vision_target": "capabilities/browse"
+        },
+        {
+          "id": "engine",
+          "path": "/walter/capabilities/browse/engine",
+          "role": "Browser engines: Camoufox and CloakBrowser Chromium",
+          "status": "active",
+          "readme": "/walter/capabilities/browse/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:9377"
+            },
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:9378"
+            }
+          ],
+          "vision_target": "capabilities/browse/engine"
+        },
+        {
+          "id": "network",
+          "path": "/walter/capabilities/browse/network",
+          "role": "Network exits (the owner's machine, the France exit, default exit, NordVPN per country on demand)",
+          "status": "active",
+          "readme": "/walter/capabilities/browse/README.md",
+          "vision_target": "capabilities/browse/network"
+        },
+        {
+          "id": "runtime",
+          "path": "/walter/capabilities/browse/runtime",
+          "role": "Execution paths and extractors",
+          "status": "active",
+          "readme": "/walter/capabilities/browse/runtime/README.md",
+          "vision_target": "capabilities/browse/runtime"
+        }
+      ]
+    },
+    {
+      "id": "bus",
+      "root": "/walter/cognition/memory",
+      "anchors": [
+        "/walter/cognition/memory/contracts/bus.json",
+        "/walter/cognition/memory/walter_memory/bus.py"
+      ],
+      "requires": [
+        "memory"
+      ],
+      "external": [],
+      "data": [
+        "bus.*"
+      ],
+      "core_paths": [
+        "/walter/cognition/memory/walter_memory/bus.py"
+      ],
+      "backup_paths": [
+        "/walter/cognition/memory"
+      ],
+      "interfaces": [
+        "Python emit/Consumer",
+        "Postgres LISTEN/NOTIFY"
+      ],
+      "bindings": {
+        "hermes": "lifecycle adapter",
+        "dsh": "lifecycle adapter",
+        "codex": "lifecycle adapter",
+        "claude-code": "lifecycle adapter"
+      },
+      "limitations": [
+        "Livraison sans trou : un consommateur ne lit que les transactions terminées (tx < xmin) ; une transaction ouverte longtemps retarde la livraison sans la perdre (bus.lag held)."
+      ],
+      "services": [],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.1.0",
+        "owner": "bus",
+        "kind": "foundation",
+        "purpose": "Livrer les événements entre modules et conserver les curseurs de traitement.",
+        "target_root": "/walter/cognition/memory",
+        "config_paths": [],
+        "permissions": [
+          "droits PostgreSQL du consommateur"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "event",
+            "interface": "walter_memory.bus.emit/Consumer",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "postgres:bus",
+            "role": "owner",
+            "owner": "bus",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "catch-up",
+            "assertion": "Un consommateur arrêté reprend depuis son curseur sans perdre les événements persistés.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "components": [
+        {
+          "id": "bus",
+          "path": "/walter/cognition/memory/walter_memory/bus.py",
+          "role": "Walter bus: schema bus, LISTEN/NOTIFY, per-consumer cursors, dead letters",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "data": [
+            "postgres:bus"
+          ],
+          "vision_target": "core/bus"
+        }
+      ],
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter bus",
+        "order": 25,
+        "summary": "/walter/cognition/memory/manifest/bus/SUMMARY.md",
+        "manifest": "/walter/cognition/memory/manifest/bus/MANIFEST.md",
+        "tools": []
+      }
+    },
+    {
+      "id": "colab",
+      "root": "/walter/capabilities/colab",
+      "anchors": [
+        "/walter/capabilities/colab/RUNBOOK.md",
+        "/walter/capabilities/colab/contracts/colab.json",
+        "/walter/capabilities/colab/on_demand.py"
+      ],
+      "requires": [],
+      "external": [
+        "official Colab MCP",
+        "browser authentication",
+        "Google Drive"
+      ],
+      "data": [
+        "immutable prepared artifacts and result evidence"
+      ],
+      "core_paths": [],
+      "backup_paths": [
+        "/walter/capabilities/colab"
+      ],
+      "interfaces": [
+        "on_demand.py CLI"
+      ],
+      "bindings": {
+        "hermes": "local CLI via host execution permissions",
+        "dsh": "local CLI via host execution permissions",
+        "codex": "local CLI via host execution permissions",
+        "claude-code": "local CLI via host execution permissions"
+      },
+      "limitations": [
+        "GPU remains blocked until prepared artifact validation; modularity work does not remove this guard.",
+        "No remote compute is allocated by modularity checks."
+      ],
+      "services": [],
+      "optional": [
+        "raw-vault"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "colab",
+        "kind": "capability",
+        "purpose": "Préparer et exécuter des travaux de calcul distant qualifiés.",
+        "target_root": "/walter/capabilities/colab",
+        "config_paths": [],
+        "permissions": [
+          "validation de l’artefact avant allocation GPU",
+          "authentification Google existante"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "cli",
+            "interface": "on_demand.py",
+            "access": "execute",
+            "timeout_seconds": 1800,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "compute-artifacts",
+            "role": "owner",
+            "owner": "colab",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "compute-guard",
+            "assertion": "Une charge non qualifiée est refusée avant toute allocation de calcul.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "components": [
+        {
+          "id": "bridge",
+          "path": "/walter/capabilities/colab/bridge.py",
+          "role": "Colab bridge: remote compute on demand",
+          "status": "active",
+          "readme": "/walter/capabilities/colab/RUNBOOK.md",
+          "vision_target": "capabilities/colab"
+        },
+        {
+          "id": "mcp",
+          "path": "/walter/capabilities/colab/mcp",
+          "role": "Colab MCP server",
+          "status": "active",
+          "readme": "/walter/capabilities/colab/mcp/README.md",
+          "vision_target": "capabilities/colab"
+        }
+      ],
+      "presentation": {
+        "audience": "agent",
+        "title": "Colab",
+        "order": 65,
+        "summary": "/walter/capabilities/colab/manifest/SUMMARY.md",
+        "manifest": "/walter/capabilities/colab/manifest/MANIFEST.md",
+        "tools": []
+      }
+    },
+    {
+      "id": "computer",
+      "root": "/walter/capabilities/computer",
+      "anchors": [
+        "/walter/capabilities/computer/contracts/computer.json",
+        "/walter/capabilities/computer/walter_computer/__init__.py"
+      ],
+      "requires": [],
+      "external": [
+        "device-node driver",
+        "Mac over SSH/Tailscale",
+        "optional walter-llm vision"
+      ],
+      "data": [
+        "isolated ephemeral operator sessions"
+      ],
+      "core_paths": [
+        "/walter/capabilities/computer/walter_computer/operator.py",
+        "/walter/capabilities/computer/walter_computer/policy.py",
+        "/walter/capabilities/computer/walter_computer/config.py",
+        "/walter/capabilities/computer/walter_computer/driver.py",
+        "/walter/capabilities/computer/walter_computer/transport.py",
+        "/walter/capabilities/computer/walter_computer/types.py",
+        "/walter/capabilities/computer/walter_computer/runtime.py",
+        "/walter/capabilities/computer/walter_computer/observer.py"
+      ],
+      "backup_paths": [
+        "/walter/capabilities/computer",
+        "/root/.config/walter-device-node",
+        "/etc/tmpfiles.d/walter-computer.conf",
+        "/user/Lucas/config/computer"
+      ],
+      "interfaces": [
+        "OperatorSessions",
+        "MCP computer_use",
+        "Hermes plugin"
+      ],
+      "bindings": {
+        "hermes": "plugin integration verified separately",
+        "dsh": "direct MCP",
+        "codex": "direct MCP",
+        "claude-code": "direct MCP"
+      },
+      "limitations": [
+        "No desktop input in health checks.",
+        "Read, pixels, vision and input require explicit grants.",
+        "Cloud vision additionally requires host-only authorization for one exact window; default denied.",
+        "Workflow reservations are cross-process leases with bounded expiry; live Mac qualification tracked separately."
+      ],
+      "services": [],
+      "optional": [
+        "llm"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "computer",
+        "kind": "capability",
+        "purpose": "Observer et manipuler un appareil avec des permissions et cibles explicites.",
+        "target_root": "/walter/capabilities/computer",
+        "config_paths": [
+          "/root/.config/walter-device-node",
+          "/walter/capabilities/computer/config/config.json",
+          "/user/Lucas/config/computer/config.json"
+        ],
+        "permissions": [
+          "read/input/foreground/pixels/vision accordés par le host",
+          "autorisation de la tâche sur appareil"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "computer_use",
+            "access": "execute",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "operator-sessions",
+            "role": "owner",
+            "owner": "computer",
+            "durability": "ephemeral"
+          },
+          {
+            "id": "device-policy",
+            "role": "owner",
+            "owner": "computer",
+            "durability": "configuration"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "device-task",
+            "assertion": "Une tâche synthétique sur le Mac réussit sans accéder aux applications personnelles.",
+            "scope": "live"
+          },
+          {
+            "id": "device-concurrency",
+            "assertion": "Les cibles périmées et les accès concurrents non autorisés sont refusés.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Computer",
+        "order": 60,
+        "summary": "/walter/capabilities/computer/manifest/SUMMARY.md",
+        "manifest": "/walter/capabilities/computer/manifest/MANIFEST.md",
+        "guide": "/walter/capabilities/computer/manifest/GUIDE.md",
+        "tools": [
+          "computer_use"
+        ],
+        "capabilities": {
+          "computer_use": {
+            "effects": [
+              "external_state"
+            ],
+            "concurrency": {
+              "resource": "computer-device"
+            },
+            "consumes": [
+              "device_session"
+            ],
+            "produces": [
+              "device_session",
+              "file"
+            ],
+            "idempotency": "none",
+            "errors": [
+              "invalid_request",
+              "permission_denied",
+              "dependency_unavailable",
+              "outcome_unknown"
+            ]
+          }
+        }
+      },
+      "components": [
+        {
+          "id": "library",
+          "path": "/walter/capabilities/computer/walter_computer",
+          "role": "Device control (Mac desktop) through atomic actions",
+          "status": "active",
+          "readme": "/walter/capabilities/computer/README.md",
+          "vision_target": "capabilities/computer"
+        }
+      ]
+    },
+    {
+      "id": "context",
+      "root": "/walter/cognition/context",
+      "decisions": "/walter/cognition/context/manifest/decisions.json",
+      "anchors": [
+        "/walter/cognition/context/contracts/context.json",
+        "/walter/cognition/context/ports/dsh/index.mjs",
+        "/walter/cognition/context/walter_context/compress/session.py"
+      ],
+      "requires": [],
+      "external": [
+        "Python 3.11+ standard library for local compression; optional public clients are loaded only by their consuming operation",
+        "Host compaction/context APIs; DSH retains its own raw journal"
+      ],
+      "data": [
+        "per-session projection epochs and caches (ephemeral)",
+        "preflight plans/pack observations and published module notes in instance state; canonical sources stay owned by Memory/Logs/Skills"
+      ],
+      "core_paths": [
+        "/walter/cognition/context/walter_context"
+      ],
+      "backup_paths": [
+        "/walter/cognition/context"
+      ],
+      "interfaces": [
+        "Python Session (walter_context.compress)",
+        "DSH CompactionEngine adapter",
+        "CLI walter-context",
+        "CLI walter-context capability router (versioned stable note)",
+        "Python walter_context.capabilities.TurnNotes",
+        "JSON bridge op=capability for trusted module notes",
+        "CLI walter-context capability all [--write] (Modules W.Alter layer from walter present notes)",
+        "HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it)",
+        "Python walter_context.retrieval.gather and walter_context.assembly.pack",
+        "Python walter_context.child.build; CLI walter-context-child (ChildContextSpec v1 JSON)",
+        "POST /preflight?inject=1 -> plan/text/pack/degraded/error (degraded = decision failed, prudent L3 plan, SOCLE A2; pack.cuts = blocks cut to the level budget); POST /preflight?shadow=1 -> private instance record without injection",
+        "CLI walter-context-entrance (Claude Code PostToolUse event on stdin; --report) — large tool outputs on their way in, shadow",
+        "In-process walter.context.window: globalThis[Symbol.for('walter.context.window')](agent, {plan}, signal) published by the DSH port -> window decision report {applied, reason, warm, turns, tokens, measured_tokens} (SOCLE A1; the kernel isolates its compaction service, the engine's intake plugin calls this entry at each owner turn)"
+      ],
+      "bindings": {
+        "walter": "Walter Engine natif (walter-engine, 17/11/2026): per-message context in the engine's intake (core/engine/walter_engine/engine.py _intake) calling POST /preflight?inject=1 with the run, the previous exchange and the session key; window decided per turn through the walter-context bridge (op `window`, applied as a `compaction/window` journal event, originals kept); the legacy Memory block only when the preflight fails or times out, said to the model and on the bus (context.degraded)",
+        "dsh": "ROLLBACK ONLY since 2026-11-17 (dsh-web stopped, DSH uninstalled and archived on 2026-11-18). Walter Engine (dsh-web): public checkpoint adapter selected by composition; per-message context through the engine's native intake plugin (core/engine/plugins/intake, mode native, inject pack by default) calling POST /preflight?inject=1; the legacy Memory block only when the preflight fails or times out (verified 2026-11-11 in /opt/dsh/home/cordis.patch.yml)",
+        "codex": "Native compaction; additive module notes and hook preflight",
+        "claude-code": "Native compaction; additive module notes and hook preflight; entrance reduction of large tool outputs in SHADOW (hook PostToolUse, records numbers only)",
+        "router": "Text sub-agents request ChildContextSpec v1 through walter-context-child; caller-only mode remains available"
+      },
+      "limitations": [
+        "DSH uses public compaction transactions; checkpoints retain all visible user and assistant dialogue or refuse.",
+        "Structural and known-answer tests do not certify semantic model quality.",
+        "Capability-note preparation does not activate the lot-4 composer or inject into an unconnected host.",
+        "Memory, Skills, Core, Router, Logs and Soul are optional at module startup; their dependent operations degrade or fail when unavailable.",
+        "retrieval, assembly, preflight and child are implemented; their availability is separate from activation and semantic quality.",
+        "Source failures omit only the affected retrieval/child block and leave a note; absence of a block does not prove absence of matching knowledge.",
+        "Preflight can write plan metadata through the Memory runs CLI; it does not own canonical memory, notebooks or procedures.",
+        "Local compression has no general semantic quality proof; recoverability depends on source availability and privacy.",
+        "Entrance runs in shadow only: walter_logs records the text the model saw, so replacing an output needs the hook to journal the original first; [entrance].mode=on is refused until then."
+      ],
+      "services": [
+        "walter-context-preflight"
+      ],
+      "service_code": {
+        "dsh-web": {
+          "code_roots": [
+            "/walter/cognition/context/ports/dsh"
+          ]
+        }
+      },
+      "optional": [
+        "core",
+        "logs",
+        "memory",
+        "router",
+        "skills",
+        "soul"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.3.0",
+        "owner": "context",
+        "kind": "capability",
+        "purpose": "Préparer et ordonner le contexte par message et par sous-agent, et compresser l’historique selon le contrat du harness ; les données canoniques restent dans leurs modules propriétaires.",
+        "target_root": "/walter/cognition/context",
+        "config_paths": [
+          "/walter/cognition/context/config/walter-context.toml"
+        ],
+        "permissions": [
+          "limites du modèle et du harness",
+          "confidentialité des originaux récupérés"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "library",
+            "interface": "Session / ContextEngine / CompactionEngine",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "capability-note",
+            "transport": "library",
+            "interface": "router note preparation and TurnNotes",
+            "access": "read",
+            "timeout_seconds": 10,
+            "timeout_status": "implemented"
+          },
+          {
+            "id": "preflight",
+            "transport": "http",
+            "interface": "POST /preflight[?shadow=1|?inject=1]",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "child",
+            "transport": "cli",
+            "interface": "walter-context-child, ChildContextSpec v1",
+            "access": "read",
+            "timeout_seconds": 45,
+            "timeout_status": "target"
+          },
+          {
+            "id": "publish-module-notes",
+            "transport": "cli",
+            "interface": "walter-context capability all --write",
+            "access": "write",
+            "timeout_seconds": 150,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "context-session-state",
+            "role": "owner",
+            "owner": "context",
+            "durability": "ephemeral"
+          },
+          {
+            "id": "postgres:walter_logs",
+            "role": "consumer",
+            "owner": "logs",
+            "durability": "canonical"
+          },
+          {
+            "id": "postgres:core",
+            "role": "consumer",
+            "owner": "memory",
+            "durability": "canonical"
+          },
+          {
+            "id": "skills-git-store",
+            "role": "consumer",
+            "owner": "skills",
+            "durability": "canonical"
+          },
+          {
+            "id": "context-preflight-observations",
+            "role": "owner",
+            "owner": "context",
+            "durability": "projection"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "context-retention",
+            "assertion": "Les contraintes, instructions, références et budgets survivent aux checkpoints répétés ou l’opération est refusée.",
+            "scope": "integration"
+          },
+          {
+            "id": "semantic-quality",
+            "assertion": "Un corpus fixé à l’avance respecte les seuils de qualité, coût et rétention visible.",
+            "scope": "live"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "components": [
+        {
+          "id": "preflight",
+          "path": "/walter/cognition/context/walter_context/preflight",
+          "role": "One decision per owner message: the ContextPlan (intent, level, capabilities, fast path)",
+          "status": "active",
+          "readme": "/walter/cognition/context/README.md",
+          "contracts": [
+            "/walter/cognition/context/contracts/schemas/context-plan.v4.json",
+            "/walter/cognition/context/contracts/schemas/context-plan.v3.json",
+            "/walter/cognition/context/contracts/schemas/context-plan.v2.json"
+          ],
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:8897/preflight"
+            }
+          ],
+          "vision_target": "cognition/context/preflight"
+        },
+        {
+          "id": "assembly",
+          "path": "/walter/cognition/context/walter_context/assembly.py",
+          "role": "Context assembly according to the plan (the turn's pack)",
+          "status": "active",
+          "readme": "/walter/cognition/context/README.md",
+          "vision_target": "cognition/context"
+        },
+        {
+          "id": "child",
+          "path": "/walter/cognition/context/walter_context/child.py",
+          "role": "ChildContextSpec: the starting brief of a sub-agent",
+          "status": "active",
+          "readme": "/walter/cognition/context/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-context-child"
+            }
+          ],
+          "vision_target": "cognition/context"
+        },
+        {
+          "id": "compress",
+          "path": "/walter/cognition/context/walter_context/compress",
+          "role": "Compaction engine (projection head → record → compact → live)",
+          "status": "active",
+          "readme": "/walter/cognition/context/README.md",
+          "vision_target": "cognition/context/compress"
+        },
+        {
+          "id": "recover",
+          "path": "/walter/cognition/context/walter_context/recover.py",
+          "role": "Retrieve the original of a compacted output (walter_logs)",
+          "status": "active",
+          "readme": "/walter/cognition/context/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-context recover"
+            }
+          ],
+          "vision_target": "cognition/context"
+        },
+        {
+          "id": "dsh-port",
+          "path": "/walter/cognition/context/ports/dsh",
+          "role": "Rollback only since 2026-11-18 (DSH uninstalled): the former DSH port (owner-turn window, checkpoint under pressure, context_recover)",
+          "status": "obsolete",
+          "readme": "/walter/cognition/context/README.md",
+          "vision_target": "core/engine/plugins",
+          "interfaces": [
+            {
+              "transport": "library",
+              "interface": "walter.context.window"
+            }
+          ]
+        },
+        {
+          "id": "bench",
+          "path": "/walter/cognition/context/bench",
+          "role": "Benches (levels, replay, quality, acceptance)",
+          "status": "active",
+          "readme": "/walter/cognition/context/README.md",
+          "vision_target": "cognition/context/bench"
+        },
+        {
+          "id": "session-state",
+          "path": "/walter/cognition/context/contracts/schemas/session-state.v1.json",
+          "role": "Working state per thread (SessionState v1)",
+          "status": "active",
+          "readme": "/walter/cognition/context/README.md",
+          "vision_target": "cognition/context/contracts"
+        }
+      ],
+      "presentation": {
+        "audience": "agent",
+        "title": "walter-context",
+        "order": 15,
+        "summary": "/walter/cognition/context/manifest/SUMMARY.md",
+        "manifest": "/walter/cognition/context/manifest/MANIFEST.md",
+        "tools": []
+      }
+    },
+    {
+      "id": "core",
+      "root": "/walter/core",
+      "anchors": [
+        "/walter/core/contracts/core.json",
+        "/walter/core/hooks/walter_hook.py",
+        "/walter/core/server.py",
+        "/walter/core/modules/catalog.json",
+        "/walter/core/modules/registry.json",
+        "/walter/core/systemd/walter-standby.service",
+        "/walter/core/systemd/walter-standby.timer",
+        "/walter/core/config/standby.toml",
+        "/walter/core/walter_beeper.py",
+        "/walter/core/interfaces/beeper/README.md"
+      ],
+      "requires": [],
+      "external": [
+        "Official Beeper Server stable ARM64, loopback API :23374, systemd beeper-server"
+      ],
+      "data": [],
+      "core_paths": [
+        "/walter/core/walter_platform",
+        "/walter/core/walter_beeper.py"
+      ],
+      "backup_paths": [
+        "/walter/core",
+        "/root/.codex/config.toml",
+        "/root/.claude.json",
+        "/root/.claude/settings.json",
+        "/usr/local/bin/walter",
+        "/user/Lucas/instance.toml",
+        "/user/Lucas/config",
+        "/user/Lucas/accounts",
+        "/user/Lucas/bootstrap"
+      ],
+      "interfaces": [
+        "MCP stdio",
+        "walter CLI",
+        "CLI contracts, matrix, doctor",
+        "Declarative harness compositions",
+        "Offline source release and staged installation",
+        "walter standby",
+        "walter matrix: qualified evidence requires matching source/scenario/version/configuration attestation (bench protocol 2)",
+        "walter-guardians: strict Incident v1 validation, explicit check failures and bounded notification retry/backoff",
+        "Python walter_beeper.BeeperClient: native Beeper REST/WS; named Secrets grants",
+        "MCP beeper_read; beeper_send_message only through local Walter Engine with policy enforce"
+      ],
+      "bindings": {
+        "hermes": "native adapters + lifecycle hook (no duplicate MCP attachment)",
+        "dsh": "ROLLBACK ONLY since 2026-11-18 (DSH uninstalled, archived): MCP + lifecycle adapter",
+        "codex": "MCP + lifecycle adapter",
+        "claude-code": "MCP + lifecycle adapter"
+      },
+      "limitations": [
+        "MCP client must reconnect to discover newly installed tools.",
+        "CLI attachment installs common MCP; context/model/lifecycle bindings are checked independently."
+      ],
+      "services": [
+        "walter-standby.timer",
+        "walter-telegram.service",
+        "walter-engine.service",
+        "beeper-server.service"
+      ],
+      "service_code": {
+        "walter-engine": {
+          "code_roots": [
+            "/walter/core/engine/walter_engine",
+            "/walter/core/engine/plugins/python/runtime"
+          ],
+          "code_files": [
+            "/walter/core/security/policy.json",
+            "/walter/core/config/engine.toml"
+          ]
+        },
+        "dsh-web": {
+          "code_roots": [
+            "/walter/core/engine/plugins",
+            "/walter/core/interfaces/api",
+            "/walter/core/interfaces/web"
+          ],
+          "code_files": [
+            "/opt/dsh/home/cordis.patch.yml",
+            "/opt/dsh/home/walter-hooks.json",
+            "/opt/dsh/home/profiles/web/cordis.patch.yml",
+            "/walter/core/security/policy.json",
+            "/walter/core/walter_beeper.py",
+            "/walter/core/walter_capabilities.py"
+          ]
+        }
+      },
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.1.0",
+        "owner": "core",
+        "kind": "foundation",
+        "purpose": "Exposer les capacités et installer les raccordements des harnesses.",
+        "target_root": "/walter/core",
+        "config_paths": [
+          "/walter/core/modules/computer-policy.json",
+          "/walter/core/config/beeper.toml"
+        ],
+        "permissions": [
+          "configurations clients",
+          "permissions du harness"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "walter_modules",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "install",
+            "transport": "cli",
+            "interface": "walter harness install",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "beeper-read",
+            "transport": "mcp",
+            "interface": "beeper_read",
+            "access": "read",
+            "timeout_seconds": 300,
+            "timeout_status": "implemented"
+          },
+          {
+            "id": "beeper-send",
+            "transport": "mcp",
+            "interface": "beeper_send_message (Engine policy/disclosure)",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "implemented"
+          }
+        ],
+        "resources": [
+          {
+            "id": "harness-bindings",
+            "role": "owner",
+            "owner": "core",
+            "durability": "configuration"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "read-only-discovery",
+            "assertion": "Un module optionnel absent ne désactive pas les capacités restantes.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "walter-core",
+        "order": 95,
+        "summary": "/walter/core/manifest/SUMMARY.md",
+        "manifest": "/walter/core/manifest/MANIFEST.md",
+        "guide": "/walter/core/manifest/GUIDE.md",
+        "tools": [
+          "walter_health",
+          "module_guide",
+          "module_index",
+          "walter_modules",
+          "beeper_read",
+          "beeper_send_message"
+        ],
+        "capabilities": {
+          "walter_health": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "module_guide": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "module_index": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "module": {
+                  "type": "string"
+                },
+                "section": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array"
+                },
+                "next_offset": {
+                  "type": "integer"
+                },
+                "cursor": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "walter_modules": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "modules": {
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "beeper_read": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "thread"
+            ],
+            "produces": [
+              "thread"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "items": {
+                  "type": "array"
+                },
+                "cursor": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "beeper_send_message": {
+            "effects": [
+              "outgoing"
+            ],
+            "concurrency": {
+              "resource": "beeper-chat",
+              "key": "chat_id"
+            },
+            "consumes": [
+              "thread"
+            ],
+            "idempotency": "none",
+            "errors": [
+              "invalid_request",
+              "permission_denied",
+              "dependency_unavailable",
+              "outcome_unknown"
+            ]
+          }
+        }
+      },
+      "components": [
+        {
+          "id": "engine",
+          "path": "/walter/core/engine",
+          "role": "Walter Engine, W.Alter's single agent runtime: native walter_engine (walter-engine.service since 2026-11-17: loop, sessions, tools, Python kernel, sub-agents, tasks, Engine API); the former DSH/Cordis kernel is uninstalled (rollback archive only)",
+          "status": "implemented",
+          "readme": "/walter/core/engine/README.md",
+          "vision_target": "core/engine"
+        },
+        {
+          "id": "engine-contracts",
+          "path": "/walter/core/engine/contracts",
+          "role": "Engine API, intake, delegation, policy, events and strategy schemas (tested drafts)",
+          "status": "implemented",
+          "readme": "/walter/core/engine/README.md",
+          "contracts": [
+            "/walter/core/engine/contracts/engine-api.v1.json"
+          ],
+          "vision_target": "core/engine/contracts"
+        },
+        {
+          "id": "engine-kernel",
+          "path": "/walter/core/engine/kernel",
+          "role": "Freeze of the DSH/Cordis kernel (lot E1); DSH uninstalled on 2026-11-18: rollback kit only, `walter engine kernel` says installed=false",
+          "status": "obsolete",
+          "readme": "/walter/core/engine/kernel/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter engine kernel"
+            }
+          ],
+          "vision_target": "core/engine/kernel"
+        },
+        {
+          "id": "engine-compositions",
+          "path": "/walter/core/engine/compositions",
+          "role": "Rollback only since 2026-11-18 (DSH uninstalled): source of the former DSH web profile face",
+          "status": "obsolete",
+          "readme": "/walter/core/engine/compositions/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter harness install dsh"
+            }
+          ],
+          "vision_target": "core/engine/compositions"
+        },
+        {
+          "id": "engine-plugins",
+          "path": "/walter/core/engine/plugins",
+          "role": "Rollback only since 2026-11-18 (DSH uninstalled): DSH Node plugins (intake, events, policy, budget); only engine/plugins/python/runtime still serves the native engine (component engine-python)",
+          "status": "obsolete",
+          "readme": "/walter/core/engine/plugins/README.md",
+          "contracts": [
+            "/walter/core/engine/contracts/engine-event.v1.json",
+            "/walter/core/engine/contracts/policy-decision.v1.json",
+            "/walter/core/engine/contracts/turn-intake.v1.json"
+          ],
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter harness install dsh"
+            }
+          ],
+          "vision_target": "core/engine/plugins"
+        },
+        {
+          "id": "engine-python",
+          "path": "/walter/core/engine/plugins/python",
+          "role": "The engine's python tool: a persistent Python kernel per conversation in an unprivileged systemd bubble (only its folder writable, local network refused); W.Alter tools from Python under the policy, background tasks, sub-agents",
+          "status": "implemented",
+          "readme": "/walter/core/engine/plugins/python/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter harness install dsh"
+            }
+          ],
+          "vision_target": "core/engine/plugins"
+        },
+        {
+          "id": "security",
+          "path": "/walter/core/security",
+          "role": "W.Alter's single execution policy (lot E3): policy.json (never-list, tool classes, presets per door, child ≤ parent), applied by the engine and by the MCP server's guard for every client",
+          "status": "implemented",
+          "readme": "/walter/core/security/README.md",
+          "contracts": [
+            "/walter/core/engine/contracts/policy-decision.v1.json"
+          ],
+          "interfaces": [
+            {
+              "transport": "library",
+              "interface": "walter_security.decide / security/policy.mjs decide"
+            }
+          ],
+          "vision_target": "core/security"
+        },
+        {
+          "id": "engine-api",
+          "path": "/walter/core/interfaces/api",
+          "role": "Rollback only since 2026-11-18 (DSH uninstalled): the former Node implementation of the Engine API; the native engine serves the same contract (engine/walter_engine/api.py)",
+          "status": "obsolete",
+          "readme": "/walter/core/interfaces/api/README.md",
+          "contracts": [
+            "/walter/core/engine/contracts/engine-api.v1.json"
+          ],
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:8895/v1"
+            }
+          ],
+          "vision_target": "core/interfaces/api"
+        },
+        {
+          "id": "interface-telegram",
+          "path": "/walter/core/interfaces/telegram",
+          "role": "Telegram door of the engine (lot E7): W.Alter's own bot, an Engine API client only — persistent conversations, idempotent messages, live progress, /stop, /nouveau, /etat, owner only; service walter-telegram",
+          "status": "active",
+          "readme": "/walter/core/interfaces/telegram/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "Telegram Bot API, long polling (bot du grant de @instance/config/core/telegram.toml)"
+            },
+            {
+              "transport": "cli",
+              "interface": "walter-python core/interfaces/telegram/bot.py --check"
+            }
+          ],
+          "vision_target": "core/interfaces/telegram"
+        },
+        {
+          "id": "mcp-server",
+          "path": "/walter/core/server.py",
+          "role": "The walter MCP server: exposes W.Alter's capabilities to agents (Walter Engine, Claude Code, Codex)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "interfaces": [
+            {
+              "transport": "mcp",
+              "interface": "walter"
+            }
+          ],
+          "vision_target": "core/interfaces/mcp"
+        },
+        {
+          "id": "capabilities-adapter",
+          "path": "/walter/core/walter_capabilities.py",
+          "role": "Adapter from MCP tools to the modules' declared commands",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/interfaces/mcp"
+        },
+        {
+          "id": "mcp-toolsets",
+          "path": "/walter/core/config/toolsets.toml",
+          "role": "MCP toolsets per client (WALTER_CLIENT_TAG); tools not listed stay reachable through walter_call",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/interfaces/mcp"
+        },
+        {
+          "id": "runtime-hook",
+          "path": "/walter/core/hooks/walter_hook.py",
+          "role": "Runtime lifecycle adapter for external agents (preflight, context, runs, bus), called at each message",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter_hook.py"
+            }
+          ],
+          "vision_target": "core/interfaces/hooks"
+        },
+        {
+          "id": "dsh-hooks",
+          "path": "/walter/core/hooks/dsh",
+          "role": "Rollback only since 2026-11-18 (DSH uninstalled): the DSH owner-turn plugin",
+          "status": "obsolete",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/engine/plugins"
+        },
+        {
+          "id": "platform",
+          "path": "/walter/core/walter_platform",
+          "role": "Registry, contracts, paths, instances, harness connections, checks (the walter CLI), and module presentation (module_guide)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter"
+            }
+          ],
+          "vision_target": "core/contracts"
+        },
+        {
+          "id": "module-catalog",
+          "path": "/walter/core/modules/catalog.json",
+          "role": "Single table of modules: current location, former location, vision target",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/contracts"
+        },
+        {
+          "id": "module-registry",
+          "path": "/walter/core/modules/registry.json",
+          "role": "Registry compiled from the contracts (generated, never edited by hand)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/contracts"
+        },
+        {
+          "id": "computer-policy",
+          "path": "/walter/core/modules/computer-policy.json",
+          "role": "Computer Use scopes per interface",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/security"
+        },
+        {
+          "id": "compositions",
+          "path": "/walter/core/compositions",
+          "role": "Harness compositions generated by walter-core (managed sections)",
+          "status": "active",
+          "readme": "/walter/core/docs/HARNESS-COMPOSITION.md",
+          "vision_target": "core/engine/compositions"
+        },
+        {
+          "id": "dsh-web-ui",
+          "path": "/walter/core/ports/dsh-web-ui",
+          "role": "Rollback only since 2026-11-18 (DSH uninstalled): the former DSH web interface customisation",
+          "status": "obsolete",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/interfaces/web"
+        },
+        {
+          "id": "web-panels",
+          "path": "/walter/core/interfaces/web/panels",
+          "role": "Web interface panels: pages of other W.Alter modules (development board…) relayed read-only behind the interface's sign-in",
+          "status": "active",
+          "readme": "/walter/core/interfaces/web/panels/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "dsh-web <path>/… (GET/HEAD) → upstream du panneau"
+            },
+            {
+              "transport": "http",
+              "interface": "Worker Cloudflare walter-web-edge (interfaces/web/edge) devant l'adresse publique : recharge same-origin d'une navigation venue d'un autre site refusée 401"
+            }
+          ],
+          "vision_target": "core/interfaces/web"
+        },
+        {
+          "id": "tool-gateway",
+          "path": "/walter/core/bin/walter-tools",
+          "role": "Tool gateway of walter_run (one process per run)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-tools serve"
+            }
+          ]
+        },
+        {
+          "id": "guardians",
+          "path": "/walter/core/bin/walter-guardians",
+          "role": "Launcher of the module guardians (diagnosis, repair, alert)",
+          "status": "active",
+          "readme": "/walter/core/GUARDIANS.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-guardians"
+            }
+          ],
+          "vision_target": "ops/guardians"
+        },
+        {
+          "id": "scenarios",
+          "path": "/walter/core/scenarios",
+          "role": "End-to-end scenarios (walter-scenario)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-scenario"
+            }
+          ],
+          "vision_target": "lab/scenarios"
+        },
+        {
+          "id": "browser-session",
+          "path": "/walter/core/browser_auth.py",
+          "role": "The owner's server-side browser session (MCP browser_session); belongs to Browse, misplaced here",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "interfaces": [
+            {
+              "transport": "mcp",
+              "interface": "browser_session"
+            }
+          ],
+          "vision_target": "capabilities/browse"
+        },
+        {
+          "id": "standby",
+          "path": "/walter/core/walter_platform/standby.py",
+          "role": "On-demand standby of services",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "ops"
+        },
+        {
+          "id": "deploy-check",
+          "path": "/walter/core/walter_platform/deploy.py",
+          "role": "Deployment freshness: each long-running service compares its start time with the code it loads; guarded repair by the core guardian (restart)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "contracts": [
+            "/walter/core/contracts/core.json"
+          ],
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter deploy status|check|restart"
+            }
+          ],
+          "vision_target": "ops"
+        },
+        {
+          "id": "beeper",
+          "path": "/walter/core/walter_beeper.py",
+          "role": "Native Beeper channel (REST/WebSocket); reads and sends go through Walter Engine's policy",
+          "status": "implemented",
+          "readme": "/walter/core/interfaces/beeper/README.md",
+          "vision_target": "core/interfaces/beeper",
+          "interfaces": [
+            {
+              "transport": "library",
+              "interface": "walter_beeper.BeeperClient"
+            },
+            {
+              "transport": "mcp",
+              "interface": "beeper_read / beeper_send_message (Engine only)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lab",
+      "root": "/walter/lab",
+      "anchors": [
+        "/walter/lab/contracts/lab.json",
+        "/walter/lab/walter_lab/core.py",
+        "/walter/lab/walter_lab/cli.py",
+        "/walter/lab/bin/walter-lab",
+        "/walter/lab/walter_lab/sandbox.py"
+      ],
+      "requires": [],
+      "external": [
+        "walter-scenario (core) as the shared bench",
+        "Docker daemon and reviewed locally available image (sandbox only)",
+        "Linux O_NOFOLLOW/dir_fd APIs (sandbox only)"
+      ],
+      "data": [
+        "experiment reports"
+      ],
+      "core_paths": [
+        "/walter/lab/walter_lab/core.py",
+        "/walter/lab/walter_lab/cli.py",
+        "/walter/lab/walter_lab/sandbox.py"
+      ],
+      "backup_paths": [
+        "/walter/lab",
+        "/user/Lucas/state/lab"
+      ],
+      "interfaces": [
+        "CLI walter-lab status|run|history|list",
+        "Experiment v1 (experiments/*.yaml)",
+        "CLI walter-lab sandbox run|probe",
+        "Python walter_lab.sandbox.run"
+      ],
+      "bindings": {
+        "hermes": "CLI under host execution permissions",
+        "dsh": "CLI under host execution permissions",
+        "codex": "CLI under host execution permissions",
+        "claude-code": "CLI under host execution permissions"
+      },
+      "limitations": [
+        "Paused until production (owner decision 2026-10-29): no experiment on Lab's own initiative; `run` needs the owner's explicit request (--requested-by owner --reason), recorded in the report. Mode in @instance/config/lab/lab.toml (module default: paused).",
+        "Scope: transverse R&D and global self-improvement only. Each module keeps its own research, refresh, learning and guardian (Router cycle, Skills curator, Browse recipes); none of them needs Lab.",
+        "The shared bench (walter-scenario, scenarios, qualifications read by `walter matrix`) is never paused; it still lives in core until its public interfaces exist (addendum 2026-10-29, F).",
+        "Scenario experiments inherit host permissions and environment; sandbox execution is a separate explicit interface.",
+        "Proposals only: nothing is ever applied by Lab.",
+        "No external-source scout or runtime-neutral runtime comparison yet.",
+        "Sandbox uses an unprivileged Docker container with no network; host copies reject links and special files and have byte/entry/depth limits.",
+        "Known credential names are excluded from input; arbitrary secret contents still require an approved sanitised source and image.",
+        "The writable bind has no disk quota during execution; unsuitable where a hard disk bound is required. Docker shares the host kernel.",
+        "Sandbox requires a reviewed image already present locally; no automatic image pull or network mode.",
+        "After backend changes run the real sandbox probe; mocked host-boundary tests do not qualify Docker isolation."
+      ],
+      "services": [],
+      "optional": [
+        "core"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "0.1.1",
+        "owner": "lab",
+        "kind": "capability",
+        "purpose": "Chercher, mesurer et proposer des améliorations de Walter, sans jamais les appliquer seul.",
+        "target_root": "/walter/lab",
+        "config_paths": [],
+        "permissions": [
+          "lancer des scénarios du banc",
+          "écrire ses rapports",
+          "lancer un conteneur Docker local sans réseau sur une copie approuvée",
+          "exporter uniquement des fichiers ordinaires validés vers un répertoire neuf"
+        ],
+        "invariants": [
+          "Une expérience a sa règle de décision écrite avant les essais.",
+          "Lab propose ; il n'applique rien.",
+          "Pas de code externe hors d'un bac à sable sans secrets.",
+          "Les copies hôte refusent les liens et fichiers spéciaux et ne changent jamais les permissions de la source.",
+          "Un résultat sandbox est validé et exporté uniquement après arrêt confirmé du conteneur."
+        ],
+        "errors": [
+          "invalid_request",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Une expérience interrompue garde les essais déjà mesurés dans son rapport."
+        ],
+        "operations": [
+          {
+            "id": "run",
+            "transport": "cli",
+            "interface": "walter-lab run",
+            "access": "execute",
+            "timeout_seconds": 7200,
+            "timeout_status": "target"
+          },
+          {
+            "id": "sandbox-run",
+            "transport": "cli",
+            "interface": "walter-lab sandbox run",
+            "access": "execute",
+            "timeout_seconds": 600,
+            "timeout_status": "implemented"
+          },
+          {
+            "id": "sandbox-probe",
+            "transport": "cli",
+            "interface": "walter-lab sandbox probe",
+            "access": "execute",
+            "timeout_seconds": 120,
+            "timeout_status": "implemented"
+          }
+        ],
+        "resources": [
+          {
+            "id": "experiment-reports",
+            "role": "owner",
+            "owner": "lab",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le format Experiment ; garder la lecture des anciens rapports."
+        ],
+        "recovery": {
+          "backup": [
+            "Module et rapports dans le paquet config offsite."
+          ],
+          "restore": [
+            "Réinstaller le module ; les rapports sont des fichiers."
+          ],
+          "verification": [
+            "walter-lab history <expérience>."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "rule-first",
+            "assertion": "La décision proposée découle de la règle écrite avant les essais.",
+            "scope": "unit"
+          },
+          {
+            "id": "host-copy-boundary",
+            "assertion": "Liens, hardlinks multiples et fichiers spéciaux sont refusés ; une course de remplacement ne lit pas hors de la source et un export ne fusionne jamais une destination existante.",
+            "scope": "unit"
+          },
+          {
+            "id": "protocol-preserved",
+            "assertion": "Checkpoints et rapport final gardent le même protocole sans écrire les valeurs d’environnement.",
+            "scope": "unit"
+          },
+          {
+            "id": "sandbox-isolation",
+            "assertion": "Le probe Docker réel vérifie UID, réseau, accès hôte et écritures racine ; timeout ou code non nul sont des échecs.",
+            "scope": "integration"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Lab",
+        "order": 90,
+        "summary": "/walter/lab/manifest/SUMMARY.md",
+        "manifest": "/walter/lab/manifest/MANIFEST.md",
+        "tools": []
+      },
+      "components": [
+        {
+          "id": "library",
+          "path": "/walter/lab/walter_lab",
+          "role": "Lab: benches, comparisons, proposals (never a deployment)",
+          "status": "active",
+          "readme": "/walter/lab/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-lab"
+            }
+          ],
+          "vision_target": "lab"
+        },
+        {
+          "id": "experiments",
+          "path": "/walter/lab/experiments",
+          "role": "Experiments and results",
+          "status": "active",
+          "readme": "/walter/lab/README.md",
+          "vision_target": "lab/experiments"
+        },
+        {
+          "id": "computer-use-v2",
+          "path": "/walter/lab/computer-use-v2",
+          "role": "Computer Use V2 study (Adaptive Universal Operator): architecture, observed prototype, bench; stopped",
+          "owner": "lab",
+          "status": "experimental",
+          "readme": "/walter/lab/computer-use-v2/README.md",
+          "vision_target": "lab/computer-use-v2"
+        }
+      ]
+    },
+    {
+      "id": "llm",
+      "root": "/walter/cognition/router/llm",
+      "anchors": [
+        "/walter/cognition/router/llm/contracts/llm.json",
+        "/walter/cognition/router/llm/gateway.py"
+      ],
+      "requires": [
+        "router",
+        "secrets"
+      ],
+      "external": [
+        "Optional native Claude Code client, path provisioned by instance"
+      ],
+      "data": [
+        "local consumer tokens",
+        "provider routing configuration"
+      ],
+      "core_paths": [],
+      "backup_paths": [
+        "/walter/cognition/router/llm",
+        "/user/Lucas/config/llm",
+        "/user/Lucas/state/llm",
+        "/user/Lucas/bootstrap/walter-llm"
+      ],
+      "interfaces": [
+        "OpenAI-compatible :8894",
+        "POST /v1/decisions {state, questions, samples?, model?|models?, paid_floor_usd?} on the Router's decision chain; POST /v1/rerank {query, documents, top_n?, model?} on the rerank poste; GET /v1/balance (SOCLE A6)",
+        "CLI walter-llm call: one exact model/provider, JSON stdin/stdout, no implicit retry or fallback"
+      ],
+      "bindings": {
+        "dsh": "configured provider",
+        "hermes": "auxiliary/module calls; main provider host-owned",
+        "codex": "specialist module calls; primary native",
+        "claude-code": "specialist module calls; primary native"
+      },
+      "limitations": [
+        "Identified HTTP runs require Memory metadata; unresolved, local_only and redacted_cloud contexts are refused. Untracked legacy requests are outside this check.",
+        "Cost telemetry distinguishes reported, estimated, legacy and unknown; missing usage or a synthetic zero does not prove free execution."
+      ],
+      "services": [
+        "walter-llm"
+      ],
+      "optional": [
+        "memory"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.2.0",
+        "owner": "llm",
+        "kind": "capability",
+        "purpose": "Exécuter les appels modèles des consommateurs autorisés via les postes du Router.",
+        "target_root": "/walter/cognition/router/llm",
+        "config_paths": [
+          "/walter/cognition/router/llm/config/gateway.json",
+          "/user/Lucas/config/llm/gateway.json"
+        ],
+        "permissions": [
+          "jeton local par consommateur",
+          "clés fournisseur hors contexte modèle"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics.",
+          "Claude subscription forwards caller-owned messages and tools plus validated technical attribution; native agent output never executes tools."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "http",
+            "interface": "OpenAI-compatible loopback :8894",
+            "access": "execute",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "model-consumer-tokens",
+            "role": "owner",
+            "owner": "llm",
+            "durability": "configuration"
+          },
+          {
+            "id": "postgres:models",
+            "role": "consumer",
+            "owner": "router",
+            "durability": "configuration"
+          },
+          {
+            "id": "bitwarden-vault",
+            "role": "consumer",
+            "owner": "secrets",
+            "durability": "external"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "consumer-auth",
+            "assertion": "Un jeton absent ou invalide est refusé et un poste choisi utilise la route attendue.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "components": [
+        {
+          "id": "gateway",
+          "path": "/walter/cognition/router/llm/gateway.py",
+          "role": "OpenAI-compatible model gateway (:8894): keys from the vault, model = a Router poste",
+          "status": "active",
+          "readme": "/walter/cognition/router/llm/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:8894/v1"
+            },
+            {
+              "transport": "cli",
+              "interface": "walter-llm call"
+            }
+          ],
+          "vision_target": "cognition/router/llm"
+        },
+        {
+          "id": "subscriptions",
+          "path": "/walter/cognition/router/llm/claude_subscription.py",
+          "role": "Subscription transports (Claude, Antigravity, ChatGPT/Codex)",
+          "status": "active",
+          "readme": "/walter/cognition/router/llm/README.md",
+          "vision_target": "cognition/router/llm"
+        }
+      ],
+      "presentation": {
+        "audience": "agent",
+        "title": "walter-llm",
+        "order": 75,
+        "summary": "/walter/cognition/router/llm/manifest/SUMMARY.md",
+        "manifest": "/walter/cognition/router/llm/manifest/MANIFEST.md",
+        "tools": []
+      }
+    },
+    {
+      "id": "logs",
+      "root": "/walter/cognition/memory",
+      "anchors": [
+        "/walter/cognition/memory/connectors/walter_logs.py",
+        "/walter/cognition/memory/contracts/logs.json",
+        "/walter/cognition/memory/walter_memory/logs.py"
+      ],
+      "requires": [
+        "memory"
+      ],
+      "external": [],
+      "data": [
+        "walter_logs.*"
+      ],
+      "core_paths": [
+        "/walter/cognition/memory/walter_memory/logs.py"
+      ],
+      "backup_paths": [
+        "/walter/cognition/memory"
+      ],
+      "interfaces": [
+        "Writer",
+        "CLI",
+        "MCP"
+      ],
+      "bindings": {
+        "hermes": "source transcript watcher + lifecycle adapter",
+        "dsh": "source transcript watcher + lifecycle adapter",
+        "codex": "source transcript watcher + lifecycle adapter",
+        "claude-code": "source transcript watcher + lifecycle adapter"
+      },
+      "limitations": [
+        "Only traces made available by the harness can be archived; hidden reasoning cannot be reconstructed."
+      ],
+      "services": [
+        "walter-logs-watch"
+      ],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "logs",
+        "kind": "foundation",
+        "purpose": "Conserver les traces accessibles de tous les harnesses dans un journal commun.",
+        "target_root": "/walter/cognition/memory",
+        "config_paths": [],
+        "permissions": [
+          "lecture cloud-safe",
+          "masquage des secrets avant écriture"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "logs_search/logs_timeline/logs_get",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "ingest",
+            "transport": "library",
+            "interface": "walter_memory.logs",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "postgres:walter_logs",
+            "role": "owner",
+            "owner": "logs",
+            "durability": "canonical"
+          },
+          {
+            "id": "postgres:core",
+            "role": "consumer",
+            "owner": "memory",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "all-sources",
+            "assertion": "Les sources principales et profils sont collectés avec reprise idempotente après interruption.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "walter-logs",
+        "order": 20,
+        "summary": "/walter/cognition/memory/manifest/logs/SUMMARY.md",
+        "manifest": "/walter/cognition/memory/manifest/logs/MANIFEST.md",
+        "guide": "/walter/cognition/memory/manifest/logs/GUIDE.md",
+        "tools": [
+          "logs_search",
+          "logs_timeline",
+          "logs_get"
+        ],
+        "capabilities": {
+          "logs_search": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "log"
+            ],
+            "returns": {
+              "type": "string"
+            }
+          },
+          "logs_timeline": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "log"
+            ],
+            "produces": [
+              "log"
+            ],
+            "returns": {
+              "type": "string"
+            }
+          },
+          "logs_get": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "log"
+            ],
+            "produces": [
+              "log"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "session_id": {
+                  "type": "string"
+                },
+                "seq": {
+                  "type": "integer"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "linked": {
+                  "type": "array"
+                }
+              }
+            }
+          }
+        }
+      },
+      "components": [
+        {
+          "id": "logs-store",
+          "path": "/walter/cognition/memory/walter_memory/logs.py",
+          "role": "Canonical execution journal walter_logs (secrets masked at write)",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "data": [
+            "postgres:walter_logs"
+          ],
+          "vision_target": "core/observability"
+        },
+        {
+          "id": "logs-watch",
+          "path": "/walter/cognition/memory/connectors/walter_logs.py",
+          "role": "Synchronisation of every runtime's logs (inotify)",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "vision_target": "core/observability"
+        }
+      ]
+    },
+    {
+      "id": "memory",
+      "root": "/walter/cognition/memory",
+      "decisions": "/walter/cognition/memory/manifest/decisions.json",
+      "anchors": [
+        "/walter/cognition/memory/contracts/memory.json",
+        "/walter/cognition/memory/walter_memory/events.py",
+        "/walter/cognition/memory/walter_memory/objects.py",
+        "/walter/cognition/memory/walter_memory/client.py",
+        "/walter/cognition/memory/walter_memory/read_policy.py",
+        "/walter/cognition/memory/walter_memory/overland.py"
+      ],
+      "requires": [
+        "core"
+      ],
+      "external": [
+        "PostgreSQL walter-pg:5433",
+        "pgvector",
+        "walter-llm for derived extraction",
+        "Beeper Server through core public BeeperClient (no Mac dependency)"
+      ],
+      "data": [
+        "core.*",
+        "ingestion.*",
+        "privacy.*",
+        "search.*",
+        "system.*",
+        "kardex.*",
+        "extraction.*",
+        "processing.*"
+      ],
+      "core_paths": [
+        "/walter/cognition/memory/walter_memory/events.py",
+        "/walter/cognition/memory/walter_memory/objects.py"
+      ],
+      "backup_paths": [
+        "/walter/cognition/memory",
+        "/root/.pgpass",
+        "/user/Lucas/bootstrap/overland.env"
+      ],
+      "interfaces": [
+        "Python library",
+        "HTTP :8890",
+        "CLI",
+        "MCP",
+        "Overland authenticated HTTP :3010",
+        "CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer",
+        "HTTP :8890 socle A3/A4: POST /v1/tasks/list {thread_id?, session_id?, status?, limit} -> {tasks: [{task_id, goal, status, thread_id, updated_at, progress, attempts, last_outcome}]}; POST /v1/tasks/update {task_id, status?, progress?, result?, note?}; POST /v1/experience {thread_id?, query?, limit} -> {items: [{at, run_id, status, summary, errors, lessons, solutions, pending}]}; /v1/runs/end accepts outcome; /v1/runs/start origin accepts interface, engine_session, request_id; /v1/context accepts thread_id (layers tasks, experience)",
+        "CLI tasks list|show|update|sweep|triage-redecide [--execute] [--channels owner|all|a,b]; CLI experience [--thread] [--query]",
+        "Beeper connector: WS -> ingestion.jobs beeper_events -> canonical core.events/media/bus; profile-scoped cursors in existing checkpoints"
+      ],
+      "bindings": {
+        "dsh": "common MCP",
+        "codex": "common MCP",
+        "claude-code": "common MCP",
+        "voice": "Authenticated canonical gateway through voice-memory HTTP port"
+      },
+      "limitations": [
+        "Canonical reads exclude stale, retracted, private and unprovenanced legacy cognitive rows.",
+        "Wild profile reads are refused by the cloud-safe port; local-only history remains local.",
+        "Existing desktop provider instances change on next session initialization; not force-restarted."
+      ],
+      "services": [
+        "walter-memory-gateway",
+        "walter-memory-overland",
+        "walter-memory-pipeline",
+        "walter-memory-beeper-watch.service",
+        "walter-memory-beeper.timer"
+      ],
+      "optional": [
+        "llm"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.2.0",
+        "owner": "memory",
+        "kind": "capability",
+        "purpose": "Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées.",
+        "target_root": "/walter/cognition/memory",
+        "config_paths": [
+          "/walter/cognition/memory/.env"
+        ],
+        "permissions": [
+          "classification de confidentialité",
+          "budget des traitements modèle"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "memory_recall",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "retain",
+            "transport": "mcp",
+            "interface": "memory_retain",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "reflect",
+            "transport": "mcp",
+            "interface": "memory_reflect",
+            "access": "execute",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "postgres:core",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "canonical"
+          },
+          {
+            "id": "postgres:ingestion",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "configuration"
+          },
+          {
+            "id": "postgres:privacy",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "configuration"
+          },
+          {
+            "id": "postgres:search",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "projection"
+          },
+          {
+            "id": "postgres:system",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "configuration"
+          },
+          {
+            "id": "postgres:kardex",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "projection"
+          },
+          {
+            "id": "embedding-models",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "projection"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "privacy-provenance",
+            "assertion": "Les lectures refusent les sources privées, purgées ou rétractées et les fragments périmés.",
+            "scope": "integration"
+          },
+          {
+            "id": "temporal-decisions",
+            "assertion": "Les décisions datées et remplacées ne sont pas présentées comme des instructions actuelles.",
+            "scope": "live"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Memory",
+        "order": 10,
+        "summary": "/walter/cognition/memory/manifest/SUMMARY.md",
+        "manifest": "/walter/cognition/memory/manifest/MANIFEST.md",
+        "guide": "/walter/cognition/memory/manifest/GUIDE.md",
+        "tools": [
+          "memory_context",
+          "memory_search",
+          "memory_events",
+          "person_lookup",
+          "memory_retain",
+          "memory_recall",
+          "memory_reflect",
+          "memory_view",
+          "tasks_list",
+          "task_create",
+          "task_update"
+        ],
+        "capabilities": {
+          "memory_context": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "entity",
+              "view"
+            ],
+            "returns": {
+              "type": "string"
+            }
+          },
+          "memory_search": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "event",
+              "derived",
+              "object"
+            ],
+            "returns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  },
+                  "ref_id": {
+                    "type": "string"
+                  },
+                  "typed_ref": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "occurred_at": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "memory_events": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "event",
+              "thread"
+            ],
+            "produces": [
+              "event",
+              "thread",
+              "object"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "events": {
+                  "type": "array"
+                },
+                "truncated": {
+                  "type": "integer"
+                },
+                "next": {
+                  "type": "object"
+                },
+                "cursor": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "person_lookup": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "entity",
+              "thread"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "entity_id": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "memory_retain": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": "parallel",
+            "idempotency": "natural",
+            "produces": [
+              "event"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "memory_recall": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "event",
+              "derived"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "memory_reflect": {
+            "effects": [
+              "cost"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "event",
+              "derived"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "memory_view": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "derived",
+              "view",
+              "entity"
+            ],
+            "produces": [
+              "event",
+              "derived",
+              "view"
+            ],
+            "returns": {
+              "type": "string"
+            }
+          },
+          "tasks_list": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "thread"
+            ],
+            "produces": [
+              "task",
+              "entity",
+              "thread"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "tasks": {
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "task_create": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "entity"
+            ],
+            "produces": [
+              "task"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "type": "string"
+                },
+                "verified": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "task_update": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": {
+              "resource": "memory-task",
+              "key": "task_id"
+            },
+            "consumes": [
+              "task"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "components": [
+        {
+          "id": "events",
+          "path": "/walter/cognition/memory/walter_memory/events.py",
+          "role": "Canonical journal core.events (append-only, idempotent)",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "data": [
+            "postgres:core"
+          ],
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "media",
+          "path": "/walter/cognition/memory/walter_memory/media.py",
+          "role": "Derivation of Raw Vault media: audio → transcript (stt poste), document → local extraction, image → OCR/caption (vision poste, disabled); driven by the bus (memory.object)",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "data": [
+            "postgres:core",
+            "postgres:processing"
+          ],
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "gateway",
+          "path": "/walter/cognition/memory/walter_memory/gateway.py",
+          "role": "The only write door (127.0.0.1:8890)",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:8890/v1"
+            }
+          ],
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "connectors",
+          "path": "/walter/cognition/memory/connectors",
+          "role": "Connectors (beeper, gmail, calendar, agent_sessions, triage…)",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "vision_target": "cognition/memory/connectors"
+        },
+        {
+          "id": "organic",
+          "path": "/walter/cognition/memory/walter_memory/organic.py",
+          "role": "Organic memory V1 (views, episodes, periods, flows)",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "assimilation",
+          "path": "/walter/cognition/memory/walter_memory/assimilation.py",
+          "role": "Bus-driven assimilation (memory.organic)",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "runs",
+          "path": "/walter/cognition/memory/walter_memory/runs.py",
+          "role": "Run plane: runs, delegated tasks and the owner's durable tasks, run episodes and experience",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "data": [
+            "postgres:runs"
+          ],
+          "vision_target": "core/orchestration"
+        },
+        {
+          "id": "kardex",
+          "path": "/walter/cognition/memory/walter_memory/social.py",
+          "role": "Kardex social layer (schema kardex)",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "data": [
+            "postgres:kardex"
+          ],
+          "vision_target": "cognition/memory/kardex"
+        },
+        {
+          "id": "search",
+          "path": "/walter/cognition/memory/walter_memory/search.py",
+          "role": "Search index (search.chunks)",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "privacy",
+          "path": "/walter/cognition/memory/walter_memory/privacy.py",
+          "role": "Privacy classes and reading rule",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "disclosure",
+          "path": "/walter/cognition/memory/walter_memory/disclosure.py",
+          "role": "Disclosure check of outgoing messages",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "vision_target": "core/security"
+        },
+        {
+          "id": "llm-client",
+          "path": "/walter/cognition/memory/walter_memory/llm.py",
+          "role": "Memory's model calls (refuses local_only, budgets); keys through Walter Secrets grants, no file fallback",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "migrations",
+          "path": "/walter/cognition/memory/migrations",
+          "role": "PostgreSQL migrations",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "vision_target": "cognition/memory/migrations"
+        },
+        {
+          "id": "overland",
+          "path": "/walter/cognition/memory/walter_memory/overland.py",
+          "role": "GPS reception (Overland, :3010)",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:3010"
+            }
+          ],
+          "vision_target": "cognition/memory/connectors"
+        },
+        {
+          "id": "beeper-native",
+          "path": "/walter/cognition/memory/connectors/beeper_watch.py",
+          "role": "Event-driven Beeper ingestion; HTTP catch-up and canonical deduplication",
+          "status": "implemented",
+          "readme": "/walter/cognition/memory/README.md",
+          "vision_target": "cognition/memory/connectors",
+          "data": [
+            "postgres:core",
+            "postgres:ingestion"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ops",
+      "root": "/walter/ops",
+      "anchors": [
+        "/walter/ops/contracts/ops.json",
+        "/walter/ops/walter_ops/cli.py",
+        "/walter/ops/bin/walter-ops",
+        "/walter/ops/walter_backup/core.py",
+        "/walter/ops/walter_backup/cli.py",
+        "/walter/ops/bin/walter-backup",
+        "/walter/ops/backup/scripts/walter-pg-backup",
+        "/walter/ops/backup/scripts/walter-statedb-backup",
+        "/walter/ops/backup/scripts/walter-offsite-backup",
+        "/walter/ops/backup/scripts/walter-offsite-restore-test"
+      ],
+      "requires": [],
+      "external": [
+        "systemd units walter-pg-backup, walter-statedb-backup, walter-offsite-backup, walter-offsite-restore-test (unit files on the host; their scripts are backup/scripts/* since 2026-10-29), walter-restore-isolated (Walter Memory's restore drill, started by Ops), walter-docker-log-rotate (host/, from Hermes' scripts on 2026-11-10)",
+        "git",
+        "docker (PostgreSQL container: dumps, db checkpoints, scratch restore)",
+        "zstd, tar, age, rclone",
+        "walter release|install|export (core platform) for deploy",
+        "Walter Memory backup_bundle (config bundle) and Walter Secrets vault-export (offsite kinds config and bitwarden)",
+        "Docker image pgvector/pgvector:pg16 (disposable database without network for migrations-check)"
+      ],
+      "data": [
+        "checkpoint log",
+        "checkpoint archives and dumps",
+        "git checkpoint refs (refs/walter-backup/*)"
+      ],
+      "core_paths": [
+        "/walter/ops/walter_ops/cli.py",
+        "/walter/ops/walter_backup/core.py",
+        "/walter/ops/walter_backup/cli.py",
+        "/walter/ops/backup/scripts"
+      ],
+      "backup_paths": [
+        "/walter/ops",
+        "/user/Lucas/config/backup",
+        "/user/Lucas/state/backup"
+      ],
+      "interfaces": [
+        "CLI walter-ops backup|git|check|recovery|deploy|status (install, onboard: planned)",
+        "CLI walter-ops install migrations-check [--keep-dumps DIR] (Walter Clean, PostgreSQL part: replay every module's migrations on a disposable database, compare the structure with the live one)",
+        "CLI walter-ops install data-check (every table classified by its module's contracts/data-classes.json; reference rows searched for the instance's private markers, counts only)",
+        "CLI walter-ops install seed-export DIR | clean-db-check [--seeds DIR | --keep-seeds DIR] (Walter Clean database built from migrations + reference rows on a disposable PostgreSQL, proven marker-free)",
+        "CLI walter-backup status|check|run|verify|git|checkpoint|checkpoints (compatibility alias, same outputs)",
+        "CLI walter-ops backup env <pg|statedb|offsite|restore_test> (shell parameters of the backup jobs)",
+        "Incident v1 (check) for the guardian supervisor"
+      ],
+      "bindings": {
+        "hermes": "CLI under host execution permissions",
+        "dsh": "CLI under host execution permissions",
+        "codex": "CLI under host execution permissions",
+        "claude-code": "CLI under host execution permissions"
+      },
+      "limitations": [
+        "Renamed from walter-backup on 2026-10-29 (owner decision): compatibility kept — command walter-backup, paths /walter/backup and /opt/walter-backup, unit names, config @instance/config/backup and state @instance/state/backup (the backup sub-component keeps its name).",
+        "installer: the database of Walter Clean is built and proven (install migrations-check, data-check, clean-db-check; bench scenarios clean-migrations, clean-database); clean-install of the software, onboarding and personal-restore are designed, not built yet (walter-ops install clean|personal and onboard answer 'planned').",
+        "deploy wraps the core platform's release/install/export; Ops does not own the other modules' code, contracts or migrations.",
+        "Backup scripts (pg, statedb, offsite, restore test) moved into backup/scripts on 2026-10-29, each qualified by a real run; host paths /usr/local/sbin/walter-* link to them. Every location comes from the instance (walter-ops backup env <kind>). The isolated restore drill stays in Walter Memory.",
+        "Restores are described, never executed by the tool.",
+        "A git checkpoint holds tracked files only; untracked files are listed, not captured.",
+        "Optional modules: memory (Raw Vault sample of verify), core (walter contracts for conformity).",
+        "Repository hygiene reports G0 warnings only; it never removes, stages or commits files.",
+        "Uncommitted age is estimated from visible file mtimes; touching/deleting a file limits that estimate.",
+        "Configured preserved evidence paths remain visible but are excluded from hygiene warnings; intentional compatibility is not inferred to be obsolete."
+      ],
+      "services": [
+        "walter-devboard-web",
+        "walter-devboard-bus",
+        "walter-devboard-due.timer",
+        "walter-devboard-docs.path"
+      ],
+      "optional": [
+        "memory",
+        "core",
+        "secrets"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "0.2.0",
+        "owner": "ops",
+        "kind": "foundation",
+        "purpose": "Installer, déployer, versionner, conserver et restaurer le logiciel Walter et ses instances (installer, deploy, git, backup, recovery, guardian), indépendamment des autres modules.",
+        "target_root": "/walter/ops",
+        "config_paths": [
+          "/walter/ops/config/backup.toml",
+          "/user/Lucas/config/backup/backup.toml"
+        ],
+        "permissions": [
+          "lecture des sauvegardes et des unités",
+          "démarrage des unités de sauvegarde existantes",
+          "aucune restauration sans accord du propriétaire"
+        ],
+        "invariants": [
+          "Fonctionne sans Router, Context, Hermes, DSH ni modèle ; Memory seulement pour l'échantillon du Raw Vault.",
+          "Conformité, santé des sauvegardes et restaurabilité restent trois réponses distinctes.",
+          "Aucune valeur secrète dans les sorties."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Une commande interrompue ne laisse qu'un fichier partiel supprimé ou une référence git cohérente.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "status",
+            "transport": "cli",
+            "interface": "walter-ops backup status",
+            "access": "read",
+            "timeout_seconds": 180,
+            "timeout_status": "target"
+          },
+          {
+            "id": "checkpoint",
+            "transport": "cli",
+            "interface": "walter-ops backup checkpoint",
+            "access": "write",
+            "timeout_seconds": 3600,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "checkpoints",
+            "role": "owner",
+            "owner": "ops",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat ; déplacer une implémentation existante seulement après qualification, avec lien de compatibilité."
+        ],
+        "recovery": {
+          "backup": [
+            "Le module et sa configuration sont dans le paquet config offsite ; ses points de reprise sont des fichiers et des références git."
+          ],
+          "restore": [
+            "Réinstaller le module depuis le paquet config ; il ne dépend d'aucun autre module pour démarrer."
+          ],
+          "verification": [
+            "walter-ops backup status puis verify ; l'exercice isolé reste la preuve complète."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "independent",
+            "assertion": "status et check répondent avec Router, Memory et Hermes arrêtés.",
+            "scope": "integration"
+          },
+          {
+            "id": "three-answers",
+            "assertion": "Une dérive de registre n'empêche ni la sauvegarde ni le rapport de santé.",
+            "scope": "integration"
+          },
+          {
+            "id": "repository-hygiene",
+            "assertion": "Les caches déjà suivis et le travail non suivi ancien déclenchent un warning G0 ; archives et rapports conservés sont distingués, sans suppression automatique.",
+            "scope": "unit"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Ops",
+        "order": 85,
+        "summary": "/walter/ops/manifest/SUMMARY.md",
+        "manifest": "/walter/ops/manifest/MANIFEST.md",
+        "tools": [
+          "devboard_correct"
+        ],
+        "capabilities": {
+          "devboard_correct": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": {
+              "resource": "devboard-card",
+              "key": "ref"
+            },
+            "consumes": [
+              "card"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "components": [
+        {
+          "id": "backup",
+          "path": "/walter/ops/backup",
+          "role": "Backups (PostgreSQL, restic offsite, git publication)",
+          "status": "active",
+          "readme": "/walter/ops/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-ops backup"
+            }
+          ],
+          "vision_target": "ops/backup"
+        },
+        {
+          "id": "ops",
+          "path": "/walter/ops/walter_ops",
+          "role": "Installation, deployment, recovery",
+          "status": "active",
+          "readme": "/walter/ops/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-ops"
+            }
+          ],
+          "vision_target": "ops"
+        },
+        {
+          "id": "services",
+          "path": "/services",
+          "role": "W.Alter's operational dependencies (databases, remote desktops, shared Python environments, gateways): installations, deployment definitions and technical data; never W.Alter code",
+          "status": "active",
+          "readme": "/services/README.md"
+        },
+        {
+          "id": "postgres",
+          "path": "/services/postgres",
+          "role": "W.Alter's PostgreSQL: container walter-pg (127.0.0.1:5433), data in /services/postgres/data, settings in config/, compose locked by fingerprint",
+          "status": "active",
+          "readme": "/services/postgres/README.md"
+        },
+        {
+          "id": "python",
+          "path": "/services/python",
+          "role": "Installed Python environments of the modules (walter-python runtime, core, router, llm, raw-vault); excluded from restic, rebuilt from the modules' locks",
+          "status": "active",
+          "readme": "/services/python/README.md"
+        },
+        {
+          "id": "webtop",
+          "path": "/services/webtop",
+          "role": "XFCE desktop in a container (Browse, Computer); compose locked by fingerprint",
+          "status": "active",
+          "readme": "/services/webtop/README.md"
+        },
+        {
+          "id": "browse-display",
+          "path": "/services/browse-display",
+          "role": "Selkies display (X :101) of W.Alter's browser, started by walter-browse-display.service",
+          "status": "active",
+          "readme": "/services/browse-display/README.md"
+        },
+        {
+          "id": "flaresolverr",
+          "path": "/services/flaresolverr",
+          "role": "FlareSolverr (127.0.0.1:8191) for web search; no data",
+          "status": "active",
+          "readme": "/services/flaresolverr/README.md"
+        },
+        {
+          "id": "nordvpn-proxy",
+          "path": "/services/nordvpn-proxy",
+          "role": "Settings of Browse's NordVPN per-country exits, opened on demand by walter-wg-exit",
+          "status": "active",
+          "readme": "/services/nordvpn-proxy/README.md"
+        },
+        {
+          "id": "raw-vault-s3",
+          "path": "/services/raw-vault-s3",
+          "role": "Raw Vault as S3 (127.0.0.1:8899, rclone); keys read from the instance's bootstrap",
+          "status": "active",
+          "readme": "/services/raw-vault-s3/README.md"
+        },
+        {
+          "id": "cloudflared",
+          "path": "/services/cloudflared",
+          "role": "Cloudflare tunnel (the instance's public ingress); settings and credentials (0600) in config/",
+          "status": "active",
+          "readme": "/services/cloudflared/README.md"
+        },
+        {
+          "id": "devboard",
+          "path": "/walter/ops/devboard",
+          "role": "W.Alter's development board: projects, pending agreements, replaced decisions, documents, agents' live activity (tailnet page, read-only)",
+          "status": "experimental",
+          "readme": "/walter/ops/devboard/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-devboard"
+            },
+            {
+              "transport": "http",
+              "interface": "tailnet :3093 (lecture seule)"
+            },
+            {
+              "transport": "mcp",
+              "interface": "devboard_correct"
+            }
+          ],
+          "vision_target": "ops/devboard"
+        }
+      ]
+    },
+    {
+      "id": "raw-vault",
+      "root": "/walter/cognition/memory/vault",
+      "anchors": [
+        "/walter/cognition/memory/vault/contracts/raw-vault.json",
+        "/walter/cognition/memory/vault/rawvault.py"
+      ],
+      "requires": [
+        "memory"
+      ],
+      "external": [
+        "rclone",
+        "Google Drive",
+        "S3 :8899"
+      ],
+      "data": [
+        "core.objects registry (memory-owned)",
+        "original bytes on Drive"
+      ],
+      "core_paths": [],
+      "backup_paths": [
+        "/walter/cognition/memory/vault",
+        "/root/.config/rclone/rclone.conf",
+        "/user/Lucas/bootstrap/raw-vault"
+      ],
+      "interfaces": [
+        "memory objects library",
+        "S3",
+        "MCP"
+      ],
+      "bindings": {
+        "hermes": "Walter library/CLI through skills; shared canonical catalog",
+        "dsh": "common MCP",
+        "codex": "common MCP",
+        "claude-code": "common MCP"
+      },
+      "limitations": [],
+      "services": [
+        "raw-vault-s3"
+      ],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "raw-vault",
+        "kind": "capability",
+        "purpose": "Conserver les octets originaux et les relier au catalogue canonique.",
+        "target_root": "/walter/cognition/memory/vault",
+        "config_paths": [
+          "/root/.config/rclone/rclone.conf",
+          "/user/Lucas/bootstrap/raw-vault/s3.env"
+        ],
+        "permissions": [
+          "classification des objets",
+          "bucket chiffré pour local_only"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "vault_search/vault_get",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "put",
+            "transport": "mcp",
+            "interface": "vault_put",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "raw-vault-bytes",
+            "role": "owner",
+            "owner": "raw-vault",
+            "durability": "external"
+          },
+          {
+            "id": "postgres:core",
+            "role": "consumer",
+            "owner": "memory",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "object-roundtrip",
+            "assertion": "Un objet synthétique est écrit, catalogué et relu avec son empreinte et sa confidentialité.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Raw Vault",
+        "order": 30,
+        "summary": "/walter/cognition/memory/vault/manifest/SUMMARY.md",
+        "manifest": "/walter/cognition/memory/vault/manifest/MANIFEST.md",
+        "guide": "/walter/cognition/memory/vault/manifest/GUIDE.md",
+        "tools": [
+          "vault_search",
+          "vault_get",
+          "vault_put"
+        ],
+        "capabilities": {
+          "vault_search": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "thread",
+              "event"
+            ],
+            "produces": [
+              "object"
+            ],
+            "returns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "object_id": {
+                    "type": "string"
+                  },
+                  "typed_ref": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "derived_text": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "vault_get": {
+            "effects": [
+              "local_write"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "object"
+            ],
+            "produces": [
+              "file"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "vault_put": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "file",
+              "entity",
+              "event",
+              "thread"
+            ],
+            "produces": [
+              "object"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "created": {
+                  "type": "boolean"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "components": [
+        {
+          "id": "rawvault-shim",
+          "path": "/walter/cognition/memory/vault/rawvault.py",
+          "role": "Former Raw Vault entry point; forwards to walter_memory.objects",
+          "status": "obsolete",
+          "readme": "/walter/cognition/memory/vault/manifest/MANIFEST.md"
+        }
+      ]
+    },
+    {
+      "id": "router",
+      "root": "/walter/cognition/router",
+      "decisions": "/walter/cognition/router/manifest/decisions.json",
+      "anchors": [
+        "/walter/cognition/router/contracts/router.json",
+        "/walter/cognition/router/cli.py",
+        "/walter/cognition/router/docs/README.md",
+        "/walter/cognition/router/serve/api.py",
+        "/walter/cognition/router/documentation.py"
+      ],
+      "requires": [],
+      "external": [
+        "PostgreSQL models schema",
+        "leaderboard/provider APIs"
+      ],
+      "data": [
+        "models.*",
+        "config",
+        "models.guardian_incidents"
+      ],
+      "core_paths": [
+        "/walter/cognition/router/store/db.py"
+      ],
+      "backup_paths": [
+        "/walter/cognition/router",
+        "/user/Lucas/config/router",
+        "/user/Lucas/state/router"
+      ],
+      "interfaces": [
+        "CLI",
+        "walter-llm task routes",
+        "MCP walter_route / walter_run / walter_decide / walter_plans / walter_web / audio_transcribe",
+        "CLI walter-router transcribe FILE… (stt poste via walter-llm)",
+        "agents' brief (`walter-router brief`, @instance/state/router/brief.md)",
+        "CLI walter-router schema (public tool contract v1)",
+        "CLI walter-router docs --write/--check [--offline]",
+        "CLI walter-router brief --json (versioned orchestrator note v1)",
+        "CLI walter-router-guardian check | run | status (the module's own maintenance)"
+      ],
+      "bindings": {
+        "dsh": "walter-llm provider; router tools through the walter MCP + brief in the profile",
+        "codex": "router tools through the walter MCP + brief in the profile; primary model native",
+        "claude-code": "router tools through the walter MCP, brief in the server instructions; primary model native"
+      },
+      "limitations": [
+        "New model choices remain subject to the owner's approval; no automatic switching introduced.",
+        "Text runs execute natively with bounded terminal/file tools; only providers of the selected model are tried, and callers must forward user_notice on failover.",
+        "The guardian lands repairs only in research/, analysis/parse.py, analysis/identity.py, analysis/aliases.json, interface/ and tests/, through deterministic gates; owner choices, execution policy, schema and units are never changed by it."
+      ],
+      "services": [
+        "walter-router-guardian.timer",
+        "walter-router-control.service",
+        "walter-router-quota.service"
+      ],
+      "optional": [
+        "core",
+        "browse"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.2.0",
+        "owner": "router",
+        "kind": "capability",
+        "purpose": "Choisir les modèles par poste avec décisions et coûts traçables.",
+        "target_root": "/walter/cognition/router",
+        "config_paths": [],
+        "permissions": [
+          "accord propriétaire pour changer un choix"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "walter_route",
+            "access": "read",
+            "timeout_seconds": 30,
+            "timeout_status": "implemented"
+          },
+          {
+            "id": "run",
+            "transport": "mcp",
+            "interface": "walter_run",
+            "access": "write",
+            "timeout_seconds": 3600,
+            "timeout_status": "implemented"
+          },
+          {
+            "id": "decide",
+            "transport": "mcp",
+            "interface": "walter_decide",
+            "access": "read",
+            "timeout_seconds": 40,
+            "timeout_status": "implemented"
+          },
+          {
+            "id": "transcribe",
+            "transport": "mcp",
+            "interface": "audio_transcribe",
+            "access": "read",
+            "timeout_seconds": 200,
+            "timeout_status": "implemented"
+          },
+          {
+            "id": "plans",
+            "transport": "mcp",
+            "interface": "walter_plans",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "implemented"
+          },
+          {
+            "id": "web",
+            "transport": "mcp",
+            "interface": "walter_web",
+            "access": "write",
+            "timeout_seconds": 780,
+            "timeout_status": "implemented"
+          }
+        ],
+        "resources": [
+          {
+            "id": "postgres:models",
+            "role": "owner",
+            "owner": "router",
+            "durability": "configuration"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "route-selection",
+            "assertion": "Un poste renvoie le choix actif et un poste inconnu échoue explicitement sans sélection arbitraire.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "public": [
+        "@instance/state/router/brief.md",
+        "@instance/state/router/brief.json"
+      ],
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Router",
+        "order": 70,
+        "summary": "/walter/cognition/router/manifest/SUMMARY.md",
+        "manifest": "/walter/cognition/router/manifest/MANIFEST.md",
+        "guide": "/walter/cognition/router/manifest/GUIDE.md",
+        "manifest_command": [
+          "walter-router",
+          "brief",
+          "--json"
+        ],
+        "tools": [
+          "walter_route",
+          "walter_run",
+          "walter_decide",
+          "walter_plans",
+          "walter_web",
+          "audio_transcribe"
+        ],
+        "index": {
+          "command": [
+            "walter-router",
+            "tasks"
+          ],
+          "sections": "tasks (key, label, interface)"
+        },
+        "capabilities": {
+          "walter_route": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "walter_run": {
+            "effects": [
+              "cost"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "file",
+              "agent"
+            ],
+            "idempotency": "none",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                },
+                "answer": {
+                  "type": "string"
+                },
+                "files": {
+                  "type": "array"
+                }
+              }
+            },
+            "errors": [
+              "invalid_request",
+              "budget_exceeded",
+              "dependency_unavailable",
+              "outcome_unknown"
+            ]
+          },
+          "walter_decide": {
+            "effects": [
+              "cost"
+            ],
+            "concurrency": "parallel",
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "choice": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "walter_plans": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": {
+              "resource": "router-plans"
+            },
+            "consumes": [
+              "plan"
+            ],
+            "produces": [
+              "plan"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "plans": {
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "walter_web": {
+            "effects": [
+              "outgoing",
+              "external_state"
+            ],
+            "concurrency": {
+              "resource": "web-chat-service",
+              "key": "service",
+              "key_default": "default"
+            },
+            "consumes": [
+              "file"
+            ],
+            "produces": [
+              "file"
+            ],
+            "idempotency": "key:request_id",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "reply": {
+                  "type": "string"
+                },
+                "files": {
+                  "type": "array"
+                }
+              }
+            },
+            "errors": [
+              "invalid_request",
+              "dependency_unavailable",
+              "deadline_exceeded",
+              "outcome_unknown"
+            ]
+          },
+          "audio_transcribe": {
+            "effects": [
+              "cost"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "file"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "object",
+              "properties": {
+                "results": {
+                  "type": "array"
+                }
+              }
+            }
+          }
+        }
+      },
+      "components": [
+        {
+          "id": "research",
+          "path": "/walter/cognition/router/research",
+          "role": "Collection of leaderboards and prices (Artificial Analysis, Arena, OpenRouter…)",
+          "status": "active",
+          "readme": "/walter/cognition/router/README.md",
+          "vision_target": "cognition/router/research"
+        },
+        {
+          "id": "analysis",
+          "path": "/walter/cognition/router/analysis",
+          "role": "Analysis, Telegram proposals, alerts",
+          "status": "active",
+          "readme": "/walter/cognition/router/README.md",
+          "vision_target": "cognition/router/analysis"
+        },
+        {
+          "id": "plan",
+          "path": "/walter/cognition/router/plan",
+          "role": "The owner's plans and quotas",
+          "status": "active",
+          "readme": "/walter/cognition/router/README.md",
+          "vision_target": "cognition/router/plan"
+        },
+        {
+          "id": "serve",
+          "path": "/walter/cognition/router/serve",
+          "role": "Model choice per task, text and media execution",
+          "status": "active",
+          "readme": "/walter/cognition/router/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-router route|pick|run"
+            }
+          ],
+          "vision_target": "cognition/router/serve"
+        },
+        {
+          "id": "oneshot",
+          "path": "/walter/cognition/router/serve/oneshot.py",
+          "role": "The Router's one-shot answers: direct walter-llm (economical poste) or delegation to Walter Engine",
+          "status": "active",
+          "readme": "/walter/cognition/router/README.md"
+        },
+        {
+          "id": "interface",
+          "path": "/walter/cognition/router/interface",
+          "role": "Public model library page",
+          "status": "active",
+          "readme": "/walter/cognition/router/README.md",
+          "vision_target": "cognition/router/interface"
+        },
+        {
+          "id": "store",
+          "path": "/walter/cognition/router/store",
+          "role": "PostgreSQL schema models (read/write)",
+          "status": "active",
+          "readme": "/walter/cognition/router/README.md",
+          "data": [
+            "postgres:models"
+          ],
+          "vision_target": "cognition/router/store"
+        },
+        {
+          "id": "guardian",
+          "path": "/walter/cognition/router/guardian",
+          "role": "The Router's guardian",
+          "status": "active",
+          "readme": "/walter/cognition/router/guardian/README.md",
+          "vision_target": "cognition/router/guardian"
+        },
+        {
+          "id": "documentation",
+          "path": "/walter/cognition/router/documentation.py",
+          "role": "Generated reference (code, configuration, database…) checked by the tests",
+          "status": "active",
+          "readme": "/walter/cognition/router/docs/README.md",
+          "vision_target": "cognition/router/docs"
+        }
+      ]
+    },
+    {
+      "id": "runtime",
+      "root": "/walter/ops/runtime",
+      "anchors": [
+        "/walter/ops/runtime/contracts/runtime.json",
+        "/walter/ops/runtime/requirements.lock",
+        "/walter/ops/runtime/bin/walter-python"
+      ],
+      "backup_paths": [
+        "/walter/ops/runtime/README.md",
+        "/walter/ops/runtime/requirements.lock",
+        "/walter/ops/runtime/requirements-dev.lock",
+        "/walter/ops/runtime/bin",
+        "/walter/ops/runtime/contracts",
+        "/usr/local/bin/walter-python"
+      ],
+      "core_paths": [],
+      "requires": [],
+      "optional": [],
+      "external": [
+        "CPython 3.12 (/usr/bin/python3.12)",
+        "uv"
+      ],
+      "services": [],
+      "data": [
+        "exact Python dependency set shared by Walter modules"
+      ],
+      "limitations": [
+        "The venv is rebuilt from the lock, not exported; a dependency upgrade affects every consumer at once."
+      ],
+      "interfaces": [
+        "command walter-python"
+      ],
+      "bindings": {
+        "hermes": "not used (Hermes keeps its own venv)",
+        "dsh": "hooks run through walter-python",
+        "codex": "hooks run through walter-python",
+        "claude-code": "hooks run through walter-python"
+      },
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "runtime",
+        "kind": "foundation",
+        "purpose": "Fournir l’environnement Python partagé des modules Walter.",
+        "target_root": "/walter/ops/runtime",
+        "config_paths": [],
+        "permissions": [
+          "aucune permission propre ; exécute le code du module appelant avec ses droits"
+        ],
+        "invariants": [
+          "Les consommateurs passent par la commande walter-python, jamais par le chemin du venv.",
+          "Le lock décrit exactement l’environnement installé."
+        ],
+        "errors": [
+          "Une dépendance absente fait échouer l’import du module appelant, sans repli silencieux."
+        ],
+        "cancellation": [
+          "Sans objet : pas de processus propre."
+        ],
+        "migrations": [
+          "Reconstruction du venv depuis le lock ; les consommateurs ne changent pas."
+        ],
+        "operations": [
+          {
+            "id": "run-python",
+            "access": "execute",
+            "transport": "cli",
+            "interface": "walter-python",
+            "timeout_seconds": 10800,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "python-runtime",
+            "role": "owner",
+            "owner": "runtime",
+            "durability": "projection"
+          }
+        ],
+        "recovery": {
+          "backup": [
+            "lock et commande sauvegardés ; venv exclu"
+          ],
+          "restore": [
+            "uv venv puis uv pip install depuis le lock"
+          ],
+          "verification": [
+            "walter-python importe psycopg, fastembed, numpy, fastapi"
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "imports",
+            "assertion": "walter-python importe les dépendances déclarées dans le lock",
+            "scope": "unit"
+          },
+          {
+            "id": "consumers",
+            "assertion": "aucun module n’appelle l’interpréteur d’un autre module",
+            "scope": "integration"
+          }
+        ]
+      },
+      "components": [
+        {
+          "id": "python",
+          "path": "/walter/ops/runtime/bin/walter-python",
+          "role": "Shared Python interpreter of the modules",
+          "status": "active",
+          "readme": "/walter/ops/runtime/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-python"
+            }
+          ],
+          "vision_target": "ops/runtime"
+        }
+      ],
+      "presentation": {
+        "audience": "agent",
+        "title": "Shared Python runtime",
+        "order": 87,
+        "summary": "/walter/ops/runtime/manifest/SUMMARY.md",
+        "manifest": "/walter/ops/runtime/manifest/MANIFEST.md",
+        "tools": []
+      }
+    },
+    {
+      "id": "secrets",
+      "root": "/walter/core/security/secrets",
+      "anchors": [
+        "/walter/core/security/secrets/contracts/secrets.json",
+        "/walter/core/security/secrets/walter_secrets/service.py",
+        "/walter/core/security/secrets/walter_secrets/vault.py"
+      ],
+      "requires": [],
+      "external": [
+        "Bitwarden CLI",
+        "age recovery material"
+      ],
+      "data": [
+        "encrypted vault cache",
+        "reference metadata",
+        "sync configuration"
+      ],
+      "core_paths": [
+        "/walter/core/security/secrets/walter_secrets/vault.py",
+        "/walter/core/security/secrets/walter_secrets/service.py",
+        "/walter/core/security/secrets/walter_secrets/masking.py",
+        "/walter/core/security/secrets/walter_secrets/settings.py",
+        "/walter/core/security/secrets/walter_secrets/unlock.py",
+        "/walter/core/security/secrets/walter_secrets/otp.py",
+        "/walter/core/security/secrets/walter_secrets/secrets_sync.py",
+        "/walter/core/security/secrets/walter_secrets/vault_react.py"
+      ],
+      "backup_paths": [
+        "/walter/core/security/secrets",
+        "/root/.config/Bitwarden CLI/data.json",
+        "/user/Lucas/config/secrets",
+        "/user/Lucas/state/secrets",
+        "/user/Lucas/bootstrap/vault",
+        "/user/Lucas/logs/walter-secrets.jsonl",
+        "/user/Lucas/logs/walter-secrets-sync.status.json",
+        "/user/Lucas/logs/walter-secrets-sync.log",
+        "/user/Lucas/accounts"
+      ],
+      "interfaces": [
+        "safe MCP metadata/reference",
+        "local CLI exec/get",
+        "Hermes hooks",
+        "walter-secret grants / grant access",
+        "walter-secret grant env / grant exec (injection ciblée)",
+        "walter_secrets.grants"
+      ],
+      "bindings": {
+        "hermes": "shared core + placeholders/output masking + browser port",
+        "dsh": "safe MCP; local exec with host approvals",
+        "codex": "safe MCP; local exec with host approvals",
+        "claude-code": "safe MCP; local exec with host approvals"
+      },
+      "limitations": [
+        "Hermes browser-field fill is a host-specific adapter.",
+        "MCP never returns raw secret values; CLI exec suppresses child output."
+      ],
+      "services": [
+        "walter-secrets-sync"
+      ],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.1.0",
+        "owner": "secrets",
+        "kind": "capability",
+        "purpose": "Gérer les références au coffre et injecter localement les valeurs autorisées.",
+        "target_root": "/walter/core/security/secrets",
+        "config_paths": [
+          "/walter/core/security/secrets/config/walter-secrets.toml",
+          "/user/Lucas/config/secrets/walter-secrets.toml"
+        ],
+        "permissions": [
+          "approbations locales pour utilisation",
+          "aucune valeur brute via MCP"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "secret_search/secret_reference",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "inject",
+            "transport": "cli",
+            "interface": "walter-secret exec",
+            "access": "execute",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "bitwarden-vault",
+            "role": "owner",
+            "owner": "secrets",
+            "durability": "external"
+          },
+          {
+            "id": "vault-cache",
+            "role": "owner",
+            "owner": "secrets",
+            "durability": "projection"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "no-secret-leak",
+            "assertion": "Références, erreurs et sorties des processus ne divulguent pas les valeurs du coffre.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Secrets",
+        "order": 40,
+        "summary": "/walter/core/security/secrets/manifest/SUMMARY.md",
+        "manifest": "/walter/core/security/secrets/manifest/MANIFEST.md",
+        "guide": "/walter/core/security/secrets/manifest/GUIDE.md",
+        "tools": [
+          "secret_search",
+          "secret_reference"
+        ],
+        "capabilities": {
+          "secret_search": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "secret"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "items": {
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "secret_reference": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "secret"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "reference": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "components": [
+        {
+          "id": "library",
+          "path": "/walter/core/security/secrets/walter_secrets",
+          "role": "Access to the Bitwarden vault without exposing values; grants",
+          "status": "active",
+          "readme": "/walter/core/security/secrets/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-secret"
+            }
+          ],
+          "vision_target": "core/security/secrets"
+        },
+        {
+          "id": "walter-cloudflare",
+          "path": "/walter/core/security/secrets/bin/walter-cloudflare",
+          "role": "Targeted injection of Cloudflare credentials (grants cloudflare-api, cloudflare-workers-ai) into a third-party command; fails closed",
+          "status": "active",
+          "readme": "/walter/core/security/secrets/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-cloudflare"
+            }
+          ],
+          "vision_target": "core/security/secrets"
+        },
+        {
+          "id": "compat",
+          "path": "/walter/core/security/secrets/compat",
+          "role": "Former compatibility entry points",
+          "status": "obsolete",
+          "readme": "/walter/core/security/secrets/README.md"
+        }
+      ]
+    },
+    {
+      "id": "skills",
+      "root": "/walter/capabilities/skills",
+      "anchors": [
+        "/walter/capabilities/skills/config/walter-skills.toml",
+        "/walter/capabilities/skills/contracts/skills.json",
+        "/walter/capabilities/skills/walter_skills/api.py",
+        "/walter/capabilities/skills/manifest/GUIDE.md"
+      ],
+      "requires": [
+        "bus"
+      ],
+      "external": [
+        "PostgreSQL skills schema",
+        "walter-llm for curation"
+      ],
+      "data": [
+        "git skill store",
+        "skills.*"
+      ],
+      "core_paths": [
+        "/walter/capabilities/skills/walter_skills/client.py",
+        "/walter/capabilities/skills/walter_skills/policy.py",
+        "/walter/capabilities/skills/walter_skills/domains.py"
+      ],
+      "backup_paths": [
+        "/walter/capabilities/skills"
+      ],
+      "interfaces": [
+        "HTTP :8891",
+        "stdlib client",
+        "MCP"
+      ],
+      "bindings": {
+        "dsh": "common MCP",
+        "codex": "common MCP",
+        "claude-code": "common MCP"
+      },
+      "limitations": [],
+      "services": [
+        "walter-skills",
+        "walter-skills-bus"
+      ],
+      "optional": [
+        "llm"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.1.0",
+        "owner": "skills",
+        "kind": "capability",
+        "purpose": "Gérer le contenu, la recherche, les propositions et la curation des procédures.",
+        "target_root": "/walter/capabilities/skills",
+        "config_paths": [
+          "/walter/capabilities/skills/config/walter-skills.toml"
+        ],
+        "permissions": [
+          "propositions en brouillon",
+          "politique de publication commune"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics.",
+          "La découverte charge le manifeste et l'index par niveau ; les procédures complètes sont lues à la demande."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "skills_search/skill_read",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "propose",
+            "transport": "mcp",
+            "interface": "skill_propose/skill_patch",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "discovery",
+            "transport": "mcp",
+            "interface": "skills_manifest/skills_index",
+            "access": "read",
+            "timeout_seconds": 10,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "skills-git-store",
+            "role": "owner",
+            "owner": "skills",
+            "durability": "canonical"
+          },
+          {
+            "id": "postgres:skills",
+            "role": "owner",
+            "owner": "skills",
+            "durability": "configuration"
+          },
+          {
+            "id": "postgres:bus",
+            "role": "consumer",
+            "owner": "bus",
+            "durability": "canonical"
+          },
+          {
+            "id": "embedding-models",
+            "role": "consumer",
+            "owner": "memory",
+            "durability": "projection"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "shared-skill",
+            "assertion": "Une procédure publiée est retrouvée depuis deux harnesses et une proposition reste en brouillon.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          },
+          {
+            "id": "progressive-discovery",
+            "assertion": "Le repère de session ne contient aucun corps de procédure ; un domaine expose les usages et workflows ; une publication active du Curator met à jour l'index sans injecter de candidats à chaque message.",
+            "scope": "integration"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "W.Alter Skills",
+        "order": 80,
+        "summary": "/walter/capabilities/skills/manifest/SUMMARY.md",
+        "manifest": "/walter/capabilities/skills/manifest/MANIFEST.md",
+        "guide": "/walter/capabilities/skills/manifest/GUIDE.md",
+        "tools": [
+          "skills_search",
+          "skills_index",
+          "skill_read",
+          "skills_manifest",
+          "skill_propose",
+          "skill_patch"
+        ],
+        "index": {
+          "command": [
+            "walter-skills",
+            "index"
+          ],
+          "section_arg": "--domain",
+          "paged": true,
+          "sections": "domains (without section: the list of domains)"
+        },
+        "capabilities": {
+          "skills_search": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "skill"
+            ],
+            "returns": {
+              "type": "string"
+            }
+          },
+          "skills_index": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "produces": [
+              "skill"
+            ],
+            "returns": {
+              "type": "object",
+              "properties": {
+                "items": {
+                  "type": "array"
+                },
+                "next_offset": {
+                  "type": "integer"
+                },
+                "cursor": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "skill_read": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": "parallel",
+            "consumes": [
+              "skill"
+            ],
+            "idempotency": "natural",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "skills_manifest": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "skill_propose": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": {
+              "resource": "skill",
+              "key": "name"
+            },
+            "produces": [
+              "skill"
+            ],
+            "idempotency": "none",
+            "returns": {
+              "type": "string"
+            }
+          },
+          "skill_patch": {
+            "effects": [
+              "record"
+            ],
+            "concurrency": {
+              "resource": "skill",
+              "key": "name"
+            },
+            "consumes": [
+              "skill"
+            ],
+            "idempotency": "none",
+            "returns": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "components": [
+        {
+          "id": "core",
+          "path": "/walter/capabilities/skills/walter_skills",
+          "role": "Skills core (git store, PostgreSQL cards, exposure policy, learning)",
+          "status": "active",
+          "readme": "/walter/capabilities/skills/README.md",
+          "vision_target": "capabilities/skills"
+        },
+        {
+          "id": "service",
+          "path": "/walter/capabilities/skills/walter_skills/api.py",
+          "role": "Service :8891",
+          "status": "active",
+          "readme": "/walter/capabilities/skills/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:8891"
+            }
+          ],
+          "vision_target": "capabilities/skills"
+        },
+        {
+          "id": "consumer",
+          "path": "/walter/capabilities/skills/walter_skills/consumer.py",
+          "role": "Bus consumer walter-skills-bus",
+          "status": "active",
+          "readme": "/walter/capabilities/skills/README.md",
+          "vision_target": "capabilities/skills"
+        },
+        {
+          "id": "library",
+          "path": "/walter/capabilities/skills/skills",
+          "role": "Library of procedures (SKILL.md)",
+          "status": "active",
+          "readme": "/walter/capabilities/skills/README.md",
+          "vision_target": "capabilities/skills/library"
+        },
+        {
+          "id": "archive",
+          "path": "/walter/capabilities/skills/archive",
+          "role": "Retired skills (reserve)",
+          "status": "obsolete",
+          "readme": "/walter/capabilities/skills/README.md",
+          "vision_target": "capabilities/skills/archive"
+        }
+      ]
+    },
+    {
+      "id": "soul",
+      "root": "/walter/core/identity",
+      "anchors": [
+        "/walter/core/identity/bin/walter-soul",
+        "/walter/core/identity/contracts/soul.json",
+        "/walter/core/identity/config/targets.toml",
+        "/walter/core/identity/defaults/identity.md",
+        "/walter/core/identity/defaults/rules.md"
+      ],
+      "requires": [],
+      "external": [],
+      "data": [
+        "identity sources (instance)",
+        "curated user profile (instance)"
+      ],
+      "core_paths": [],
+      "backup_paths": [
+        "/walter/core/identity",
+        "/user/Lucas/soul",
+        "/user/Lucas/config/soul",
+        "/user/Lucas/state/soul",
+        "/user/Lucas/profiles"
+      ],
+      "interfaces": [
+        "renderer",
+        "walter-soul render/path/sync/check/init",
+        "walter_profile MCP"
+      ],
+      "bindings": {
+        "codex": "common MCP",
+        "claude-code": "common MCP"
+      },
+      "limitations": [
+        "An instance may keep historical target locations (harness homes, profile workspaces) through its targets override."
+      ],
+      "services": [],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "soul",
+        "kind": "foundation",
+        "purpose": "Rendre l'identité de l'instance active pour chaque runtime ; livrer l'identité et les règles par défaut d'une nouvelle instance.",
+        "target_root": "/walter/core/identity",
+        "config_paths": [
+          "/walter/core/identity/config/targets.toml"
+        ],
+        "permissions": [
+          "écriture des profils générés"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "renderer",
+            "interface": "walter-soul sync/check",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "identity-sources",
+            "role": "owner",
+            "owner": "soul",
+            "durability": "canonical"
+          },
+          {
+            "id": "generated-profiles",
+            "role": "owner",
+            "owner": "soul",
+            "durability": "projection"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "render-consistency",
+            "assertion": "Une modification des sources produit des profils cohérents et détecte les retouches manuelles.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "walter-soul",
+        "order": 90,
+        "summary": "/walter/core/identity/manifest/SUMMARY.md",
+        "manifest": "/walter/core/identity/manifest/MANIFEST.md",
+        "guide": "/walter/core/identity/manifest/GUIDE.md",
+        "tools": [
+          "walter_profile"
+        ],
+        "capabilities": {
+          "walter_profile": {
+            "effects": [
+              "none"
+            ],
+            "concurrency": "parallel",
+            "returns": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "components": [
+        {
+          "id": "renderer",
+          "path": "/walter/core/identity/bin/walter-soul",
+          "role": "Renders the identity for each runtime (Soul, conduct, profiles)",
+          "status": "active",
+          "readme": "/walter/core/identity/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-soul"
+            }
+          ],
+          "vision_target": "core/identity"
+        },
+        {
+          "id": "runtimes",
+          "path": "/walter/core/identity/runtimes",
+          "role": "Neutral adapters per runtime",
+          "status": "active",
+          "readme": "/walter/core/identity/README.md",
+          "vision_target": "core/identity/runtimes"
+        }
+      ]
+    }
+  ]
+}

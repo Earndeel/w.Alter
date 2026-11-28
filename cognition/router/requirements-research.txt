@@ -1,0 +1,2 @@
+# AA's public page-data manifest uses authenticated AES-GCM, then gzip.
+cryptography==46.0.5

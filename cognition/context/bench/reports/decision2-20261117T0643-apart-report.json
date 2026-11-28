@@ -1,0 +1,732 @@
+{
+ "turn": {
+  "A": {
+   "n": 48,
+   "about": "production today: set 2, Drex first, 3 samples averaged",
+   "degraded": 0,
+   "errors": 0,
+   "reused": 0,
+   "readings_late": 0,
+   "readings_unavailable": 0,
+   "decision_ms": {
+    "p50": 723,
+    "p95": 1177,
+    "p99": 1308,
+    "max": 1330
+   },
+   "readings_ms": {
+    "p50": null,
+    "p95": null,
+    "p99": null,
+    "max": null
+   },
+   "plan_ms": {
+    "p50": 716,
+    "p95": 1177,
+    "p99": 1312,
+    "max": 1336
+   },
+   "total_ms": {
+    "p50": 888,
+    "p95": 1430,
+    "p99": 1470,
+    "max": 1479
+   },
+   "cal": {
+    "act": [
+     6,
+     7
+    ],
+    "thread": [
+     8,
+     9
+    ],
+    "work": [
+     19,
+     20
+    ],
+    "needs_crit_miss": [
+     0,
+     9
+    ],
+    "needs_false": [
+     0,
+     17
+    ],
+    "needs_crit_miss_calibrated": [
+     0,
+     9
+    ],
+    "dates": [
+     0,
+     8,
+     0
+    ],
+    "dates_ambiguous_said": [
+     0,
+     0
+    ],
+    "people": [
+     0,
+     6,
+     0
+    ]
+   },
+   "test": {
+    "act": [
+     2,
+     3
+    ],
+    "thread": [
+     5,
+     5
+    ],
+    "work": [
+     16,
+     18
+    ],
+    "needs_crit_miss": [
+     0,
+     13
+    ],
+    "needs_false": [
+     0,
+     4
+    ],
+    "needs_crit_miss_calibrated": [
+     0,
+     13
+    ],
+    "dates": [
+     0,
+     12,
+     0
+    ],
+    "dates_ambiguous_said": [
+     0,
+     2
+    ],
+    "people": [
+     0,
+     4,
+     0
+    ]
+   },
+   "all": {
+    "act": [
+     8,
+     10
+    ],
+    "thread": [
+     13,
+     14
+    ],
+    "work": [
+     35,
+     38
+    ],
+    "needs_crit_miss": [
+     0,
+     22
+    ],
+    "needs_false": [
+     0,
+     21
+    ],
+    "needs_crit_miss_calibrated": [
+     0,
+     22
+    ],
+    "dates": [
+     0,
+     20,
+     0
+    ],
+    "dates_ambiguous_said": [
+     0,
+     2
+    ],
+    "people": [
+     0,
+     10,
+     0
+    ]
+   },
+   "unavailable": [],
+   "pack_tokens_p50": 786
+  },
+  "C": {
+   "n": 48,
+   "about": "registry, Drex first, 2 hedged (first answer kept)",
+   "degraded": 2,
+   "errors": 0,
+   "reused": 6,
+   "readings_late": 0,
+   "readings_unavailable": 0,
+   "decision_ms": {
+    "p50": 726,
+    "p95": 1303,
+    "p99": 2844,
+    "max": 3985
+   },
+   "readings_ms": {
+    "p50": null,
+    "p95": null,
+    "p99": null,
+    "max": null
+   },
+   "plan_ms": {
+    "p50": 730,
+    "p95": 3061,
+    "p99": 4501,
+    "max": 4501
+   },
+   "total_ms": {
+    "p50": 897,
+    "p95": 3233,
+    "p99": 4652,
+    "max": 4678
+   },
+   "cal": {
+    "act": [
+     6,
+     7
+    ],
+    "thread": [
+     8,
+     9
+    ],
+    "work": [
+     19,
+     20
+    ],
+    "needs_crit_miss": [
+     0,
+     9
+    ],
+    "needs_false": [
+     0,
+     17
+    ],
+    "needs_crit_miss_calibrated": [
+     0,
+     9
+    ],
+    "dates": [
+     6,
+     8,
+     2
+    ],
+    "dates_ambiguous_said": [
+     0,
+     0
+    ],
+    "people": [
+     6,
+     6,
+     0
+    ]
+   },
+   "test": {
+    "act": [
+     2,
+     3
+    ],
+    "thread": [
+     4,
+     5
+    ],
+    "work": [
+     16,
+     17
+    ],
+    "needs_crit_miss": [
+     1,
+     13
+    ],
+    "needs_false": [
+     0,
+     4
+    ],
+    "needs_crit_miss_calibrated": [
+     1,
+     13
+    ],
+    "dates": [
+     9,
+     12,
+     0
+    ],
+    "dates_ambiguous_said": [
+     1,
+     2
+    ],
+    "people": [
+     4,
+     4,
+     0
+    ]
+   },
+   "all": {
+    "act": [
+     8,
+     10
+    ],
+    "thread": [
+     12,
+     14
+    ],
+    "work": [
+     35,
+     37
+    ],
+    "needs_crit_miss": [
+     1,
+     22
+    ],
+    "needs_false": [
+     0,
+     21
+    ],
+    "needs_crit_miss_calibrated": [
+     1,
+     22
+    ],
+    "dates": [
+     15,
+     20,
+     2
+    ],
+    "dates_ambiguous_said": [
+     1,
+     2
+    ],
+    "people": [
+     10,
+     10,
+     0
+    ]
+   },
+   "unavailable": [],
+   "pack_tokens_p50": 786
+  },
+  "F": {
+   "n": 48,
+   "about": "registry, Drex first, 2 hedged, readings asked apart (the plan waits for the judgements only)",
+   "degraded": 0,
+   "errors": 0,
+   "reused": 14,
+   "readings_late": 2,
+   "readings_unavailable": 0,
+   "decision_ms": {
+    "p50": 554,
+    "p95": 970,
+    "p99": 1067,
+    "max": 1128
+   },
+   "readings_ms": {
+    "p50": 156,
+    "p95": 814,
+    "p99": 1007,
+    "max": 1031
+   },
+   "plan_ms": {
+    "p50": 556,
+    "p95": 968,
+    "p99": 1068,
+    "max": 1133
+   },
+   "total_ms": {
+    "p50": 754,
+    "p95": 1924,
+    "p99": 2860,
+    "max": 2935
+   },
+   "cal": {
+    "act": [
+     6,
+     7
+    ],
+    "thread": [
+     8,
+     9
+    ],
+    "work": [
+     19,
+     20
+    ],
+    "needs_crit_miss": [
+     0,
+     9
+    ],
+    "needs_false": [
+     0,
+     17
+    ],
+    "needs_crit_miss_calibrated": [
+     0,
+     9
+    ],
+    "dates": [
+     6,
+     8,
+     2
+    ],
+    "dates_ambiguous_said": [
+     0,
+     0
+    ],
+    "people": [
+     6,
+     6,
+     0
+    ]
+   },
+   "test": {
+    "act": [
+     2,
+     3
+    ],
+    "thread": [
+     5,
+     5
+    ],
+    "work": [
+     17,
+     18
+    ],
+    "needs_crit_miss": [
+     0,
+     13
+    ],
+    "needs_false": [
+     0,
+     4
+    ],
+    "needs_crit_miss_calibrated": [
+     0,
+     13
+    ],
+    "dates": [
+     9,
+     12,
+     0
+    ],
+    "dates_ambiguous_said": [
+     1,
+     2
+    ],
+    "people": [
+     4,
+     4,
+     0
+    ]
+   },
+   "all": {
+    "act": [
+     8,
+     10
+    ],
+    "thread": [
+     13,
+     14
+    ],
+    "work": [
+     36,
+     38
+    ],
+    "needs_crit_miss": [
+     0,
+     22
+    ],
+    "needs_false": [
+     0,
+     21
+    ],
+    "needs_crit_miss_calibrated": [
+     0,
+     22
+    ],
+    "dates": [
+     15,
+     20,
+     2
+    ],
+    "dates_ambiguous_said": [
+     1,
+     2
+    ],
+    "people": [
+     10,
+     10,
+     0
+    ]
+   },
+   "unavailable": [],
+   "pack_tokens_p50": 717
+  },
+  "G": {
+   "n": 48,
+   "about": "registry, Drex first, 3 averaged, readings asked apart",
+   "degraded": 0,
+   "errors": 0,
+   "reused": 0,
+   "readings_late": 2,
+   "readings_unavailable": 0,
+   "decision_ms": {
+    "p50": 750,
+    "p95": 1115,
+    "p99": 1445,
+    "max": 1558
+   },
+   "readings_ms": {
+    "p50": 114,
+    "p95": 802,
+    "p99": 858,
+    "max": 859
+   },
+   "plan_ms": {
+    "p50": 749,
+    "p95": 1120,
+    "p99": 1443,
+    "max": 1561
+   },
+   "total_ms": {
+    "p50": 928,
+    "p95": 1624,
+    "p99": 2706,
+    "max": 2726
+   },
+   "cal": {
+    "act": [
+     6,
+     7
+    ],
+    "thread": [
+     8,
+     9
+    ],
+    "work": [
+     19,
+     20
+    ],
+    "needs_crit_miss": [
+     0,
+     9
+    ],
+    "needs_false": [
+     0,
+     17
+    ],
+    "needs_crit_miss_calibrated": [
+     0,
+     9
+    ],
+    "dates": [
+     6,
+     8,
+     2
+    ],
+    "dates_ambiguous_said": [
+     0,
+     0
+    ],
+    "people": [
+     6,
+     6,
+     0
+    ]
+   },
+   "test": {
+    "act": [
+     2,
+     3
+    ],
+    "thread": [
+     5,
+     5
+    ],
+    "work": [
+     17,
+     18
+    ],
+    "needs_crit_miss": [
+     1,
+     13
+    ],
+    "needs_false": [
+     0,
+     4
+    ],
+    "needs_crit_miss_calibrated": [
+     1,
+     13
+    ],
+    "dates": [
+     9,
+     12,
+     0
+    ],
+    "dates_ambiguous_said": [
+     1,
+     2
+    ],
+    "people": [
+     4,
+     4,
+     0
+    ]
+   },
+   "all": {
+    "act": [
+     8,
+     10
+    ],
+    "thread": [
+     13,
+     14
+    ],
+    "work": [
+     36,
+     38
+    ],
+    "needs_crit_miss": [
+     1,
+     22
+    ],
+    "needs_false": [
+     0,
+     21
+    ],
+    "needs_crit_miss_calibrated": [
+     1,
+     22
+    ],
+    "dates": [
+     15,
+     20,
+     2
+    ],
+    "dates_ambiguous_said": [
+     1,
+     2
+    ],
+    "people": [
+     10,
+     10,
+     0
+    ]
+   },
+   "unavailable": [],
+   "pack_tokens_p50": 717
+  }
+ },
+ "calibration": {
+  "A": {
+   "needs_threshold": 0.5,
+   "cal_loss": 0.0
+  },
+  "C": {
+   "needs_threshold": 0.5,
+   "cal_loss": 0.0
+  },
+  "F": {
+   "needs_threshold": 0.5,
+   "cal_loss": 0.0
+  },
+  "G": {
+   "needs_threshold": 0.5,
+   "cal_loss": 0.0
+  }
+ },
+ "agreement_with_A": {
+  "C": {
+   "act": 45,
+   "thread": 47,
+   "caps": 35,
+   "level": 45,
+   "n": 48
+  },
+  "F": {
+   "act": 46,
+   "thread": 48,
+   "caps": 35,
+   "level": 46,
+   "n": 48
+  },
+  "G": {
+   "act": 46,
+   "thread": 48,
+   "caps": 36,
+   "level": 47,
+   "n": 48
+  }
+ },
+ "incoming": {
+  "old": {
+   "n": 0,
+   "errors": 0,
+   "decision_ms": {
+    "p50": null,
+    "p95": null,
+    "p99": null
+   }
+  },
+  "new": {
+   "n": 0,
+   "errors": 0,
+   "decision_ms": {
+    "p50": null,
+    "p95": null,
+    "p99": null
+   },
+   "deadline": [
+    0,
+    0,
+    0
+   ],
+   "amount": [
+    0,
+    0,
+    0
+   ]
+  },
+  "action_agreement": 12
+ },
+ "outgoing": {
+  "old": {
+   "n": 0,
+   "errors": 0,
+   "decision_ms": {
+    "p50": null,
+    "p95": null,
+    "p99": null
+   },
+   "commits": [
+    0,
+    0
+   ]
+  },
+  "new": {
+   "n": 0,
+   "errors": 0,
+   "decision_ms": {
+    "p50": null,
+    "p95": null,
+    "p99": null
+   },
+   "commits": [
+    0,
+    0
+   ],
+   "when": [
+    0,
+    0
+   ],
+   "amount": [
+    0,
+    0
+   ]
+  }
+ }
+}

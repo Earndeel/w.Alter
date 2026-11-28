@@ -1,0 +1,2 @@
+#!/bin/sh
+cd /walter/capabilities/skills && PGPASSFILE=/root/.pgpass exec /usr/local/bin/walter-python -m walter_skills.cli "$@"

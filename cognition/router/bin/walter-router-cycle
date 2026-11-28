@@ -1,0 +1,43 @@
+#!/bin/bash
+# Walter Router 48 h cycle:
+#   1. research + analysis: every source fetched by the router itself (research/), understood and organised in the
+#      database, models ranked, active library written (analysis/); no message yet
+#   2. plans (meters, billing mails, web research, cost price of a token), then the guardian advises — one Walter Engine
+#      delegation (guardian/advice.py; the Router's one agent is its guardian, 2026-11-21): checks sources,
+#      providers and names (the Router applies its validated name links), works out the consequences for the owner
+#      (proposals become Telegram alerts with buttons, sent at step 3); report in $LOG/analysis-<day>.md
+#   3. analysis again with the new name links, then Telegram (a model above an active one, the agent's advice…)
+#   4. the agents' brief is rewritten (profiles re-rendered when it changed); interface: the library page is
+#      republished; then the guardian (own unit) follows up what is still broken: stale source, provider down,
+#      failing test
+# A failing source keeps its last good snapshot; step 2 never blocks the cycle.
+# Instance bindings (log folder, library URL) come from the active Walter
+# instance through `walter-router instance-env`.
+set -uo pipefail
+WR=walter-router
+export HOME="${HOME:-$(getent passwd "$(id -un)" | cut -d: -f6)}"
+eval "$("$WR" instance-env)" || { echo "[cycle] no instance bindings"; exit 1; }
+mkdir -p "$LOG"
+day=$(date -u +%Y%m%d)
+
+echo "[cycle] 1/4 research + analysis (no message yet)"
+"$WR" refresh --no-notify || exit 1   # a failed refresh fails the unit (Telegram only after 2 failed cycles)
+
+echo "[cycle] 2/4 plans: meters, billing mails, web research on the plans, cost price of a token"
+# --no-notify: nothing leaves before step 3, so each message carries the agent's reading and the new name links
+# (2026-11-21: a challenger sent at step 2 said « prix non publié » although its price was on OpenRouter)
+timeout 1500 "$WR" research plans --no-notify > "$LOG/plans-$day.json" 2>&1 || echo "[cycle] plans research failed (non-blocking)"
+
+echo "[cycle] 2/4 the guardian advises on Walter Engine (sources, names, consequences; proposals sent at step 3)"
+timeout 1300 "$WR" analyze > "$LOG/analysis-run-$day.json" 2>&1 \
+  || echo "[cycle] guardian advice failed (exit $?) — see $LOG/analysis-run-$day.json"
+
+echo "[cycle] 3/4 analysis with the new name links, then Telegram (a model above an active one, the agent's advice)"
+"$WR" refresh --skip-collect || exit 1
+echo "[cycle] 4/4 agents' brief; library page republished"
+"$WR" brief --write || echo "[cycle] agents' brief not written (non-blocking)"
+echo "[cycle] library page ${LIBRARY_URL:-(not published by this instance)} (Cloudflare Access)"
+"$WR" publish-library || echo "[cycle] library page not published (non-blocking)"
+echo "[cycle] guardian started on its own unit: what this cycle left broken is followed up (guardian/README.md)"
+systemctl start --no-block walter-router-guardian.service || echo "[cycle] guardian not started (non-blocking)"
+exit 0

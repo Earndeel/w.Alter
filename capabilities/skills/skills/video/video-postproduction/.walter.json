@@ -1,0 +1,14 @@
+{
+ "content_since": "2026-07-28T08:12:00Z",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/video-postproduction",
+  "sha": "5c551342fcd271f68fe9a122ff11bc0ee3ab6158a2894d289961a69de9e9f797",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "read by an agent",
+ "restored_at": "2026-11-24T15:16:32+00:00",
+ "store_sha": "5c551342fcd271f68fe9a122ff11bc0ee3ab6158a2894d289961a69de9e9f797"
+}

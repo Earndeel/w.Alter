@@ -1,0 +1,1 @@
+Walter Context decides what enters the model's window on each call: a plan per owner message, the prepared context of the turn, sub-agent briefs, and compression of long histories without silent loss.

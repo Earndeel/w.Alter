@@ -1,0 +1,363 @@
+#!/usr/local/bin/walter-python
+"""walter-unharnessed — Lab adapter: the third-party harness Unharnessed (one tool: a persistent Python REPL) wired
+to Walter through public interfaces only. Trial requested by the owner on 2026-11-16; nothing here is production.
+
+What Walter provides, per message (same contract as walter_hook.py gives Claude Code / DSH):
+  model    walter-llm (127.0.0.1:8894, OpenAI-compatible), model = a Walter Router task (coding, general, auto),
+           own agent token `unharnessed-lab` (@instance/bootstrap/lab/unharnessed-llm.env)
+  run      one Walter run per message, channel `test` → walter-llm caps its paid spend (2 €/24 h shared test budget);
+           the run id rides every model request (X-Walter-Run-Id, written into the agent's models.json)
+  context  Walter Memory context (gateway /v1/context) + walter-skills exposure, prepended in <walter-context>
+  tools    MCP `walter` (Core's server, located with `walter path core`, client tag `unharnessed`), reached from the
+           kernel (`mcp` object)
+  identity walter-soul's neutral profile + profile/unharnessed.md, appended to Unharnessed's system prompt
+
+Unharnessed never asks before running code. It runs as a transient systemd unit (the « bubble »): the whole file
+system read-only except its own state folder, private /tmp, no Docker socket, no SSH keys, no system D-Bus (so no
+systemctl start/stop), memory/task/CPU ceilings and a wall-clock limit. Same uid (root): a bubble, not a jail.
+
+Usage:
+  walter-unharnessed setup                      models.json, MCP server, kernel venv (idempotent)
+  walter-unharnessed check                      what is wired, as JSON
+  walter-unharnessed prompt                     the assembled system prompt (Unharnessed's own breakdown)
+  walter-unharnessed run [--task T] [--context pack|legacy|off] [--resume KEY] [--workdir NAME] [--timeout S] [--raw] PROMPT
+                                                one message → JSON summary (answer, run, tokens, cells, seconds)
+Not wired yet (see README): journal into walter_logs, bus turn.ended, Walter Memory episodes.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+import uuid
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parents[1]
+APP = Path(os.environ.get("WALTER_UNHARNESSED_APP", "/apps/unharnessed"))
+BIN = APP / "bin" / "unharnessed"
+PKG = APP / "src"                      # packaged layout: unharnessed-runtime/ and skills/ next to it
+LLM_URL = "http://127.0.0.1:8894/v1"
+MEMORY_URL = os.environ.get("WALTER_MEMORY_URL", "http://127.0.0.1:8890")
+TASKS = ("coding", "general", "auto")
+CONTEXT_BUDGET = {"profile": 0, "people": 300, "knowledge": 600, "evidence": 300}   # = walter_hook.py
+HOME = Path.home()
+# uv (kernel venv, the model's projects) lives in the operator's home on this host: keep it on the bubble's PATH
+PATH = ":".join(dict.fromkeys([str(Path(shutil.which("uv") or "uv").parent), "/usr/local/sbin", "/usr/local/bin",
+                               "/usr/sbin", "/usr/bin", "/sbin", "/bin"]))
+
+
+def module_root(name: str) -> Path:
+    """A Walter module's root through its declared interface (`walter path`), never a hardcoded directory."""
+    out = subprocess.run(["walter", "path", name], capture_output=True, text=True, timeout=30)
+    if out.returncode or not out.stdout.strip():
+        sys.exit(f"walter path {name} failed")
+    return Path(out.stdout.strip())
+
+
+def mcp_command() -> tuple[str, str]:
+    """Core's MCP server (stdio), the same command `walter harness attach` gives the other harnesses."""
+    core = module_root("core")
+    return str(core / "venv" / "bin" / "python"), str(core / "server.py")
+
+
+def instance(*parts: str) -> Path:
+    out = subprocess.run(["walter", "instance", "path", *parts], capture_output=True, text=True, timeout=30)
+    if out.returncode or not out.stdout.strip():
+        sys.exit(f"walter instance path {' '.join(parts)} failed")
+    return Path(out.stdout.strip())
+
+
+STATE = instance("state", "lab", "unharnessed")
+AGENT, WORKSPACE, CACHE, RUNS = STATE / "agent", STATE / "workspace", STATE / "cache", STATE / "runs"
+TOKEN_FILE = instance("bootstrap", "lab", "unharnessed-llm.env")
+SESSIONS = RUNS / "sessions.json"      # walter session key → Unharnessed session file
+
+
+def models_json(run_id: str | None) -> dict:
+    headers = {"X-Walter-Run-Id": run_id} if run_id else {}
+    model = lambda task, name: {"id": task, "name": name, "contextWindow": 200000, "maxTokens": 32000,
+                                "reasoning": False, "input": ["text"]}
+    return {"providers": {"walter": {
+        "name": "W.Alter (Walter Router)", "baseUrl": LLM_URL, "api": "openai-completions",
+        "apiKey": "WALTER_LLM_TOKEN", "headers": headers,
+        # walter-llm speaks Chat Completions through LiteLLM: no developer role, no store, the Router sets the effort
+        "compat": {"supportsDeveloperRole": False, "supportsStore": False, "supportsReasoningEffort": False,
+                   "supportsUsageInStreaming": True},
+        "models": [model("coding", "Walter · code / agentique"), model("general", "Walter · général"),
+                   model("auto", "Walter · auto")]}}}
+
+
+def write_models(run_id: str | None) -> None:
+    AGENT.mkdir(parents=True, exist_ok=True)
+    p = AGENT / "models.json"
+    p.write_text(json.dumps(models_json(run_id), indent=1))
+    os.chmod(p, 0o600)
+
+
+def profile() -> str:
+    """walter-soul's neutral (DSH) rendering of the identity + this engine's adapter, owner placeholders filled."""
+    soul = subprocess.run(["walter-soul", "render", "dsh"], capture_output=True, text=True, timeout=60)
+    if soul.returncode:
+        sys.exit("walter-soul render dsh failed")
+    text = re.sub(r"^<!--.*?-->\n", "", soul.stdout, flags=re.S)
+    adapter = (HERE / "profile" / "unharnessed.md").read_text()
+    out = subprocess.run(["walter", "instance", "render"], input=text.rstrip() + "\n\n" + adapter,
+                         capture_output=True, text=True, timeout=30)
+    if out.returncode:
+        sys.exit("walter instance render failed")
+    return out.stdout
+
+
+def bubble(argv: list[str], *, timeout: int, env: dict | None = None, stdin: str | None = None,
+           unit: str | None = None, cwd: Path | None = None) -> subprocess.CompletedProcess:
+    """argv run as a transient systemd unit: read-only system, writable state folder only (see module doc)."""
+    props = ["ProtectSystem=strict", "ProtectHome=read-only", f"ReadWritePaths={STATE}", "PrivateTmp=yes",
+             "NoNewPrivileges=yes", "RestrictSUIDSGID=yes", "ProtectKernelTunables=yes", "ProtectKernelModules=yes",
+             "ProtectControlGroups=yes", "ProtectClock=yes", "MemoryMax=6G", "TasksMax=512", "CPUQuota=300%",
+             f"RuntimeMaxSec={timeout}", f"EnvironmentFile={TOKEN_FILE}",
+             # ways out of the bubble for a root process: Docker, SSH keys (the Mac), the system bus (systemctl)
+             "InaccessiblePaths=-/run/docker.sock", "InaccessiblePaths=-/var/run/docker.sock",
+             "InaccessiblePaths=-/run/containerd", f"InaccessiblePaths=-{HOME / '.ssh'}",
+             "InaccessiblePaths=-/run/dbus/system_bus_socket", "InaccessiblePaths=-/run/systemd/private"]
+    envs = {"HOME": str(HOME), "PATH": PATH, "LANG": "C.UTF-8", "UNHARNESSED_CODING_AGENT_DIR": str(AGENT),
+            "UNHARNESSED_PACKAGE_DIR": str(PKG), "UNHARNESSED_KERNEL_VENV": str(CACHE / "kernel-venv"),
+            "UV_CACHE_DIR": str(CACHE / "uv"),
+            "UV_PYTHON_INSTALL_DIR": str(CACHE / "uv-python"), "XDG_CACHE_HOME": str(CACHE / "xdg"),
+            "WALTER_CLIENT_TAG": "unharnessed", **(env or {})}
+    cmd = ["systemd-run", "--wait", "--pipe", "--collect", "--quiet", f"--working-directory={cwd or WORKSPACE}",
+           f"--unit={unit or 'unharnessed-lab-' + uuid.uuid4().hex[:8]}"]
+    cmd += [f"--property={p}" for p in props] + [f"--setenv={k}={v}" for k, v in envs.items()]
+    return subprocess.run(cmd + ["--", *argv], input=stdin if stdin is not None else "", capture_output=True,
+                          text=True, timeout=timeout + 60)
+
+
+def mcp_list() -> str:
+    return bubble([str(BIN), "mcp", "list"], timeout=60).stdout
+
+
+def setup(_a) -> int:
+    for d in (AGENT, WORKSPACE, CACHE, RUNS):
+        d.mkdir(parents=True, exist_ok=True)
+    write_models(None)
+    if "walter" not in mcp_list():
+        r = bubble([str(BIN), "mcp", "add", "walter", "--env", "WALTER_CLIENT_TAG=WALTER_CLIENT_TAG",
+                    "--env", "HOME=HOME", "--env", "PATH=PATH", "--env", "WALTER_RUN_ID=WALTER_RUN_ID",
+                    "--env", "WALTER_SESSION_KEY=WALTER_SESSION_KEY", "--", *mcp_command()], timeout=60)
+        print(r.stdout.strip() or r.stderr.strip())
+    r = bubble([str(BIN), "--unharnessed-bootstrap"], timeout=900)
+    print(json.dumps({"bootstrap_rc": r.returncode, "tail": (r.stdout + r.stderr)[-600:]}, ensure_ascii=False))
+    return r.returncode
+
+
+def check(_a) -> int:
+    import httpx
+    out = {"binary": BIN.is_file(), "token": TOKEN_FILE.is_file(), "models_json": (AGENT / "models.json").is_file(),
+           "mcp_walter": "walter" in mcp_list(), "state": str(STATE)}
+    try:
+        out["walter_llm"] = httpx.get(LLM_URL.rsplit("/v1", 1)[0] + "/health", timeout=5).status_code
+    except httpx.HTTPError as e:
+        out["walter_llm"] = type(e).__name__
+    print(json.dumps(out, indent=1))
+    return 0 if all(v is True for k, v in out.items() if k in ("binary", "token", "models_json", "mcp_walter")) else 1
+
+
+def prompt_cmd(_a) -> int:
+    write_models(None)
+    r = bubble([str(BIN), "prompt"], timeout=120)   # Unharnessed's own layers; Walter's profile is appended per run
+    print(r.stdout or r.stderr)
+    print("\n--- appended per run (--append-system-prompt) ---\n" + profile())
+    return r.returncode
+
+
+def context_pack(prompt: str, key: str, run_id: str) -> str:
+    """walter-context's pack (plan → retrieval → assembly) from the warm preflight service, as DSH gets it. The plan it
+    writes on the run is what walter-llm's `auto` reads (task + level for this message). Raises on failure."""
+    import urllib.request
+    req = {"turn_id": f"{key}:{int(time.time() * 1000)}", "message": prompt[:6000], "previous": None,
+           "runtime": "unharnessed", "session_id": key, "privacy_class": "cloud_allowed", "run_id": run_id,
+           "answer_within_ms": 7000, "exclude_blocks": ["capabilities"]}
+    r = urllib.request.Request(f"http://127.0.0.1:{os.environ.get('WALTER_CONTEXT_PREFLIGHT_PORT', '8897')}"
+                               "/preflight?inject=1", data=json.dumps(req).encode(),
+                               headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(r, timeout=9) as resp:
+        out = json.loads(resp.read())
+    if out.get("error") or not out.get("plan"):
+        raise RuntimeError(out.get("error") or "no plan")
+    return out.get("text") or ""
+
+
+def walter_context(prompt: str, key: str, first_turn: bool, run_id: str, mode: str) -> tuple[str, list[str]]:
+    """Memory + skills for this message through their public clients, as walter_hook.py does (fail-open).
+    mode pack = walter-context's pack (DSH's mode since 2026-11-07), legacy = the memory gateway block."""
+    import httpx
+    from walter_memory import client as memory_client, privacy
+    from walter_skills import client as skills_client
+    parts, notes = [], []
+    if mode == "pack":
+        try:
+            text = context_pack(prompt, key, run_id)
+            if text:
+                parts.append(text)
+            notes.append("pack")
+        except Exception as e:  # noqa: BLE001 — never lose the context: legacy block instead
+            notes.append(f"pack failed {type(e).__name__}: legacy")
+            mode = "legacy"
+    try:
+        if mode != "legacy":
+            raise StopIteration
+        r = httpx.post(f"{MEMORY_URL}/v1/context", headers={"Authorization": f"Bearer {memory_client.token()}"},
+                       timeout=10, json={"query": prompt[:4000], "budget": CONTEXT_BUDGET, "include_profile": False,
+                                         "caller": "unharnessed-lab", "mode": "on", "session_id": key})
+        r.raise_for_status()
+        text = (r.json().get("text") or "").strip()
+        lines = [l for l in text.splitlines() if not any(c == "secret" for c, _ in privacy.detect(l))]
+        if lines:
+            parts.append("Mémoire W.Alter (souvenirs datés ; le plus récent l'emporte) :\n" + "\n".join(lines))
+    except StopIteration:
+        pass
+    except Exception as e:  # noqa: BLE001 — fail-open, as the hook
+        notes.append(f"memory: {type(e).__name__}")
+    try:
+        s = skills_client.expose("message", prompt, session_id=key, runtime="unharnessed", first_turn=first_turn)
+        if s.get("text"):
+            parts.append(s["text"])
+    except Exception as e:  # noqa: BLE001
+        notes.append(f"skills: {type(e).__name__}")
+    return "\n\n".join(parts), notes
+
+
+def parse_stream(stdout: str) -> dict:
+    """Unharnessed --mode json: one JSON event per line. Kept generic: answer, usage, cells, session, errors."""
+    out = {"session_file": None, "session_id": None, "answer": None, "cells": 0, "turns": 0, "input_tokens": 0,
+           "output_tokens": 0, "cache_read_tokens": 0, "cost_usd": 0.0, "errors": [], "models": set()}
+    for line in stdout.splitlines():
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        t = ev.get("type")
+        if t == "session":
+            out["session_id"] = ev.get("id") or ev.get("sessionId")
+            out["session_file"] = ev.get("sessionFile") or ev.get("path")
+        elif t == "tool_execution_start":
+            out["cells"] += 1
+        elif t == "message_end":
+            msg = ev.get("message") or {}
+            if msg.get("role") == "assistant":
+                out["turns"] += 1
+                u = msg.get("usage") or {}
+                out["input_tokens"] += u.get("input") or 0
+                out["output_tokens"] += u.get("output") or 0
+                out["cache_read_tokens"] += u.get("cacheRead") or 0
+                out["cost_usd"] += ((u.get("cost") or {}).get("total") or 0)
+                if msg.get("model"):
+                    out["models"].add(f"{msg.get('provider')}/{msg.get('model')}")
+                if msg.get("stopReason") == "error" or msg.get("errorMessage"):
+                    out["errors"].append(str(msg.get("errorMessage"))[:300])
+                text = "".join(c.get("text", "") for c in msg.get("content") or [] if c.get("type") == "text")
+                if text.strip():
+                    out["answer"] = text
+    out["models"] = sorted(out["models"])
+    return out
+
+
+def run(a) -> int:
+    from walter_memory import runs, privacy
+    prompt = " ".join(a.prompt).strip()
+    if not prompt:
+        sys.exit("empty prompt")
+    if any(c == "secret" for c, _ in privacy.detect(prompt)):
+        sys.exit("refused: the message looks like it holds a secret (local_only); walter-llm only serves cloud runs")
+    sessions = json.loads(SESSIONS.read_text()) if SESSIONS.exists() else {}
+    key = a.resume or f"unharnessed/vm/{uuid.uuid4()}"
+    resume = sessions.get(key) if a.resume else None
+    if a.resume and not resume:
+        sys.exit(f"unknown session {a.resume}")
+    run_id = runs.start(origin={"channel": "test", "runtime": "unharnessed", "session_id": key}, goal=prompt,
+                        privacy_class="cloud_allowed")
+    runs.safe(runs.routing, run_id, {"applied": False, "configured": True, "via": f"walter-llm poste {a.task}"})
+    t0 = time.time()
+    ctx, notes = ("", []) if a.context == "off" else walter_context(prompt, key, not resume, run_id, a.context)
+    message = (f"<walter-context>\n{ctx}\n</walter-context>\n\n" if ctx else "") + prompt
+    write_models(run_id)
+    argv = [str(BIN), "--mode", "json", "-p", "--provider", "walter", "--model", a.task,
+            "--append-system-prompt", profile(), "--background-wait-ms", str(min(a.timeout, 600) * 1000)]
+    if resume:
+        argv += ["-r", resume]
+    status, res = "failed", parse_stream("")
+    r = subprocess.CompletedProcess(argv, 124, stdout="", stderr="timeout")
+    try:
+        workdir = WORKSPACE / a.workdir if a.workdir else WORKSPACE
+        if WORKSPACE.resolve() not in [workdir.resolve(), *workdir.resolve().parents]:
+            sys.exit("--workdir must stay inside the lab workspace")
+        workdir.mkdir(parents=True, exist_ok=True)
+        r = bubble(argv + ["--", message], timeout=a.timeout, cwd=workdir,
+                   env={"WALTER_RUN_ID": run_id, "WALTER_SESSION_KEY": key, "UNHARNESSED_STDIN_TIMEOUT_MS": "0"})
+        res = parse_stream(r.stdout)
+        status = "ended" if r.returncode == 0 and res["answer"] is not None and not res["errors"] else "failed"
+    except subprocess.TimeoutExpired as e:
+        out = e.stdout.decode(errors="replace") if isinstance(e.stdout, bytes) else (e.stdout or "")
+        r = subprocess.CompletedProcess(argv, 124, stdout=out, stderr="timeout")
+        res = parse_stream(out)
+    finally:
+        write_models(None)        # no stale run id for the next caller
+        runs.safe(runs.end, run_id, status)
+    if res.get("session_file"):
+        sessions[key] = res["session_file"]
+    elif res.get("session_id"):
+        sessions[key] = res["session_id"]
+    SESSIONS.write_text(json.dumps(sessions, indent=1))
+    served, planned = [], None
+    for wait in (0.5, 2.0):               # the gateway records its call after the stream ends: give it a moment
+        time.sleep(wait)
+        try:
+            found = json.loads(subprocess.run(["walter-memory", "runs", "show", run_id], capture_output=True,
+                                              text=True, timeout=30).stdout or "{}")
+        except (OSError, ValueError, subprocess.SubprocessError):
+            break
+        run_row = found.get("run") or {}
+        served = sorted({f"{c.get('provider')}/{c.get('model_id')}" for c in found.get("model_calls") or []})
+        planned = run_row.get("requested") or (run_row.get("routing") or {}).get("requested")
+        if served or not res["turns"]:
+            break
+    summary = {"ok": status == "ended", "session": key, "run_id": run_id, "task": a.task, "planned": planned,
+               "served_by": served, "rc": r.returncode,
+               "seconds": round(time.time() - t0, 1), "context_chars": len(ctx), "context_notes": notes,
+               **{k: v for k, v in res.items() if k != "answer"}, "answer": res["answer"],
+               "stderr_tail": r.stderr[-800:] if r.returncode else ""}
+    stamp = time.strftime("%Y%m%dT%H%M%S")
+    (RUNS / f"{stamp}-{run_id[:8]}.jsonl").write_text(r.stdout)
+    with (RUNS / "summary.jsonl").open("a") as f:
+        f.write(json.dumps({k: v for k, v in summary.items() if k != "answer"} | {"at": stamp}) + "\n")
+    print(r.stdout if a.raw else json.dumps(summary, ensure_ascii=False, indent=1))
+    return 0 if summary["ok"] else 1
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(prog="walter-unharnessed", description=__doc__.split("\n\n")[0])
+    sub = p.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("setup").set_defaults(fn=setup)
+    sub.add_parser("check").set_defaults(fn=check)
+    sub.add_parser("prompt").set_defaults(fn=prompt_cmd)
+    r = sub.add_parser("run")
+    r.add_argument("--task", choices=TASKS, default="auto",
+                   help="Router task; auto = the task and level walter-context's plan wrote on the run (as DSH)")
+    r.add_argument("--context", choices=("pack", "legacy", "off"), default="pack",
+                   help="pack = walter-context (DSH's mode), legacy = memory block, off = the bare harness")
+    r.add_argument("--resume", help="walter session key of an earlier run (unharnessed/vm/<uuid>)")
+    r.add_argument("--timeout", type=int, default=900)
+    r.add_argument("--workdir", help="sub-folder of the lab workspace to work in (created)")
+    r.add_argument("--raw", action="store_true", help="print Unharnessed's JSON event stream instead of the summary")
+    r.add_argument("prompt", nargs="+")
+    r.set_defaults(fn=run)
+    a = p.parse_args()
+    return a.fn(a)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

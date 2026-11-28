@@ -1,0 +1,7 @@
+{
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "claude_code",
+ "reason": "Monsieur 2026-10-26: split the living-room TV skill into isolated procedures (fast TV access, playback, maintenance), each with what worked and what did not, so the next agent does not lose time. Built from the hub skill android-tv-stremio-dongle and today's Hermes/Codex/Claude Code TV sessions; commands checked read-only on the real dongle.",
+ "store_sha": "1c6c155fd8c88bd401127f38711c81245ce7fff720421d055795c48a7787819c"
+}

@@ -1,0 +1,18 @@
+# Source of /etc/systemd/system/walter-web-gate.service (installed by copy).
+# Access gate between the Cloudflare tunnel and the engine's web door for the public address (2026-11-15;
+# walter-engine since 2026-11-17, dsh-web removed 2026-11-18).
+[Unit]
+Description=W.Alter web Access gate (Cloudflare Access -> Walter web sign-in)
+After=network-online.target walter-engine.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/node /walter/core/interfaces/web/access-gate/gate.mjs /user/Lucas/config/core/web-gate.json
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
