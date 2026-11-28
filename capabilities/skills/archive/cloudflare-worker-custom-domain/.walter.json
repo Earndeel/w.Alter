@@ -1,5 +1,8 @@
 {
+ "archived_at": "2026-11-28T04:15:09+00:00",
+ "archived_reason": "not read for 30 days",
  "content_since": "2026-04-12T15:57:37Z",
+ "domain": "cloudflare",
  "hermes": {
   "path": "/root/.hermes/skills/cloud/cloudflare-worker-custom-domain",
   "sha": "7f4cb7caf56b9f38b05af5af32ec2465b0f21c87b5a63a998dc3f554e92995dc",
@@ -8,5 +11,6 @@
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
+ "reserve": true,
  "store_sha": "7f4cb7caf56b9f38b05af5af32ec2465b0f21c87b5a63a998dc3f554e92995dc"
 }
