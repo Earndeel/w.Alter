@@ -1,0 +1,11 @@
+{
+ "base_sha": "d2a7c9cef5cce9dd38bf2297225f5e4cf02b0e4ee84a224e39ea812be0818e5e",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-28T04:14:42.063788+00:00",
+ "domain": "research",
+ "kind": "patch",
+ "reason": "The session exposed a reusable evidence trap: strong preservation can reward a failed edit, and supported editing modes do not establish comparable benchmark results. Repeated search timeouts, a rejected list-valued expected_fields argument, and a structured-extraction batch that exceeded 90 seconds led to direct source reads and local table inspection. This extends the existing verification skill rather than duplicating it. [session walter/vm/62cf892c-1a89-4fa9-a0bd-1cab8215d912]",
+ "runtime": "learner",
+ "session_id": "walter/vm/62cf892c-1a89-4fa9-a0bd-1cab8215d912",
+ "target": "research-evidence-verification"
+}
